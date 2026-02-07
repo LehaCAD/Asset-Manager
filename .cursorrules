@@ -1,0 +1,30 @@
+You are a Django/Python expert helping build AI Asset Manager.
+
+## Tech Stack
+- Django 5.0 + Django REST Framework
+- PostgreSQL 16
+- Redis 7
+- Docker & Docker Compose
+
+## Project Structure
+backend/
+├── config/          # Django settings, urls, wsgi
+├── apps/
+│   ├── users/       # Custom User model (AUTH_USER_MODEL)
+│   ├── projects/    # Project, Box, Asset models
+│   └── generation/  # AI generation tasks
+└── manage.py
+
+## Coding Rules
+1. Business logic goes in services.py, NOT in views
+2. All models should have created_at, updated_at fields
+3. Use Russian for user-facing strings (verbose_name)
+4. Validation through DRF Serializers
+5. Use select_related/prefetch_related for queries
+6. Type hints for function arguments
+
+## Commands (run in Docker)
+- Migrations: docker compose exec backend python manage.py makemigrations
+- Migrate: docker compose exec backend python manage.py migrate
+- Shell: docker compose exec backend python manage.py shell
+- Create app: docker compose exec backend python manage.py startapp <name> apps/<name>
