@@ -30,7 +30,7 @@ services:
   backend:
     build: ./backend
     container_name: apom_backend
-    command: python manage.py runserver 0.0.0.0:8000
+    command: daphne -b 0.0.0.0 -p 8000 config.asgi:application
     volumes:
       - ./backend:/app
     ports:
@@ -81,6 +81,20 @@ services:
       - backend
       - redis
       - db
+
+  frontend:
+    build: ./frontend
+    container_name: apom_frontend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - backend
 
 volumes:
   postgres_data:
