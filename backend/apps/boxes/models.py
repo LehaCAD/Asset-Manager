@@ -17,6 +17,15 @@ class Box(models.Model):
         default=0,
         verbose_name='Порядковый номер'
     )
+    headliner = models.ForeignKey(
+        'assets.Asset',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='headliner_for_box',
+        verbose_name='Хедлайнер',
+        help_text='Главный ассет — обложка бокса на сценарном столе'
+    )
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name='Дата создания'

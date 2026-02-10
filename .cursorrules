@@ -1,30 +1,83 @@
-You are a Django/Python expert helping build AI Asset Manager.
+# APOM - Cursor Rules for Django Development
 
-## Tech Stack
-- Django 5.0 + Django REST Framework
-- PostgreSQL 16
-- Redis 7
-- Docker & Docker Compose
+## GOLDEN RULES (CRITICAL)
+1. Max 45% context usage per session
+2. Max 15 exchanges per feature
+3. /clear after EVERY feature completion
+4. Never work on 2 features simultaneously
 
-## Project Structure
-backend/
-├── config/          # Django settings, urls, wsgi
-├── apps/
-│   ├── users/       # Custom User model (AUTH_USER_MODEL)
-│   ├── projects/    # Project, Box, Asset models
-│   └── generation/  # AI generation tasks
-└── manage.py
+## DO NOT AUTO-LOAD
+- Any .md files (README.md, VISION.md, ARCHITECTURE.md, docs/)
+- Test files (test_*.py, tests/, conftest.py)
+- Migrations (migrations/*.py)
+- Config files (.env, secrets.*, __pycache__, .pytest_cache/)
+- Status tracking (PROGRESS.md, TASK_SUMMARY.md)
 
-## Coding Rules
-1. Business logic goes in services.py, NOT in views
-2. All models should have created_at, updated_at fields
-3. Use Russian for user-facing strings (verbose_name)
-4. Validation through DRF Serializers
-5. Use select_related/prefetch_related for queries
-6. Type hints for function arguments
+Exception: Load if explicitly referenced with @filename
 
-## Commands (run in Docker)
-- Migrations: docker compose exec backend python manage.py makemigrations
-- Migrate: docker compose exec backend python manage.py migrate
-- Shell: docker compose exec backend python manage.py shell
-- Create app: docker compose exec backend python manage.py startapp <name> apps/<name>
+## ALWAYS LOAD (small & critical)
+- config/settings.py (Django configuration)
+- requirements.txt (dependencies)
+
+## Per-Feature: Load ONLY Current App
+When building feature in @apps/X/:
+- Load ONLY @apps/X/ folder (current feature)
+- Load @apps/users/ (if AUTH_USER_MODEL is needed)
+- Do NOT load other @apps/ folders
+- Do NOT load any .md files
+
+## Output Rules Per Feature Task
+Create ONLY:
+1. models.py (with created_at, updated_at)
+2. serializers.py (DRF serializers with validation)
+3. views.py (viewsets, actions)
+4. urls.py (routes)
+5. services.py (business logic)
+6. tests.py (pytest tests - MUST pass)
+
+Do NOT create:
+- README.md если я не прошу об этом напрямую
+- __init__.py
+- migrations/ (Django handles)
+- forms.py (using DRF)
+
+## Django Code Standards
+- All models inherit from models.Model
+- Foreign keys: on_delete=models.CASCADE + related_name
+- All strings: verbose_name="Русский текст"
+- All models: created_at = models.DateTimeField(auto_now_add=True)
+- All models: updated_at = models.DateTimeField(auto_now=True)
+
+## DRF Standards
+- Business logic in services.py (NOT in views!)
+- Validation in serializers (custom validate_*() methods)
+- Views use select_related/prefetch_related
+- Type hints: def method(self, obj: Model) -> str:
+- Error handling with DRF exceptions
+
+## Type Hints (Required)
+from typing import Optional, List
+def create_asset(user: User, name: str) -> Asset:
+    pass
+
+## Testing
+- Tests in @apps/X/tests.py
+- Pytest (not unittest)
+- Command: pytest apps/X/tests.py -v
+- All tests MUST pass before /clear
+
+## Git Workflow
+- 1 feature = 1 commit
+- Format: git commit -m "feat: feature_name (description)"
+- Example: git commit -m "feat: projects (CRUD + permissions)"
+
+## When User References @PROJECT_SPEC.md
+- Read ONLY the referenced section
+- Do NOT load entire file
+- Focus narrowly on that feature requirements
+- Ask for clarification if ambiguous
+
+## Context Monitoring
+- If context > 45%: Tell user "Context 45%+, time for /clear"
+- If no progress 3+ exchanges: Suggest "/clear"
+- After 15 exchanges: Remind user about /clear

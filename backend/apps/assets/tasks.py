@@ -11,6 +11,37 @@ from .services import substitute_variables
 from apps.boxes.s3_utils import upload_file_to_s3, generate_unique_filename
 
 
+def notify_asset_status(asset: Asset, status: str, file_url: str = '', error_message: str = '') -> None:
+    """
+    Отправить WebSocket-уведомление об изменении статуса ассета.
+    Вызывается из Celery-задач при завершении/ошибке генерации.
+    """
+    try:
+        from channels.layers import get_channel_layer
+        from asgiref.sync import async_to_sync
+
+        channel_layer = get_channel_layer()
+        if channel_layer is None:
+            return
+
+        project_id = asset.box.project_id
+        group_name = f'project_{project_id}'
+
+        async_to_sync(channel_layer.group_send)(
+            group_name,
+            {
+                'type': 'asset_status_changed',
+                'asset_id': asset.id,
+                'status': status,
+                'file_url': file_url,
+                'thumbnail_url': asset.thumbnail_url or '',
+                'error_message': error_message,
+            }
+        )
+    except Exception as e:
+        print(f"⚠️ Не удалось отправить WebSocket-уведомление: {e}")
+
+
 @shared_task
 def test_task(message: str) -> str:
     """
@@ -92,10 +123,11 @@ def start_generation(self, asset_id: int) -> dict:
         if asset.generation_config:
             context.update(asset.generation_config)
         
-        # Если есть родительский ассет (для img2vid)
+        # Если есть родительский ассет (для img2vid) — передаем URL в input_urls
         if asset.parent_asset and asset.parent_asset.file_url:
-            # Для Kie.ai: одна переменная image_url для массива input_urls
-            context['image_url'] = asset.parent_asset.file_url
+            context['input_urls'] = [asset.parent_asset.file_url]
+        else:
+            context['input_urls'] = []
         
         # Подставляем переменные в request_schema
         request_body = substitute_variables(ai_model.request_schema, context)
@@ -172,6 +204,7 @@ def start_generation(self, asset_id: int) -> dict:
             asset.status = Asset.STATUS_FAILED
             asset.error_message = str(e)
             asset.save()
+            notify_asset_status(asset, 'FAILED', error_message=str(e))
         except Asset.DoesNotExist:
             pass
         
@@ -283,6 +316,9 @@ def check_generation_status(self, asset_id: int) -> dict:
             asset.status = Asset.STATUS_COMPLETED
             asset.save()
             
+            # WebSocket-уведомление
+            notify_asset_status(asset, 'COMPLETED', file_url=s3_url)
+            
             print(f"✅ Asset #{asset_id} завершен! URL: {s3_url}")
             
             return {
@@ -298,6 +334,9 @@ def check_generation_status(self, asset_id: int) -> dict:
             asset.status = Asset.STATUS_FAILED
             asset.error_message = fail_msg
             asset.save()
+            
+            # WebSocket-уведомление
+            notify_asset_status(asset, 'FAILED', error_message=fail_msg)
             
             print(f"❌ Генерация failed: {fail_msg}")
             

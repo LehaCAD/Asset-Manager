@@ -3,7 +3,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from .models import Box
-from .serializers import BoxSerializer
+from .serializers import BoxSerializer, ReorderSerializer
+from .services import reorder_boxes
 from .s3_utils import upload_file_to_s3, detect_asset_type
 
 
@@ -32,7 +33,7 @@ class BoxViewSet(viewsets.ModelViewSet):
         """Возвращает только боксы проектов текущего пользователя с фильтрацией."""
         queryset = Box.objects.filter(
             project__user=self.request.user
-        ).select_related('project').prefetch_related('assets')
+        ).select_related('project', 'headliner').prefetch_related('assets')
         
         # Фильтрация по project через query params
         project_id = self.request.query_params.get('project', None)
@@ -237,3 +238,65 @@ class BoxViewSet(viewsets.ModelViewSet):
                 {'error': f'Failed to start generation: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsProjectOwner])
+    def set_headliner(self, request, pk=None):
+        """
+        Назначить хедлайнера для бокса.
+        
+        POST /api/boxes/{id}/set_headliner/
+        
+        Принимает:
+        - asset_id: ID ассета (обязательно). Передать null для сброса хедлайнера.
+        """
+        box = self.get_object()
+        asset_id = request.data.get('asset_id')
+
+        if asset_id is None:
+            box.headliner = None
+            box.save(update_fields=['headliner', 'updated_at'])
+            return Response(BoxSerializer(box).data)
+
+        from apps.assets.models import Asset
+        try:
+            asset = Asset.objects.get(id=asset_id, box=box)
+        except Asset.DoesNotExist:
+            return Response(
+                {'error': 'Ассет не найден или не принадлежит этому боксу.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        box.headliner = asset
+        box.save(update_fields=['headliner', 'updated_at'])
+        return Response(BoxSerializer(box).data)
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def reorder(self, request):
+        """
+        Изменить порядок боксов.
+        
+        POST /api/boxes/reorder/
+        
+        Принимает:
+        - box_ids: [1, 3, 2, ...] — список ID боксов в новом порядке
+        """
+        serializer = ReorderSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        box_ids = serializer.validated_data['box_ids']
+
+        # Проверяем, что все боксы принадлежат пользователю
+        user_box_ids = set(
+            Box.objects.filter(
+                project__user=request.user,
+                id__in=box_ids
+            ).values_list('id', flat=True)
+        )
+        if set(box_ids) != user_box_ids:
+            return Response(
+                {'error': 'Некоторые боксы не найдены или не принадлежат вам.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        reorder_boxes(box_ids)
+        return Response({'status': 'ok'})
