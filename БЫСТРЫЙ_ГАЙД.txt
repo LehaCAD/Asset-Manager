@@ -1,0 +1,120 @@
+═══════════════════════════════════════════════════════════════
+         БЫСТРЫЙ ГАЙД - ДЕПЛОЙ ЗА 15 МИНУТ
+═══════════════════════════════════════════════════════════════
+
+1. ПОДКЛЮЧИТЕСЬ К СЕРВЕРУ
+
+   ssh root@85.239.56.80
+   (пароль: qk_sAs#7qBPE5j)
+
+───────────────────────────────────────────────────────────────
+
+2. УСТАНОВИТЕ DOCKER (выполните на сервере)
+
+   curl -fsSL https://get.docker.com | sh
+   apt install docker-compose-plugin -y
+
+───────────────────────────────────────────────────────────────
+
+3. ЗАГРУЗИТЕ ПРОЕКТ
+
+   Вариант 1: Используйте WinSCP
+   - Скачайте: https://winscp.net/eng/download.php
+   - Подключитесь к 85.239.56.80 (root / qk_sAs#7qBPE5j)
+   - Перетащите папку проекта в /var/www/asset-manager
+
+   Вариант 2: Через архив
+   - На вашем компе создайте архив (см. РУЧНОЙ_ДЕПЛОЙ.md)
+   - Загрузите через WinSCP в /tmp/
+   - На сервере:
+     mkdir -p /var/www/asset-manager
+     cd /var/www/asset-manager
+     tar -xzf /tmp/deploy.tar.gz
+
+───────────────────────────────────────────────────────────────
+
+4. СОЗДАЙТЕ .env.production НА СЕРВЕРЕ
+
+   cd /var/www/asset-manager
+   nano .env.production
+
+   Вставьте (скопируйте из файла .env.production на вашем компе):
+
+DEBUG=False
+SECRET_KEY=Y{1!Y\&s8W>YqhgU9N^~SBC->Q&2/<UzxGb2vdd+2g!6X:3aRk
+ALLOWED_HOSTS=raskadrawka.ru,www.raskadrawka.ru,85.239.56.80,localhost,backend
+POSTGRES_DB=apom_production
+POSTGRES_USER=apom_user
+POSTGRES_PASSWORD=rc8Q>FPR$k
+DB_HOST=db
+DB_PORT=5432
+REDIS_HOST=redis
+CELERY_BROKER_URL=redis://redis:6379/0
+CELERY_RESULT_BACKEND=redis://redis:6379/0
+AWS_ACCESS_KEY_ID=9IK65D3WEVBF7OP7GS42
+AWS_SECRET_ACCESS_KEY=N4r1GOADgA4He7NV2wcRt6bYb02cdsAVxS2IJqhy
+AWS_STORAGE_BUCKET_NAME=ai-production-asset-managemer
+AWS_S3_REGION_NAME=ru-1
+AWS_S3_ENDPOINT_URL=https://s3.timeweb.com
+NEXT_PUBLIC_API_URL=https://raskadrawka.ru
+
+   Сохраните: Ctrl+O, Enter, Ctrl+X
+
+───────────────────────────────────────────────────────────────
+
+5. ПОДГОТОВЬТЕ КОНФИГ
+
+   cp next.config.production.mjs frontend/next.config.mjs
+   mkdir -p nginx/conf.d certbot/conf certbot/www
+
+───────────────────────────────────────────────────────────────
+
+6. ЗАПУСТИТЕ DOCKER (это займет 5-10 минут)
+
+   docker compose -f docker-compose.production.yml up -d --build
+
+───────────────────────────────────────────────────────────────
+
+7. ПРИМЕНИТЕ МИГРАЦИИ
+
+   sleep 15
+   docker compose -f docker-compose.production.yml exec backend python manage.py migrate
+   docker compose -f docker-compose.production.yml exec backend python manage.py collectstatic --noinput
+
+───────────────────────────────────────────────────────────────
+
+8. СОЗДАЙТЕ АДМИНА
+
+   docker compose -f docker-compose.production.yml exec backend python manage.py createsuperuser
+
+   Введите логин, email, пароль
+
+───────────────────────────────────────────────────────────────
+
+9. ГОТОВО!
+
+   Откройте: http://raskadrawka.ru
+   Админка: http://raskadrawka.ru/admin
+
+═══════════════════════════════════════════════════════════════
+
+ПОЛЕЗНЫЕ КОМАНДЫ:
+
+Логи:
+  docker compose -f docker-compose.production.yml logs -f
+
+Перезапуск:
+  docker compose -f docker-compose.production.yml restart
+
+Статус:
+  docker ps
+
+═══════════════════════════════════════════════════════════════
+
+ЕСЛИ ЧТО-ТО НЕ РАБОТАЕТ:
+
+1. Смотрите логи (команда выше)
+2. Откройте РУЧНОЙ_ДЕПЛОЙ.md для детальной инструкции
+3. Проверьте что все контейнеры запущены: docker ps
+
+═══════════════════════════════════════════════════════════════

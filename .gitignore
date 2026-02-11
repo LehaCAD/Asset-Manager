@@ -20,6 +20,15 @@ staticfiles/
 # IDE
 .vscode/
 .idea/
+
+# Deployment
+deploy.tar.gz
+certbot/
+*.ppk
+
+# SSH keys
+private.ppk
+public
 *.swp
 *.swo
 .cursor/
