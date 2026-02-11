@@ -13,7 +13,6 @@ function LoginForm() {
   const { login, isLoading, error, clearError, isAuthenticated } = useAuthStore();
 
   useEffect(() => {
-    // If already authenticated, redirect to projects
     if (isAuthenticated) {
       const redirect = searchParams.get('redirect') || '/projects';
       router.push(redirect);
@@ -21,7 +20,6 @@ function LoginForm() {
   }, [isAuthenticated, router, searchParams]);
 
   useEffect(() => {
-    // Clear error when component unmounts
     return () => clearError();
   }, [clearError]);
 
@@ -32,80 +30,81 @@ function LoginForm() {
       const redirect = searchParams.get('redirect') || '/projects';
       router.push(redirect);
     } catch {
-      // Error is handled by the store
+      // Error handled by store
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Sign in to AI Asset Manager
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Or{' '}
-            <Link href="/register" className="font-medium text-blue-600 hover:text-blue-500">
-              create a new account
-            </Link>
-          </p>
+    <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-surface-secondary">
+      <div className="max-w-sm w-full animate-fade-in-up">
+        {/* Logo */}
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-14 h-14 rounded-2xl bg-accent flex items-center justify-center mb-4 shadow-lg shadow-accent/20">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="12 2 2 7 12 12 22 7 12 2" />
+              <polyline points="2 17 12 22 22 17" />
+              <polyline points="2 12 12 17 22 12" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-bold text-txt-primary">Вход в систему</h1>
+          <p className="text-sm text-txt-muted mt-1">Раскадровка</p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm -space-y-px">
+
+        <div className="bg-white rounded-2xl border border-surface-border shadow-sm p-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="username" className="sr-only">
-                Username
+              <label htmlFor="username" className="block text-sm font-medium text-txt-secondary mb-1.5">
+                Имя пользователя
               </label>
               <input
                 id="username"
-                name="username"
                 type="text"
                 autoComplete="username"
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="Username"
+                className="w-full px-4 py-2.5 bg-surface-secondary border border-surface-border rounded-lg text-txt-primary text-sm placeholder-txt-muted focus:border-accent focus:outline-none transition-colors"
+                placeholder="Введите логин"
               />
             </div>
             <div>
-              <label htmlFor="password" className="sr-only">
-                Password
+              <label htmlFor="password" className="block text-sm font-medium text-txt-secondary mb-1.5">
+                Пароль
               </label>
               <input
                 id="password"
-                name="password"
                 type="password"
                 autoComplete="current-password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="Password"
+                className="w-full px-4 py-2.5 bg-surface-secondary border border-surface-border rounded-lg text-txt-primary text-sm placeholder-txt-muted focus:border-accent focus:outline-none transition-colors"
+                placeholder="Введите пароль"
               />
             </div>
-          </div>
 
-          {error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <div className="flex">
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">{error}</h3>
-                </div>
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <p className="text-red-600 text-sm">{error}</p>
               </div>
-            </div>
-          )}
+            )}
 
-          <div>
             <button
               type="submit"
               disabled={isLoading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              className="w-full py-2.5 bg-accent hover:bg-accent-hover text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
             >
-              {isLoading ? 'Signing in...' : 'Sign in'}
+              {isLoading ? 'Вход...' : 'Войти'}
             </button>
-          </div>
-        </form>
+          </form>
+        </div>
+
+        <p className="text-center text-sm text-txt-muted mt-6">
+          Нет аккаунта?{' '}
+          <Link href="/register" className="text-accent hover:text-accent-hover transition-colors font-medium">
+            Создать
+          </Link>
+        </p>
       </div>
     </div>
   );
@@ -115,9 +114,7 @@ export default function LoginPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-        </div>
+        <div className="animate-spin rounded-full h-10 w-10 border-2 border-accent border-t-transparent" />
       </div>
     }>
       <LoginForm />

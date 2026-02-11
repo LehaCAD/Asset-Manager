@@ -1,5 +1,5 @@
 """
-Бизнес-логика для работы с боксами.
+Бизнес-логика для работы с сценами.
 """
 from typing import Optional, List
 from apps.projects.models import Project
@@ -8,15 +8,15 @@ from .models import Box
 
 def create_box(project: Project, name: str, order_index: int = 0) -> Box:
     """
-    Создание нового бокса.
+    Создание новой сцены.
     
     Args:
-        project: Проект, к которому относится бокс
-        name: Название бокса
+        project: Проект, к которому относится сцена
+        name: Название сцены
         order_index: Порядковый номер (по умолчанию 0)
         
     Returns:
-        Созданный бокс
+        Созданная сцена
     """
     box = Box.objects.create(
         project=project,
@@ -32,15 +32,15 @@ def update_box(
     order_index: Optional[int] = None
 ) -> Box:
     """
-    Обновление бокса.
+    Обновление сцены.
     
     Args:
-        box: Объект бокса
+        box: Объект сцены
         name: Новое название (опционально)
         order_index: Новый порядковый номер (опционально)
         
     Returns:
-        Обновленный бокс
+        Обновленная сцена
     """
     if name is not None:
         box.name = name
@@ -53,10 +53,10 @@ def update_box(
 
 def reorder_boxes(box_ids: List[int]) -> None:
     """
-    Изменение порядка боксов.
+    Изменение порядка сцен.
     
     Args:
-        box_ids: Список ID боксов в новом порядке
+        box_ids: Список ID сцен в новом порядке
     """
     for index, box_id in enumerate(box_ids):
         Box.objects.filter(id=box_id).update(order_index=index)
@@ -64,22 +64,22 @@ def reorder_boxes(box_ids: List[int]) -> None:
 
 def delete_box(box: Box) -> None:
     """
-    Удаление бокса.
+    Удаление сцены.
     
     Args:
-        box: Объект бокса для удаления
+        box: Объект сцены для удаления
     """
     box.delete()
 
 
 def get_project_boxes(project: Project) -> List[Box]:
     """
-    Получение всех боксов проекта в правильном порядке.
+    Получение всех сцен проекта в правильном порядке.
     
     Args:
         project: Проект
         
     Returns:
-        Список боксов, отсортированных по order_index и created_at
+        Список сцен, отсортированных по order_index и created_at
     """
     return list(Box.objects.filter(project=project).select_related('project'))

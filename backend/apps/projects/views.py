@@ -30,5 +30,17 @@ class ProjectViewSet(viewsets.ModelViewSet):
         return Project.objects.filter(user=self.request.user).prefetch_related('boxes')
     
     def perform_create(self, serializer):
-        """При создании автоматически устанавливает текущего пользователя."""
-        serializer.save(user=self.request.user)
+        """При создании автоматически устанавливает текущего пользователя и проверяет лимиты."""
+        user = self.request.user
+        
+        # Проверяем лимит проектов
+        user_quota = user.quota
+        current_projects_count = Project.objects.filter(user=user).count()
+        
+        if current_projects_count >= user_quota.max_projects:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied(
+                f'Достигнут лимит проектов ({user_quota.max_projects}). Обратитесь к администратору.'
+            )
+        
+        serializer.save(user=user)

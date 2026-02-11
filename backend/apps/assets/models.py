@@ -2,9 +2,9 @@ from django.db import models
 
 
 class Asset(models.Model):
-    """Модель ассета (изображение или видео)."""
+    """Модель элемента (изображение или видео)."""
     
-    # Типы ассетов
+    # Типы элементов
     ASSET_TYPE_IMAGE = 'IMAGE'
     ASSET_TYPE_VIDEO = 'VIDEO'
     
@@ -41,12 +41,17 @@ class Asset(models.Model):
         'boxes.Box',
         on_delete=models.CASCADE,
         related_name='assets',
-        verbose_name='Бокс'
+        verbose_name='Сцена'
     )
     asset_type = models.CharField(
         max_length=10,
         choices=ASSET_TYPE_CHOICES,
-        verbose_name='Тип ассета'
+        verbose_name='Тип элемента'
+    )
+    order_index = models.IntegerField(
+        default=0,
+        verbose_name='Порядковый номер',
+        help_text='Порядок отображения элемента внутри сцены'
     )
     file_url = models.URLField(
         max_length=500,
@@ -75,7 +80,7 @@ class Asset(models.Model):
         blank=True,
         related_name='generated_assets',
         verbose_name='AI Модель',
-        help_text='Модель, которая сгенерировала этот ассет'
+        help_text='Модель, которая сгенерировала этот элемент'
     )
     generation_config = models.JSONField(
         default=dict,
@@ -96,7 +101,7 @@ class Asset(models.Model):
         choices=STATUS_CHOICES,
         default=STATUS_PENDING,
         verbose_name='Статус',
-        help_text='Статус генерации ассета'
+        help_text='Статус генерации элемента'
     )
     error_message = models.TextField(
         blank=True,
@@ -108,7 +113,7 @@ class Asset(models.Model):
         choices=SOURCE_TYPE_CHOICES,
         default=SOURCE_GENERATED,
         verbose_name='Тип источника',
-        help_text='Способ создания ассета'
+        help_text='Способ создания элемента'
     )
     parent_asset = models.ForeignKey(
         'self',
@@ -116,8 +121,8 @@ class Asset(models.Model):
         null=True,
         blank=True,
         related_name='child_assets',
-        verbose_name='Родительский ассет',
-        help_text='Исходный ассет для img2vid или вариаций'
+        verbose_name='Родительский элемент',
+        help_text='Исходный элемент для img2vid или вариаций'
     )
     external_task_id = models.CharField(
         max_length=255,
@@ -137,9 +142,9 @@ class Asset(models.Model):
     )
 
     class Meta:
-        verbose_name = 'Ассет'
-        verbose_name_plural = 'Ассеты'
-        ordering = ['-created_at']
+        verbose_name = 'Элемент'
+        verbose_name_plural = 'Элементы'
+        ordering = ['order_index', 'created_at']
 
     def __str__(self) -> str:
-        return f'{self.get_asset_type_display()} #{self.id} (Бокс: {self.box.name})'
+        return f'{self.get_asset_type_display()} #{self.id} (Сцена: {self.box.name})'

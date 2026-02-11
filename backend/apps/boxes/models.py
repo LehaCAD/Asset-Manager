@@ -2,7 +2,21 @@ from django.db import models
 
 
 class Box(models.Model):
-    """Модель бокса (шота)."""
+    """Модель сцены."""
+    
+    # Статусы сцены
+    STATUS_DRAFT = 'DRAFT'
+    STATUS_IN_PROGRESS = 'IN_PROGRESS'
+    STATUS_REVIEW = 'REVIEW'
+    STATUS_APPROVED = 'APPROVED'
+    
+    STATUS_CHOICES = [
+        (STATUS_DRAFT, 'Черновик'),
+        (STATUS_IN_PROGRESS, 'В работе'),
+        (STATUS_REVIEW, 'На проверке'),
+        (STATUS_APPROVED, 'Утверждён'),
+    ]
+    
     project = models.ForeignKey(
         'projects.Project',
         on_delete=models.CASCADE,
@@ -12,6 +26,13 @@ class Box(models.Model):
     name = models.CharField(
         max_length=255,
         verbose_name='Название'
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_DRAFT,
+        verbose_name='Статус',
+        help_text='Статус сцены'
     )
     order_index = models.IntegerField(
         default=0,
@@ -23,8 +44,8 @@ class Box(models.Model):
         null=True,
         blank=True,
         related_name='headliner_for_box',
-        verbose_name='Хедлайнер',
-        help_text='Главный ассет — обложка бокса на сценарном столе'
+        verbose_name='Лучший элемент',
+        help_text='Главный элемент — обложка сцены на сценарном столе'
     )
     created_at = models.DateTimeField(
         auto_now_add=True,
@@ -36,8 +57,8 @@ class Box(models.Model):
     )
 
     class Meta:
-        verbose_name = 'Бокс (Шот)'
-        verbose_name_plural = 'Боксы (Шоты)'
+        verbose_name = 'Сцена'
+        verbose_name_plural = 'Сцены'
         ordering = ['order_index', 'created_at']
 
     def __str__(self) -> str:

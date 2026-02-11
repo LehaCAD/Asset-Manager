@@ -10,6 +10,7 @@ class BoxSerializer(serializers.ModelSerializer):
     headliner_url = serializers.SerializerMethodField()
     headliner_thumbnail_url = serializers.SerializerMethodField()
     headliner_type = serializers.SerializerMethodField()
+    status_display = serializers.SerializerMethodField()
     
     class Meta:
         model = Box
@@ -17,7 +18,9 @@ class BoxSerializer(serializers.ModelSerializer):
             'id', 
             'project', 
             'project_name',
-            'name', 
+            'name',
+            'status',
+            'status_display',
             'order_index',
             'headliner',
             'headliner_url',
@@ -30,7 +33,7 @@ class BoxSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at']
     
     def get_assets_count(self, obj: Box) -> int:
-        """Получение количества ассетов в боксе."""
+        """Получение количества элементов в сцене."""
         return obj.assets.count()
     
     def get_project_name(self, obj: Box) -> str:
@@ -38,27 +41,31 @@ class BoxSerializer(serializers.ModelSerializer):
         return obj.project.name
 
     def get_headliner_url(self, obj: Box) -> str:
-        """URL файла хедлайнера для обложки бокса."""
+        """URL файла лучшего элемента для обложки сцены."""
         if obj.headliner:
             return obj.headliner.file_url
         return ''
 
     def get_headliner_thumbnail_url(self, obj: Box) -> str:
-        """URL превью хедлайнера."""
+        """URL превью лучшего элемента."""
         if obj.headliner:
             return obj.headliner.thumbnail_url or obj.headliner.file_url
         return ''
 
     def get_headliner_type(self, obj: Box) -> str:
-        """Тип хедлайнера (IMAGE/VIDEO) — нужен фронту для hover-проигрывания."""
+        """Тип лучшего элемента (IMAGE/VIDEO) — нужен фронту для hover-проигрывания."""
         if obj.headliner:
             return obj.headliner.asset_type
         return ''
+    
+    def get_status_display(self, obj: Box) -> str:
+        """Получение читаемого статуса."""
+        return obj.get_status_display()
 
 
 class ReorderSerializer(serializers.Serializer):
-    """Сериализатор для изменения порядка боксов."""
+    """Сериализатор для изменения порядка сцен."""
     box_ids = serializers.ListField(
         child=serializers.IntegerField(),
-        help_text='Список ID боксов в новом порядке'
+        help_text='Список ID сцен в новом порядке'
     )

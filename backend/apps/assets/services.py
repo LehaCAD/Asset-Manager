@@ -1,5 +1,5 @@
 """
-Бизнес-логика для работы с ассетами.
+Бизнес-логика для работы с элементами.
 """
 from typing import Optional, List, Dict, Any
 import re
@@ -27,20 +27,15 @@ def substitute_variables(request_schema: Dict[str, Any], context: Dict[str, Any]
     def replace_value(value: Any) -> Any:
         """Рекурсивная замена значений."""
         if isinstance(value, dict):
-            # Рекурсивно обрабатываем словари
             return {k: replace_value(v) for k, v in value.items()}
         elif isinstance(value, list):
-            # Рекурсивно обрабатываем списки
             return [replace_value(item) for item in value]
         elif isinstance(value, str):
-            # Проверяем, является ли вся строка одним плейсхолдером {{variable}}
             full_match = re.match(r'^\{\{([^}]+)\}\}$', value.strip())
             if full_match:
                 var_name = full_match.group(1).strip()
-                # Возвращаем значение из context как есть (может быть любой тип)
                 return context.get(var_name, value)
             
-            # Иначе заменяем все {{variable}} в строке на их строковые значения
             pattern = r'\{\{([^}]+)\}\}'
             
             def replacer(match):
@@ -50,7 +45,6 @@ def substitute_variables(request_schema: Dict[str, Any], context: Dict[str, Any]
             
             return re.sub(pattern, replacer, value)
         else:
-            # Примитивные типы возвращаем как есть
             return value
     
     return replace_value(request_schema)
@@ -65,18 +59,18 @@ def create_asset(
     is_favorite: bool = False
 ) -> Asset:
     """
-    Создание нового ассета.
+    Создание нового элемента.
     
     Args:
-        box: Бокс, к которому относится ассет
-        asset_type: Тип ассета (IMAGE или VIDEO)
+        box: Сцена, к которой относится элемент
+        asset_type: Тип элемента (IMAGE или VIDEO)
         file_url: URL файла (опционально)
         thumbnail_url: URL превью (опционально)
         prompt_text: Текст промпта (опционально)
         is_favorite: Избранное (по умолчанию False)
         
     Returns:
-        Созданный ассет
+        Созданный элемент
     """
     asset = Asset.objects.create(
         box=box,
@@ -97,17 +91,17 @@ def update_asset(
     is_favorite: Optional[bool] = None
 ) -> Asset:
     """
-    Обновление ассета.
+    Обновление элемента.
     
     Args:
-        asset: Объект ассета
+        asset: Объект элемента
         file_url: Новый URL файла (опционально)
         thumbnail_url: Новый URL превью (опционально)
         prompt_text: Новый текст промпта (опционально)
         is_favorite: Новое значение избранного (опционально)
         
     Returns:
-        Обновленный ассет
+        Обновленный элемент
     """
     if file_url is not None:
         asset.file_url = file_url
@@ -127,10 +121,10 @@ def toggle_favorite(asset: Asset) -> Asset:
     Переключение статуса избранного.
     
     Args:
-        asset: Объект ассета
+        asset: Объект элемента
         
     Returns:
-        Обновленный ассет
+        Обновленный элемент
     """
     asset.is_favorite = not asset.is_favorite
     asset.save()
@@ -139,24 +133,24 @@ def toggle_favorite(asset: Asset) -> Asset:
 
 def delete_asset(asset: Asset) -> None:
     """
-    Удаление ассета.
+    Удаление элемента.
     
     Args:
-        asset: Объект ассета для удаления
+        asset: Объект элемента для удаления
     """
     asset.delete()
 
 
 def get_box_assets(box: Box, asset_type: Optional[str] = None) -> List[Asset]:
     """
-    Получение всех ассетов бокса.
+    Получение всех элементов сцены.
     
     Args:
-        box: Бокс
+        box: Сцена
         asset_type: Фильтр по типу (IMAGE или VIDEO), опционально
         
     Returns:
-        Список ассетов, отсортированных по дате создания (новые первыми)
+        Список элементов, отсортированных по дате создания (новые первыми)
     """
     queryset = Asset.objects.filter(box=box).select_related('box', 'box__project')
     
@@ -168,15 +162,26 @@ def get_box_assets(box: Box, asset_type: Optional[str] = None) -> List[Asset]:
 
 def get_favorite_assets(box: Box) -> List[Asset]:
     """
-    Получение избранных ассетов бокса.
+    Получение избранных элементов сцены.
     
     Args:
-        box: Бокс
+        box: Сцена
         
     Returns:
-        Список избранных ассетов
+        Список избранных элементов
     """
     return list(
         Asset.objects.filter(box=box, is_favorite=True)
         .select_related('box', 'box__project')
     )
+
+
+def reorder_assets(asset_ids: List[int]) -> None:
+    """
+    Изменение порядка элементов.
+    
+    Args:
+        asset_ids: Список ID элементов в новом порядке
+    """
+    for index, asset_id in enumerate(asset_ids):
+        Asset.objects.filter(id=asset_id).update(order_index=index)

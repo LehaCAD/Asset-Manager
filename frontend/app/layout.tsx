@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import AuthProvider from "@/components/AuthProvider";
 import Navbar from "@/components/Navbar";
+import ToastProvider from "@/components/ToastProvider";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -16,8 +17,8 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "AI Asset Manager",
-  description: "AI-powered asset management for creative projects",
+  title: "Раскадровка",
+  description: "Визуальный менеджер нейро-продакшена",
 };
 
 export default function RootLayout({
@@ -26,13 +27,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="ru">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white text-txt-primary min-h-screen`}
       >
         <AuthProvider>
           <Navbar />
-          {children}
+          <main>{children}</main>
+          <ToastProvider />
         </AuthProvider>
       </body>
     </html>

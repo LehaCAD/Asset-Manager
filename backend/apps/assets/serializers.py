@@ -17,6 +17,7 @@ class AssetSerializer(serializers.ModelSerializer):
             'box',
             'box_name',
             'asset_type',
+            'order_index',
             'file_url',
             'thumbnail_url',
             'is_favorite',
@@ -38,7 +39,7 @@ class AssetSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at', 'external_task_id']
     
     def get_box_name(self, obj) -> str:
-        """Получение названия бокса."""
+        """Получение названия сцены."""
         return obj.box.name
     
     def get_ai_model_name(self, obj) -> str:
@@ -54,3 +55,11 @@ class AssetSerializer(serializers.ModelSerializer):
     def get_source_type_display(self, obj) -> str:
         """Получение читаемого типа источника."""
         return obj.get_source_type_display()
+
+
+class ReorderSerializer(serializers.Serializer):
+    """Сериализатор для изменения порядка элементов."""
+    asset_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        help_text='Список ID элементов в новом порядке'
+    )
