@@ -45,8 +45,8 @@ INSTALLED_APPS = [
     'storages',  # django-storages для S3
     'apps.users',
     'apps.projects',
-    'apps.boxes',
-    'apps.assets',
+    'apps.scenes',
+    'apps.elements',
     'apps.ai_providers',
     'apps.sharing',
 ]

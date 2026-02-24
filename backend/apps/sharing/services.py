@@ -5,7 +5,7 @@ from typing import Optional, List
 from datetime import datetime, timedelta
 from django.utils import timezone
 from apps.projects.models import Project
-from apps.boxes.models import Box
+from apps.scenes.models import Scene
 from .models import SharedLink, Comment
 
 
@@ -81,15 +81,15 @@ def get_active_links(project: Project) -> List[SharedLink]:
 
 
 def create_comment(
-    box: Box,
+    scene: Scene,
     author_name: str,
     text: str
 ) -> Comment:
     """
-    Создание комментария к боксу.
+    Создание комментария к сцене.
     
     Args:
-        box: Бокс
+        scene: Сцена
         author_name: Имя автора комментария
         text: Текст комментария
         
@@ -97,7 +97,7 @@ def create_comment(
         Созданный комментарий
     """
     comment = Comment.objects.create(
-        box=box,
+        scene=scene,
         author_name=author_name,
         text=text
     )
@@ -119,18 +119,18 @@ def mark_comment_as_read(comment: Comment) -> Comment:
     return comment
 
 
-def get_box_comments(box: Box, unread_only: bool = False) -> List[Comment]:
+def get_scene_comments(scene: Scene, unread_only: bool = False) -> List[Comment]:
     """
-    Получение комментариев бокса.
+    Получение комментариев сцены.
     
     Args:
-        box: Бокс
+        scene: Сцена
         unread_only: Только непрочитанные
         
     Returns:
         Список комментариев
     """
-    queryset = Comment.objects.filter(box=box).select_related('box', 'box__project')
+    queryset = Comment.objects.filter(scene=scene).select_related('scene', 'scene__project')
     
     if unread_only:
         queryset = queryset.filter(is_read=False)
@@ -150,8 +150,8 @@ def get_project_comments(project: Project, unread_only: bool = False) -> List[Co
         Список комментариев
     """
     queryset = Comment.objects.filter(
-        box__project=project
-    ).select_related('box', 'box__project')
+        scene__project=project
+    ).select_related('scene', 'scene__project')
     
     if unread_only:
         queryset = queryset.filter(is_read=False)
@@ -170,6 +170,6 @@ def get_unread_count(project: Project) -> int:
         Количество непрочитанных комментариев
     """
     return Comment.objects.filter(
-        box__project=project,
+        scene__project=project,
         is_read=False
     ).count()

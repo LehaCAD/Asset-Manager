@@ -34,12 +34,12 @@ class UserQuota(models.Model):
         verbose_name='Максимум проектов',
         help_text='Максимальное количество проектов пользователя'
     )
-    max_boxes_per_project = models.IntegerField(
+    max_scenes_per_project = models.IntegerField(
         default=20,
         verbose_name='Максимум сцен на проект',
         help_text='Максимальное количество сцен в одном проекте'
     )
-    max_assets_per_box = models.IntegerField(
+    max_elements_per_scene = models.IntegerField(
         default=10,
         verbose_name='Максимум элементов на сцену',
         help_text='Максимальное количество элементов в одной сцене'
@@ -58,7 +58,7 @@ class UserQuota(models.Model):
         verbose_name_plural = 'Квоты пользователей'
 
     def __str__(self) -> str:
-        return f'Квота: {self.user.username} (Проекты: {self.max_projects}, Сцены: {self.max_boxes_per_project}, Элементы: {self.max_assets_per_box})'
+        return f'Квота: {self.user.username} (Проекты: {self.max_projects}, Сцены: {self.max_scenes_per_project}, Элементы: {self.max_elements_per_scene})'
 
 
 @receiver(post_save, sender=User)

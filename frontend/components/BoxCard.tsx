@@ -6,14 +6,14 @@ import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { type Box } from '@/lib/api';
+import { type Scene } from '@/lib/api';
 import DropdownMenu from './ui/DropdownMenu';
 import ConfirmDialog from './ui/ConfirmDialog';
 import Modal from './ui/Modal';
 import { useProjectsStore } from '@/lib/store/projects';
 
 interface BoxCardProps {
-  box: Box;
+  scene: Scene;
   index: number;
   aspectClass?: string;
 }
@@ -25,8 +25,8 @@ const STATUS_CONFIG = {
   APPROVED: { label: 'Утверждён', color: 'bg-green-100 text-green-700' },
 } as const;
 
-export default function BoxCard({ box, index, aspectClass = 'aspect-video' }: BoxCardProps) {
-  const { updateBox, deleteBox } = useProjectsStore();
+export default function BoxCard({ scene, index, aspectClass = 'aspect-video' }: BoxCardProps) {
+  const { updateScene, deleteScene } = useProjectsStore();
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -37,18 +37,18 @@ export default function BoxCard({ box, index, aspectClass = 'aspect-video' }: Bo
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: box.id });
+  } = useSortable({ id: scene.id });
 
   const [showRename, setShowRename] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [showStatus, setShowStatus] = useState(false);
-  const [newName, setNewName] = useState(box.name);
+  const [newName, setNewName] = useState(scene.name);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [isHovering, setIsHovering] = useState(false);
 
-  const hasHeadliner = !!box.headliner_url;
-  const isVideo = box.headliner_type === 'VIDEO';
+  const hasHeadliner = !!scene.headliner_url;
+  const isVideo = scene.headliner_type === 'VIDEO';
   const mediaFitClass = aspectClass === 'aspect-vertical' ? 'object-contain' : 'object-cover';
 
   const style = {
@@ -62,7 +62,7 @@ export default function BoxCard({ box, index, aspectClass = 'aspect-video' }: Bo
     setLoading(true);
     setError('');
     try {
-      await updateBox(box.id, { name: newName.trim() });
+      await updateScene(scene.id, { name: newName.trim() });
       toast.success('Сцена переименована');
       setShowRename(false);
     } catch (e) {
@@ -74,10 +74,10 @@ export default function BoxCard({ box, index, aspectClass = 'aspect-video' }: Bo
     }
   };
 
-  const handleStatusChange = async (newStatus: Box['status']) => {
+  const handleStatusChange = async (newStatus: Scene['status']) => {
     setLoading(true);
     try {
-      await updateBox(box.id, { status: newStatus });
+      await updateScene(scene.id, { status: newStatus });
       toast.success('Статус сцены изменён');
       setShowStatus(false);
     } catch (e) {
@@ -92,7 +92,7 @@ export default function BoxCard({ box, index, aspectClass = 'aspect-video' }: Bo
   const handleDelete = async () => {
     setLoading(true);
     try {
-      await deleteBox(box.id);
+      await deleteScene(scene.id);
       toast.success('Сцена удалена');
       setShowDelete(false);
     } catch (e) {
@@ -138,7 +138,7 @@ export default function BoxCard({ box, index, aspectClass = 'aspect-video' }: Bo
         </svg>
       ),
       onClick: () => {
-        setNewName(box.name);
+        setNewName(scene.name);
         setError('');
         setShowRename(true);
       },
@@ -157,7 +157,7 @@ export default function BoxCard({ box, index, aspectClass = 'aspect-video' }: Bo
   ];
 
   const handleCardClick = () => {
-    router.push(`/projects/${box.project}/boxes/${box.id}`);
+    router.push(`/projects/${scene.project}/boxes/${scene.id}`);
   };
 
   return (
@@ -177,15 +177,15 @@ export default function BoxCard({ box, index, aspectClass = 'aspect-video' }: Bo
               {isVideo ? (
                 <>
                   <Image
-                    src={box.headliner_thumbnail_url || box.headliner_url}
-                    alt={box.name}
+                    src={scene.headliner_thumbnail_url || scene.headliner_url}
+                    alt={scene.name}
                     fill
                     sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
                     className={`${mediaFitClass} transition-opacity duration-300 ${isHovering ? 'opacity-0' : 'opacity-100'}`}
                   />
                   <video
                     ref={videoRef}
-                    src={box.headliner_url}
+                    src={scene.headliner_url}
                     muted
                     loop
                     playsInline
@@ -200,8 +200,8 @@ export default function BoxCard({ box, index, aspectClass = 'aspect-video' }: Bo
                 </>
               ) : (
                 <Image
-                  src={box.headliner_thumbnail_url || box.headliner_url}
-                  alt={box.name}
+                  src={scene.headliner_thumbnail_url || scene.headliner_url}
+                  alt={scene.name}
                   fill
                   sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
                   className={`${mediaFitClass} ${aspectClass === 'aspect-vertical' ? '' : 'group-hover:scale-105'} transition-transform duration-500`}
@@ -252,14 +252,14 @@ export default function BoxCard({ box, index, aspectClass = 'aspect-video' }: Bo
         <div className="p-3">
           <div className="flex items-center gap-2 mb-1">
             <h3 className="text-sm font-medium text-txt-primary truncate group-hover:text-accent transition-colors flex-1">
-              {box.name}
+              {scene.name}
             </h3>
-            <span className={`px-2 py-0.5 rounded-md text-[10px] font-medium ${STATUS_CONFIG[box.status].color}`}>
-              {STATUS_CONFIG[box.status].label}
+            <span className={`px-2 py-0.5 rounded-md text-[10px] font-medium ${STATUS_CONFIG[scene.status].color}`}>
+              {STATUS_CONFIG[scene.status].label}
             </span>
           </div>
           <p className="text-xs text-txt-muted">
-            {box.assets_count} {formatElementCount(box.assets_count)}
+            {scene.elements_count} {formatElementCount(scene.elements_count)}
           </p>
         </div>
       </div>
@@ -302,16 +302,16 @@ export default function BoxCard({ box, index, aspectClass = 'aspect-video' }: Bo
             <button
               key={status}
               onClick={() => handleStatusChange(status)}
-              disabled={loading || box.status === status}
+              disabled={loading || scene.status === status}
               className={`w-full px-4 py-3 text-left rounded-lg border transition-all ${
-                box.status === status
+                scene.status === status
                   ? 'border-accent bg-accent/5 cursor-default'
                   : 'border-surface-border hover:border-accent/50 hover:bg-surface-secondary'
               } disabled:opacity-50`}
             >
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-txt-primary">{STATUS_CONFIG[status].label}</span>
-                {box.status === status && (
+                {scene.status === status && (
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-accent">
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
@@ -328,7 +328,7 @@ export default function BoxCard({ box, index, aspectClass = 'aspect-video' }: Bo
         onClose={() => setShowDelete(false)}
         onConfirm={handleDelete}
         title="Удалить сцену?"
-        message={`Сцена «${box.name}» и все её элементы будут удалены безвозвратно.`}
+        message={`Сцена «${scene.name}» и все её элементы будут удалены безвозвратно.`}
         confirmText="Удалить"
         danger
         loading={loading}

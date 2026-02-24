@@ -44,16 +44,16 @@ class SharedLinkAdmin(admin.ModelAdmin):
 @admin.register(Comment)
 class CommentAdmin(admin.ModelAdmin):
     """Админка для модели Comment."""
-    list_display = ('author_name', 'box', 'text_preview', 'is_read', 'created_at')
-    list_filter = ('is_read', 'created_at', 'box__project')
-    search_fields = ('author_name', 'text', 'box__name')
+    list_display = ('author_name', 'scene', 'text_preview', 'is_read', 'created_at')
+    list_filter = ('is_read', 'created_at', 'scene__project')
+    search_fields = ('author_name', 'text', 'scene__name')
     list_editable = ('is_read',)
     readonly_fields = ('created_at', 'updated_at')
     ordering = ('-created_at',)
     
     fieldsets = (
         ('Основная информация', {
-            'fields': ('box', 'author_name', 'is_read')
+            'fields': ('scene', 'author_name', 'is_read')
         }),
         ('Комментарий', {
             'fields': ('text',)

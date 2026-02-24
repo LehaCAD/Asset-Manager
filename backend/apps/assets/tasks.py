@@ -1,19 +1,19 @@
 """
-Celery tasks для работы с ассетами.
+Celery tasks для работы с элементами.
 """
 from celery import shared_task
 import time
 import requests
 from typing import Optional
 from django.core.files.base import ContentFile
-from .models import Asset
+from .models import Element
 from .services import substitute_variables
 from apps.boxes.s3_utils import upload_file_to_s3, generate_unique_filename
 
 
-def notify_asset_status(asset: Asset, status: str, file_url: str = '', error_message: str = '') -> None:
+def notify_element_status(element: Element, status: str, file_url: str = '', error_message: str = '') -> None:
     """
-    Отправить WebSocket-уведомление об изменении статуса ассета.
+    Отправить WebSocket-уведомление об изменении статуса элемента.
     Вызывается из Celery-задач при завершении/ошибке генерации.
     """
     try:
@@ -24,17 +24,17 @@ def notify_asset_status(asset: Asset, status: str, file_url: str = '', error_mes
         if channel_layer is None:
             return
 
-        project_id = asset.box.project_id
+        project_id = element.scene.project_id
         group_name = f'project_{project_id}'
 
         async_to_sync(channel_layer.group_send)(
             group_name,
             {
-                'type': 'asset_status_changed',
-                'asset_id': asset.id,
+                'type': 'element_status_changed',
+                'element_id': element.id,
                 'status': status,
                 'file_url': file_url,
-                'thumbnail_url': asset.thumbnail_url or '',
+                'thumbnail_url': element.thumbnail_url or '',
                 'error_message': error_message,
             }
         )
@@ -89,43 +89,43 @@ def example_async_task(name: str, count: int = 1) -> dict:
 
 
 @shared_task(bind=True, max_retries=3)
-def start_generation(self, asset_id: int) -> dict:
+def start_generation(self, element_id: int) -> dict:
     """
     Запуск генерации через AI провайдера (Kie.ai).
     
     Args:
-        asset_id: ID ассета для генерации
+        element_id: ID элемента для генерации
     
     Returns:
         Результат с task_id от провайдера
     """
     try:
-        # Получаем ассет
-        asset = Asset.objects.select_related(
+        # Получаем элемент
+        element = Element.objects.select_related(
             'ai_model',
             'ai_model__provider',
-            'parent_asset'
-        ).get(id=asset_id)
+            'parent_element'
+        ).get(id=element_id)
         
-        if not asset.ai_model:
+        if not element.ai_model:
             raise ValueError("AI модель не указана")
         
-        ai_model = asset.ai_model
+        ai_model = element.ai_model
         provider = ai_model.provider
         
         # Формируем context для подстановки переменных
         context = {
-            'prompt': asset.prompt_text or '',
+            'prompt': element.prompt_text or '',
             'model': ai_model.name,
         }
         
         # Добавляем параметры из generation_config
-        if asset.generation_config:
-            context.update(asset.generation_config)
+        if element.generation_config:
+            context.update(element.generation_config)
         
-        # Если есть родительский ассет (для img2vid) — передаем URL в input_urls
-        if asset.parent_asset and asset.parent_asset.file_url:
-            context['input_urls'] = [asset.parent_asset.file_url]
+        # Если есть родительский элемент (для img2vid) — передаем URL в input_urls
+        if element.parent_element and element.parent_element.file_url:
+            context['input_urls'] = [element.parent_element.file_url]
         else:
             context['input_urls'] = []
         
@@ -143,7 +143,7 @@ def start_generation(self, asset_id: int) -> dict:
         if provider.api_key:
             headers['Authorization'] = f'Bearer {provider.api_key}'
         
-        print(f"🚀 Отправка запроса на генерацию для Asset #{asset_id}")
+        print(f"🚀 Отправка запроса на генерацию для Element #{element_id}")
         print(f"URL: {full_url}")
         print(f"Body: {request_body}")
         
@@ -176,21 +176,21 @@ def start_generation(self, asset_id: int) -> dict:
         if not task_id:
             raise ValueError(f"Task ID не найден в ответе: {result}")
         
-        # Обновляем ассет
-        asset.external_task_id = task_id
-        asset.status = Asset.STATUS_PROCESSING
-        asset.save()
+        # Обновляем элемент
+        element.external_task_id = task_id
+        element.status = Element.STATUS_PROCESSING
+        element.save()
         
-        print(f"✅ Asset #{asset_id} обновлен: task_id={task_id}, status=PROCESSING")
+        print(f"✅ Element #{element_id} обновлен: task_id={task_id}, status=PROCESSING")
         
         # Запускаем polling задачу
         check_generation_status.apply_async(
-            args=[asset_id],
+            args=[element_id],
             countdown=10  # Начинаем проверку через 10 секунд
         )
         
         return {
-            'asset_id': asset_id,
+            'element_id': element_id,
             'task_id': task_id,
             'status': 'processing'
         }
@@ -198,14 +198,14 @@ def start_generation(self, asset_id: int) -> dict:
     except Exception as e:
         print(f"❌ Ошибка при запуске генерации: {e}")
         
-        # Обновляем статус ассета
+        # Обновляем статус элемента
         try:
-            asset = Asset.objects.get(id=asset_id)
-            asset.status = Asset.STATUS_FAILED
-            asset.error_message = str(e)
-            asset.save()
-            notify_asset_status(asset, 'FAILED', error_message=str(e))
-        except Asset.DoesNotExist:
+            element = Element.objects.get(id=element_id)
+            element.status = Element.STATUS_FAILED
+            element.error_message = str(e)
+            element.save()
+            notify_element_status(element, 'FAILED', error_message=str(e))
+        except Element.DoesNotExist:
             pass
         
         # Retry при сетевых ошибках
@@ -216,26 +216,26 @@ def start_generation(self, asset_id: int) -> dict:
 
 
 @shared_task(bind=True, max_retries=60)
-def check_generation_status(self, asset_id: int) -> dict:
+def check_generation_status(self, element_id: int) -> dict:
     """
     Проверка статуса генерации через polling (GET /recordInfo).
     
     Args:
-        asset_id: ID ассета
+        element_id: ID элемента
     
     Returns:
         Статус генерации
     """
     try:
-        asset = Asset.objects.select_related(
+        element = Element.objects.select_related(
             'ai_model',
             'ai_model__provider'
-        ).get(id=asset_id)
+        ).get(id=element_id)
         
-        if not asset.external_task_id:
+        if not element.external_task_id:
             raise ValueError("External task_id не найден")
         
-        provider = asset.ai_model.provider
+        provider = element.ai_model.provider
         
         # URL для проверки статуса (Kie.ai: /api/v1/jobs/recordInfo)
         check_url = f"{provider.base_url.rstrip('/')}/api/v1/jobs/recordInfo"
@@ -247,7 +247,7 @@ def check_generation_status(self, asset_id: int) -> dict:
         # Запрос статуса
         response = requests.get(
             check_url,
-            params={'taskId': asset.external_task_id},
+            params={'taskId': element.external_task_id},
             headers=headers,
             timeout=30
         )
@@ -258,7 +258,7 @@ def check_generation_status(self, asset_id: int) -> dict:
         data = result.get('data', {})
         state = data.get('state', '').lower()
         
-        print(f"📊 Статус генерации Asset #{asset_id}: {state}")
+        print(f"📊 Статус генерации Element #{element_id}: {state}")
         
         if state == 'success':
             # Генерация завершена успешно
@@ -311,18 +311,18 @@ def check_generation_status(self, asset_id: int) -> dict:
             saved_path = default_storage.save(file_path, ContentFile(file_response.content))
             s3_url = default_storage.url(saved_path)
             
-            # Обновляем ассет
-            asset.file_url = s3_url
-            asset.status = Asset.STATUS_COMPLETED
-            asset.save()
+            # Обновляем элемент
+            element.file_url = s3_url
+            element.status = Element.STATUS_COMPLETED
+            element.save()
             
             # WebSocket-уведомление
-            notify_asset_status(asset, 'COMPLETED', file_url=s3_url)
+            notify_element_status(element, 'COMPLETED', file_url=s3_url)
             
-            print(f"✅ Asset #{asset_id} завершен! URL: {s3_url}")
+            print(f"✅ Element #{element_id} завершен! URL: {s3_url}")
             
             return {
-                'asset_id': asset_id,
+                'element_id': element_id,
                 'status': 'completed',
                 'file_url': s3_url
             }
@@ -331,17 +331,17 @@ def check_generation_status(self, asset_id: int) -> dict:
             # Генерация failed
             fail_msg = data.get('failMsg', 'Unknown error')
             
-            asset.status = Asset.STATUS_FAILED
-            asset.error_message = fail_msg
-            asset.save()
+            element.status = Element.STATUS_FAILED
+            element.error_message = fail_msg
+            element.save()
             
             # WebSocket-уведомление
-            notify_asset_status(asset, 'FAILED', error_message=fail_msg)
+            notify_element_status(element, 'FAILED', error_message=fail_msg)
             
             print(f"❌ Генерация failed: {fail_msg}")
             
             return {
-                'asset_id': asset_id,
+                'element_id': element_id,
                 'status': 'failed',
                 'error': fail_msg
             }
@@ -360,14 +360,14 @@ def check_generation_status(self, asset_id: int) -> dict:
         if isinstance(e, (requests.RequestException, requests.Timeout)):
             raise self.retry(exc=e, countdown=10)
         
-        # Обновляем статус ассета при критической ошибке
+        # Обновляем статус элемента при критической ошибке
         try:
-            asset = Asset.objects.get(id=asset_id)
-            if asset.status != Asset.STATUS_COMPLETED:
-                asset.status = Asset.STATUS_FAILED
-                asset.error_message = str(e)
-                asset.save()
-        except Asset.DoesNotExist:
+            element = Element.objects.get(id=element_id)
+            if element.status != Element.STATUS_COMPLETED:
+                element.status = Element.STATUS_FAILED
+                element.error_message = str(e)
+                element.save()
+        except Element.DoesNotExist:
             pass
         
         raise

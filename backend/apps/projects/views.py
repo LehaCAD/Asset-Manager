@@ -27,7 +27,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """Возвращает только проекты текущего пользователя."""
-        return Project.objects.filter(user=self.request.user).prefetch_related('boxes')
+        return Project.objects.filter(user=self.request.user).prefetch_related('scenes')
     
     def perform_create(self, serializer):
         """При создании автоматически устанавливает текущего пользователя и проверяет лимиты."""

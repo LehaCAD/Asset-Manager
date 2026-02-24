@@ -3,8 +3,8 @@
 """
 from typing import Optional, List, Dict, Any
 import re
-from apps.boxes.models import Box
-from .models import Asset
+from apps.boxes.models import Scene
+from .models import Element
 
 
 def substitute_variables(request_schema: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
@@ -50,20 +50,20 @@ def substitute_variables(request_schema: Dict[str, Any], context: Dict[str, Any]
     return replace_value(request_schema)
 
 
-def create_asset(
-    box: Box,
-    asset_type: str,
+def create_element(
+    scene: Scene,
+    element_type: str,
     file_url: str = '',
     thumbnail_url: str = '',
     prompt_text: str = '',
     is_favorite: bool = False
-) -> Asset:
+) -> Element:
     """
     Создание нового элемента.
     
     Args:
-        box: Сцена, к которой относится элемент
-        asset_type: Тип элемента (IMAGE или VIDEO)
+        scene: Сцена, к которой относится элемент
+        element_type: Тип элемента (IMAGE или VIDEO)
         file_url: URL файла (опционально)
         thumbnail_url: URL превью (опционально)
         prompt_text: Текст промпта (опционально)
@@ -72,29 +72,29 @@ def create_asset(
     Returns:
         Созданный элемент
     """
-    asset = Asset.objects.create(
-        box=box,
-        asset_type=asset_type,
+    element = Element.objects.create(
+        scene=scene,
+        element_type=element_type,
         file_url=file_url,
         thumbnail_url=thumbnail_url,
         prompt_text=prompt_text,
         is_favorite=is_favorite
     )
-    return asset
+    return element
 
 
-def update_asset(
-    asset: Asset,
+def update_element(
+    element: Element,
     file_url: Optional[str] = None,
     thumbnail_url: Optional[str] = None,
     prompt_text: Optional[str] = None,
     is_favorite: Optional[bool] = None
-) -> Asset:
+) -> Element:
     """
     Обновление элемента.
     
     Args:
-        asset: Объект элемента
+        element: Объект элемента
         file_url: Новый URL файла (опционально)
         thumbnail_url: Новый URL превью (опционально)
         prompt_text: Новый текст промпта (опционально)
@@ -104,84 +104,84 @@ def update_asset(
         Обновленный элемент
     """
     if file_url is not None:
-        asset.file_url = file_url
+        element.file_url = file_url
     if thumbnail_url is not None:
-        asset.thumbnail_url = thumbnail_url
+        element.thumbnail_url = thumbnail_url
     if prompt_text is not None:
-        asset.prompt_text = prompt_text
+        element.prompt_text = prompt_text
     if is_favorite is not None:
-        asset.is_favorite = is_favorite
+        element.is_favorite = is_favorite
     
-    asset.save()
-    return asset
+    element.save()
+    return element
 
 
-def toggle_favorite(asset: Asset) -> Asset:
+def toggle_favorite(element: Element) -> Element:
     """
     Переключение статуса избранного.
     
     Args:
-        asset: Объект элемента
+        element: Объект элемента
         
     Returns:
         Обновленный элемент
     """
-    asset.is_favorite = not asset.is_favorite
-    asset.save()
-    return asset
+    element.is_favorite = not element.is_favorite
+    element.save()
+    return element
 
 
-def delete_asset(asset: Asset) -> None:
+def delete_element(element: Element) -> None:
     """
     Удаление элемента.
     
     Args:
-        asset: Объект элемента для удаления
+        element: Объект элемента для удаления
     """
-    asset.delete()
+    element.delete()
 
 
-def get_box_assets(box: Box, asset_type: Optional[str] = None) -> List[Asset]:
+def get_scene_elements(scene: Scene, element_type: Optional[str] = None) -> List[Element]:
     """
     Получение всех элементов сцены.
     
     Args:
-        box: Сцена
-        asset_type: Фильтр по типу (IMAGE или VIDEO), опционально
+        scene: Сцена
+        element_type: Фильтр по типу (IMAGE или VIDEO), опционально
         
     Returns:
         Список элементов, отсортированных по дате создания (новые первыми)
     """
-    queryset = Asset.objects.filter(box=box).select_related('box', 'box__project')
+    queryset = Element.objects.filter(scene=scene).select_related('scene', 'scene__project')
     
-    if asset_type:
-        queryset = queryset.filter(asset_type=asset_type)
+    if element_type:
+        queryset = queryset.filter(element_type=element_type)
     
     return list(queryset)
 
 
-def get_favorite_assets(box: Box) -> List[Asset]:
+def get_favorite_elements(scene: Scene) -> List[Element]:
     """
     Получение избранных элементов сцены.
     
     Args:
-        box: Сцена
+        scene: Сцена
         
     Returns:
         Список избранных элементов
     """
     return list(
-        Asset.objects.filter(box=box, is_favorite=True)
-        .select_related('box', 'box__project')
+        Element.objects.filter(scene=scene, is_favorite=True)
+        .select_related('scene', 'scene__project')
     )
 
 
-def reorder_assets(asset_ids: List[int]) -> None:
+def reorder_elements(element_ids: List[int]) -> None:
     """
     Изменение порядка элементов.
     
     Args:
-        asset_ids: Список ID элементов в новом порядке
+        element_ids: Список ID элементов в новом порядке
     """
-    for index, asset_id in enumerate(asset_ids):
-        Asset.objects.filter(id=asset_id).update(order_index=index)
+    for index, element_id in enumerate(element_ids):
+        Element.objects.filter(id=element_id).update(order_index=index)

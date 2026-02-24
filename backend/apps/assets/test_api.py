@@ -3,18 +3,17 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from django.contrib.auth import get_user_model
 from apps.projects.models import Project
-from apps.boxes.models import Box
-from apps.assets.models import Asset
+from apps.boxes.models import Scene
+from apps.assets.models import Element
 from apps.ai_providers.models import AIProvider, AIModel
 
 User = get_user_model()
 
 
-class AssetAPITest(APITestCase):
-    """Тесты для Assets API."""
+class ElementAPITest(APITestCase):
+    """Тесты для Elements API."""
     
     def setUp(self):
-        """Создание тестовых пользователей и данных."""
         self.user1 = User.objects.create_user(
             username='user1',
             email='user1@example.com',
@@ -35,23 +34,22 @@ class AssetAPITest(APITestCase):
             name='Проект 2'
         )
         
-        self.box1 = Box.objects.create(
+        self.scene1 = Scene.objects.create(
             project=self.project1,
-            name='Бокс 1',
+            name='Сцена 1',
             order_index=0
         )
-        self.box2 = Box.objects.create(
+        self.scene2 = Scene.objects.create(
             project=self.project1,
-            name='Бокс 2',
+            name='Сцена 2',
             order_index=1
         )
-        self.box3 = Box.objects.create(
+        self.scene3 = Scene.objects.create(
             project=self.project2,
-            name='Бокс пользователя 2',
+            name='Сцена пользователя 2',
             order_index=0
         )
         
-        # Создать AI модель
         provider = AIProvider.objects.create(
             name='Test Provider',
             base_url='https://test.com'
@@ -63,91 +61,80 @@ class AssetAPITest(APITestCase):
             api_endpoint='/test'
         )
         
-        # Создать ассеты
-        self.asset1 = Asset.objects.create(
-            box=self.box1,
-            asset_type=Asset.ASSET_TYPE_IMAGE,
+        self.element1 = Element.objects.create(
+            scene=self.scene1,
+            element_type=Element.ELEMENT_TYPE_IMAGE,
             file_url='https://example.com/1.jpg',
             prompt_text='Test prompt 1',
             is_favorite=True,
             ai_model=self.ai_model
         )
-        self.asset2 = Asset.objects.create(
-            box=self.box1,
-            asset_type=Asset.ASSET_TYPE_VIDEO,
+        self.element2 = Element.objects.create(
+            scene=self.scene1,
+            element_type=Element.ELEMENT_TYPE_VIDEO,
             file_url='https://example.com/2.mp4',
             prompt_text='Test prompt 2',
             is_favorite=False
         )
-        self.asset3 = Asset.objects.create(
-            box=self.box2,
-            asset_type=Asset.ASSET_TYPE_IMAGE,
+        self.element3 = Element.objects.create(
+            scene=self.scene2,
+            element_type=Element.ELEMENT_TYPE_IMAGE,
             file_url='https://example.com/3.jpg',
             is_favorite=True
         )
-        self.asset4 = Asset.objects.create(
-            box=self.box3,  # Бокс user2
-            asset_type=Asset.ASSET_TYPE_IMAGE,
+        self.element4 = Element.objects.create(
+            scene=self.scene3,
+            element_type=Element.ELEMENT_TYPE_IMAGE,
             file_url='https://example.com/4.jpg'
         )
         
-        self.list_url = reverse('asset-list')
+        self.list_url = reverse('element-list')
     
-    def test_list_assets_unauthorized(self):
-        """Тест: неавторизованный пользователь не может получить список."""
+    def test_list_elements_unauthorized(self):
         response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
     
-    def test_list_assets_authenticated(self):
-        """Тест: пользователь видит только ассеты своих проектов."""
+    def test_list_elements_authenticated(self):
         self.client.force_authenticate(user=self.user1)
         response = self.client.get(self.list_url)
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 3)  # asset1, asset2, asset3
+        self.assertEqual(len(response.data), 3)
     
-    def test_list_assets_filtered_by_box(self):
-        """Тест: фильтрация ассетов по box."""
+    def test_list_elements_filtered_by_scene(self):
         self.client.force_authenticate(user=self.user1)
-        response = self.client.get(f'{self.list_url}?box={self.box1.id}')
+        response = self.client.get(f'{self.list_url}?scene={self.scene1.id}')
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 2)  # asset1, asset2
+        self.assertEqual(len(response.data), 2)
     
-    def test_list_assets_filtered_by_type(self):
-        """Тест: фильтрация по asset_type."""
+    def test_list_elements_filtered_by_type(self):
         self.client.force_authenticate(user=self.user1)
         
-        # Только изображения
-        response = self.client.get(f'{self.list_url}?asset_type=IMAGE')
+        response = self.client.get(f'{self.list_url}?element_type=IMAGE')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 2)  # asset1, asset3
+        self.assertEqual(len(response.data), 2)
         
-        # Только видео
-        response = self.client.get(f'{self.list_url}?asset_type=VIDEO')
+        response = self.client.get(f'{self.list_url}?element_type=VIDEO')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)  # asset2
+        self.assertEqual(len(response.data), 1)
     
-    def test_list_assets_filtered_by_favorite(self):
-        """Тест: фильтрация по is_favorite."""
+    def test_list_elements_filtered_by_favorite(self):
         self.client.force_authenticate(user=self.user1)
         
-        # Только избранные
         response = self.client.get(f'{self.list_url}?is_favorite=true')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 2)  # asset1, asset3
+        self.assertEqual(len(response.data), 2)
         
-        # Не избранные
         response = self.client.get(f'{self.list_url}?is_favorite=false')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)  # asset2
+        self.assertEqual(len(response.data), 1)
     
-    def test_create_asset(self):
-        """Тест: создание ассета."""
+    def test_create_element(self):
         self.client.force_authenticate(user=self.user1)
         data = {
-            'box': self.box1.id,
-            'asset_type': Asset.ASSET_TYPE_IMAGE,
+            'scene': self.scene1.id,
+            'element_type': Element.ELEMENT_TYPE_IMAGE,
             'file_url': 'https://example.com/new.jpg',
             'prompt_text': 'New prompt',
             'is_favorite': False
@@ -155,85 +142,74 @@ class AssetAPITest(APITestCase):
         response = self.client.post(self.list_url, data)
         
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data['asset_type'], Asset.ASSET_TYPE_IMAGE)
-        self.assertEqual(response.data['box_name'], 'Бокс 1')
+        self.assertEqual(response.data['element_type'], Element.ELEMENT_TYPE_IMAGE)
+        self.assertEqual(response.data['scene_name'], 'Сцена 1')
     
-    def test_retrieve_asset(self):
-        """Тест: получение деталей ассета."""
+    def test_retrieve_element(self):
         self.client.force_authenticate(user=self.user1)
-        url = reverse('asset-detail', kwargs={'pk': self.asset1.pk})
+        url = reverse('element-detail', kwargs={'pk': self.element1.pk})
         response = self.client.get(url)
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['file_url'], 'https://example.com/1.jpg')
-        self.assertEqual(response.data['box_name'], 'Бокс 1')
+        self.assertEqual(response.data['scene_name'], 'Сцена 1')
         self.assertEqual(response.data['ai_model_name'], 'Test Model')
     
-    def test_retrieve_other_user_asset(self):
-        """Тест: пользователь не может получить чужой ассет."""
+    def test_retrieve_other_user_element(self):
         self.client.force_authenticate(user=self.user1)
-        url = reverse('asset-detail', kwargs={'pk': self.asset4.pk})
+        url = reverse('element-detail', kwargs={'pk': self.element4.pk})
         response = self.client.get(url)
         
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
     
-    def test_update_asset(self):
-        """Тест: обновление ассета (PATCH)."""
+    def test_update_element(self):
         self.client.force_authenticate(user=self.user1)
-        url = reverse('asset-detail', kwargs={'pk': self.asset1.pk})
+        url = reverse('element-detail', kwargs={'pk': self.element1.pk})
         data = {'is_favorite': False}
         response = self.client.patch(url, data)
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertFalse(response.data['is_favorite'])
     
-    def test_delete_asset(self):
-        """Тест: удаление ассета."""
+    def test_delete_element(self):
         self.client.force_authenticate(user=self.user1)
-        url = reverse('asset-detail', kwargs={'pk': self.asset2.pk})
+        url = reverse('element-detail', kwargs={'pk': self.element2.pk})
         response = self.client.delete(url)
         
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(Asset.objects.filter(pk=self.asset2.pk).exists())
+        self.assertFalse(Element.objects.filter(pk=self.element2.pk).exists())
     
-    def test_delete_other_user_asset(self):
-        """Тест: пользователь не может удалить чужой ассет."""
+    def test_delete_other_user_element(self):
         self.client.force_authenticate(user=self.user1)
-        url = reverse('asset-detail', kwargs={'pk': self.asset4.pk})
+        url = reverse('element-detail', kwargs={'pk': self.element4.pk})
         response = self.client.delete(url)
         
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertTrue(Asset.objects.filter(pk=self.asset4.pk).exists())
+        self.assertTrue(Element.objects.filter(pk=self.element4.pk).exists())
     
-    def test_box_name_field(self):
-        """Тест: поле box_name возвращает название бокса."""
+    def test_scene_name_field(self):
         self.client.force_authenticate(user=self.user1)
-        url = reverse('asset-detail', kwargs={'pk': self.asset1.pk})
+        url = reverse('element-detail', kwargs={'pk': self.element1.pk})
         response = self.client.get(url)
         
-        self.assertEqual(response.data['box_name'], 'Бокс 1')
+        self.assertEqual(response.data['scene_name'], 'Сцена 1')
     
     def test_ai_model_name_field(self):
-        """Тест: поле ai_model_name возвращает название модели."""
         self.client.force_authenticate(user=self.user1)
         
-        # С AI моделью
-        url = reverse('asset-detail', kwargs={'pk': self.asset1.pk})
+        url = reverse('element-detail', kwargs={'pk': self.element1.pk})
         response = self.client.get(url)
         self.assertEqual(response.data['ai_model_name'], 'Test Model')
         
-        # Без AI модели
-        url = reverse('asset-detail', kwargs={'pk': self.asset2.pk})
+        url = reverse('element-detail', kwargs={'pk': self.element2.pk})
         response = self.client.get(url)
         self.assertIsNone(response.data['ai_model_name'])
     
     def test_combined_filters(self):
-        """Тест: комбинация фильтров."""
         self.client.force_authenticate(user=self.user1)
         
-        # box + asset_type + is_favorite
         response = self.client.get(
-            f'{self.list_url}?box={self.box1.id}&asset_type=IMAGE&is_favorite=true'
+            f'{self.list_url}?scene={self.scene1.id}&element_type=IMAGE&is_favorite=true'
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)  # Только asset1
+        self.assertEqual(len(response.data), 1)

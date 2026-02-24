@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { type Asset } from '@/lib/api';
+import { type Element } from '@/lib/api';
 import ConfirmDialog from './ui/ConfirmDialog';
 
 interface AssetThumbnailProps {
-  asset: Asset;
+  asset: Element;
   index: number;
   isSelected: boolean;
   isHeadliner: boolean;

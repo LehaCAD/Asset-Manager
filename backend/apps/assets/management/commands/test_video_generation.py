@@ -5,8 +5,8 @@ from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
 from django.core.files import File
 from apps.projects.models import Project
-from apps.boxes.models import Box
-from apps.assets.models import Asset
+from apps.boxes.models import Scene
+from apps.assets.models import Element
 from apps.ai_providers.models import AIModel
 from apps.assets.tasks import start_generation
 from apps.boxes.s3_utils import upload_file_to_s3
@@ -48,13 +48,13 @@ class Command(BaseCommand):
         )
         self.stdout.write(f'✅ Проект: {project.name}')
         
-        # Найти или создать бокс
-        box, _ = Box.objects.get_or_create(
+        # Найти или создать сцену
+        scene, _ = Scene.objects.get_or_create(
             project=project,
-            name='Test Video Box',
-            defaults={'name': 'Test Video Box', 'order_index': 0}
+            name='Test Video Scene',
+            defaults={'name': 'Test Video Scene', 'order_index': 0}
         )
-        self.stdout.write(f'✅ Бокс: {box.name}')
+        self.stdout.write(f'✅ Сцена: {scene.name}')
         
         # Загрузить 123.jpg на S3
         self.stdout.write('\n📤 Загрузка 123.jpg на S3...')
@@ -76,16 +76,16 @@ class Command(BaseCommand):
                 
                 self.stdout.write(self.style.SUCCESS(f'✅ Изображение загружено: {image_url}'))
                 
-                # Создать parent asset (исходное изображение)
-                parent_asset = Asset.objects.create(
-                    box=box,
-                    asset_type=Asset.ASSET_TYPE_IMAGE,
+                # Создать parent element (исходное изображение)
+                parent_element = Element.objects.create(
+                    scene=scene,
+                    element_type=Element.ELEMENT_TYPE_IMAGE,
                     file_url=image_url,
                     prompt_text='Source image for video generation',
-                    status=Asset.STATUS_COMPLETED,
-                    source_type=Asset.SOURCE_UPLOADED
+                    status=Element.STATUS_COMPLETED,
+                    source_type=Element.SOURCE_UPLOADED
                 )
-                self.stdout.write(f'✅ Создан parent Asset #{parent_asset.id}')
+                self.stdout.write(f'✅ Создан parent Element #{parent_element.id}')
                 
         except FileNotFoundError:
             self.stdout.write(self.style.ERROR('❌ Файл 123.jpg не найден!'))
@@ -109,37 +109,37 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR('❌ Модель Seedance не найдена!'))
             return
         
-        # Создание ассета для видео
+        # Создание элемента для видео
         prompt = "Two people arm wrestling in a vintage room, dynamic movement, cinematic"
         
-        asset = Asset.objects.create(
-            box=box,
-            asset_type=Asset.ASSET_TYPE_VIDEO,
+        element = Element.objects.create(
+            scene=scene,
+            element_type=Element.ELEMENT_TYPE_VIDEO,
             prompt_text=prompt,
             ai_model=ai_model,
-            parent_asset=parent_asset,  # Указываем исходное изображение
+            parent_element=parent_element,  # Указываем исходное изображение
             generation_config={
                 'aspect_ratio': '16:9',
                 'resolution': '720p',
                 'duration': '8'
             },
-            status=Asset.STATUS_PENDING,
-            source_type=Asset.SOURCE_IMG2VID
+            status=Element.STATUS_PENDING,
+            source_type=Element.SOURCE_IMG2VID
         )
         
-        self.stdout.write(f'\n✅ Создан Asset для видео #{asset.id}')
+        self.stdout.write(f'\n✅ Создан Element для видео #{element.id}')
         self.stdout.write(f'   Промпт: {prompt}')
-        self.stdout.write(f'   Parent Asset: #{parent_asset.id}')
-        self.stdout.write(f'   Конфигурация: {asset.generation_config}')
+        self.stdout.write(f'   Parent Element: #{parent_element.id}')
+        self.stdout.write(f'   Конфигурация: {element.generation_config}')
         
         # Запуск генерации
         self.stdout.write('\n🚀 Запуск генерации через Celery...')
         
-        task = start_generation.delay(asset.id)
+        task = start_generation.delay(element.id)
         
         self.stdout.write(self.style.SUCCESS(f'\n✅ Задача отправлена в Celery!'))
         self.stdout.write(f'   Celery Task ID: {task.id}')
-        self.stdout.write(f'   Asset ID: {asset.id}')
+        self.stdout.write(f'   Element ID: {element.id}')
         
         self.stdout.write('\n' + '=' * 70)
         self.stdout.write(self.style.SUCCESS('🎬 Генерация запущена!'))
@@ -148,6 +148,6 @@ class Command(BaseCommand):
         self.stdout.write('\n📊 Мониторинг:')
         self.stdout.write('   docker compose logs -f celery')
         self.stdout.write('\n🔍 Проверить статус:')
-        self.stdout.write(f'   Asset.objects.get(id={asset.id}).status')
-        self.stdout.write(f'   Asset.objects.get(id={asset.id}).external_task_id')
+        self.stdout.write(f'   Element.objects.get(id={element.id}).status')
+        self.stdout.write(f'   Element.objects.get(id={element.id}).external_task_id')
         self.stdout.write('')

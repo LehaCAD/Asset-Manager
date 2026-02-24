@@ -16,29 +16,26 @@ def get_file_extension(filename: str) -> str:
     return os.path.splitext(filename)[1].lower()
 
 
-def detect_asset_type(filename: str) -> str:
+def detect_element_type(filename: str) -> str:
     """
     Определить тип элемента по расширению файла.
     
     Returns:
         'IMAGE' или 'VIDEO'
     """
-    from apps.assets.models import Asset
+    from apps.assets.models import Element
     
     ext = get_file_extension(filename)
     
-    # Расширения изображений (только поддерживаемые)
     image_extensions = ['.jpg', '.jpeg', '.png']
-    # Расширения видео (только поддерживаемые)
     video_extensions = ['.mp4']
     
     if ext in image_extensions:
-        return Asset.ASSET_TYPE_IMAGE
+        return Element.ELEMENT_TYPE_IMAGE
     elif ext in video_extensions:
-        return Asset.ASSET_TYPE_VIDEO
+        return Element.ELEMENT_TYPE_VIDEO
     else:
-        # По умолчанию считаем изображением
-        return Asset.ASSET_TYPE_IMAGE
+        return Element.ELEMENT_TYPE_IMAGE
 
 
 def validate_file_type(filename: str) -> bool:
@@ -68,16 +65,16 @@ def generate_unique_filename(original_filename: str) -> str:
     return unique_name
 
 
-def upload_file_to_s3(file: UploadedFile, folder: str = 'uploads', project_id: int = None, box_id: int = None) -> Tuple[str, str]:
+def upload_file_to_s3(file: UploadedFile, folder: str = 'uploads', project_id: int = None, scene_id: int = None) -> Tuple[str, str]:
     """
     Загрузить файл на S3 и вернуть URL.
     
     Args:
         file: загруженный файл (Django UploadedFile)
         folder: папка для сохранения (по умолчанию 'uploads'). 
-                Если указаны project_id и box_id, используется структурированная папка.
+                Если указаны project_id и scene_id, используется структурированная папка.
         project_id: ID проекта (опционально, для структурированного хранения)
-        box_id: ID сцены (опционально, для структурированного хранения)
+        scene_id: ID сцены (опционально, для структурированного хранения)
     
     Returns:
         Tuple[file_url, filename] - URL файла на S3 и имя файла
@@ -90,10 +87,10 @@ def upload_file_to_s3(file: UploadedFile, folder: str = 'uploads', project_id: i
     unique_id = uuid.uuid4().hex[:8]
     filename = f"{unique_id}_{slug}{ext}"
     
-    # Формируем путь в зависимости от наличия project_id и box_id
-    if project_id and box_id:
-        # Структурированная папка: projects/{project_id}/scenes/{box_id}/
-        file_path = f"projects/{project_id}/scenes/{box_id}/{filename}"
+    # Формируем путь в зависимости от наличия project_id и scene_id
+    if project_id and scene_id:
+        # Структурированная папка: projects/{project_id}/scenes/{scene_id}/
+        file_path = f"projects/{project_id}/scenes/{scene_id}/{filename}"
     else:
         # Старая структура для обратной совместимости
         file_path = f"{folder}/{filename}"
@@ -136,14 +133,14 @@ def delete_file_from_s3(file_url: str) -> bool:
         return False
 
 
-def generate_video_thumbnail(file: UploadedFile, project_id: int, box_id: int) -> Optional[str]:
+def generate_video_thumbnail(file: UploadedFile, project_id: int, scene_id: int) -> Optional[str]:
     """
     Сгенерировать превью для видео файла используя ffmpeg.
     
     Args:
         file: загруженный видео файл
         project_id: ID проекта
-        box_id: ID сцены
+        scene_id: ID сцены
     
     Returns:
         URL превью или None в случае ошибки
@@ -176,7 +173,7 @@ def generate_video_thumbnail(file: UploadedFile, project_id: int, box_id: int) -
             
             # Генерируем уникальное имя для превью
             thumbnail_filename = f"{uuid.uuid4().hex}_thumb.jpg"
-            thumbnail_path = f"projects/{project_id}/scenes/{box_id}/{thumbnail_filename}"
+            thumbnail_path = f"projects/{project_id}/scenes/{scene_id}/{thumbnail_filename}"
             
             # Загружаем превью на S3
             saved_path = default_storage.save(thumbnail_path, ContentFile(thumbnail_content))

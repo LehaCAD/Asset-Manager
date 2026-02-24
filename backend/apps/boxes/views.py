@@ -2,10 +2,10 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from .models import Box
-from .serializers import BoxSerializer, ReorderSerializer
-from .services import reorder_boxes
-from .s3_utils import upload_file_to_s3, detect_asset_type, validate_file_type, generate_video_thumbnail
+from .models import Scene
+from .serializers import SceneSerializer, ReorderSerializer
+from .services import reorder_scenes
+from .s3_utils import upload_file_to_s3, detect_element_type, validate_file_type, generate_video_thumbnail
 
 
 class IsProjectOwner(permissions.BasePermission):
@@ -15,7 +15,7 @@ class IsProjectOwner(permissions.BasePermission):
         return obj.project.user == request.user
 
 
-class BoxViewSet(viewsets.ModelViewSet):
+class SceneViewSet(viewsets.ModelViewSet):
     """
     ViewSet для CRUD операций со сценами.
     
@@ -26,14 +26,14 @@ class BoxViewSet(viewsets.ModelViewSet):
     partial_update: Частично обновить сцену (PATCH)
     destroy: Удалить сцену
     """
-    serializer_class = BoxSerializer
+    serializer_class = SceneSerializer
     permission_classes = [IsAuthenticated, IsProjectOwner]
     
     def get_queryset(self):
         """Возвращает только сцены проектов текущего пользователя с фильтрацией."""
-        queryset = Box.objects.filter(
+        queryset = Scene.objects.filter(
             project__user=self.request.user
-        ).select_related('project', 'headliner').prefetch_related('assets')
+        ).select_related('project', 'headliner').prefetch_related('elements')
         
         # Фильтрация по project через query params
         project_id = self.request.query_params.get('project', None)
@@ -66,11 +66,11 @@ class BoxViewSet(viewsets.ModelViewSet):
         
         # Проверяем лимит сцен в проекте
         user_quota = request.user.quota
-        current_boxes_count = Box.objects.filter(project=project).count()
+        current_scenes_count = Scene.objects.filter(project=project).count()
         
-        if current_boxes_count >= user_quota.max_boxes_per_project:
+        if current_scenes_count >= user_quota.max_scenes_per_project:
             return Response(
-                {'detail': f'Достигнут лимит сцен в проекте ({user_quota.max_boxes_per_project}). Обратитесь к администратору.'},
+                {'detail': f'Достигнут лимит сцен в проекте ({user_quota.max_scenes_per_project}). Обратитесь к администратору.'},
                 status=status.HTTP_403_FORBIDDEN
             )
         
@@ -79,9 +79,9 @@ class BoxViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsProjectOwner])
     def upload(self, request, pk=None):
         """
-        Загрузить файл на S3 и создать Asset.
+        Загрузить файл на S3 и создать Element.
         
-        POST /api/boxes/{id}/upload/
+        POST /api/scenes/{id}/upload/
         
         Принимает:
         - file: файл (multipart/form-data)
@@ -89,9 +89,9 @@ class BoxViewSet(viewsets.ModelViewSet):
         - is_favorite: флаг избранного (опционально, default=False)
         
         Возвращает:
-        - Данные созданного Asset (AssetSerializer)
+        - Данные созданного Element (ElementSerializer)
         """
-        box = self.get_object()
+        scene = self.get_object()
         
         # Проверка наличия файла
         if 'file' not in request.FILES:
@@ -110,15 +110,15 @@ class BoxViewSet(viewsets.ModelViewSet):
             )
         
         # Определение типа элемента по расширению
-        asset_type = detect_asset_type(file.name)
+        element_type = detect_element_type(file.name)
         
         # Проверяем лимит элементов в сцене
         user_quota = request.user.quota
-        current_assets_count = box.assets.count()
+        current_elements_count = scene.elements.count()
         
-        if current_assets_count >= user_quota.max_assets_per_box:
+        if current_elements_count >= user_quota.max_elements_per_scene:
             return Response(
-                {'detail': f'Достигнут лимит элементов в сцене ({user_quota.max_assets_per_box}). Обратитесь к администратору.'},
+                {'detail': f'Достигнут лимит элементов в сцене ({user_quota.max_elements_per_scene}). Обратитесь к администратору.'},
                 status=status.HTTP_403_FORBIDDEN
             )
         
@@ -126,27 +126,27 @@ class BoxViewSet(viewsets.ModelViewSet):
             # Загрузка файла на S3 с новой структурой папок
             file_url, filename = upload_file_to_s3(
                 file, 
-                project_id=box.project.id,
-                box_id=box.id
+                project_id=scene.project.id,
+                scene_id=scene.id
             )
             
             # Генерация превью для видео
             thumbnail_url = None
-            if asset_type == 'VIDEO':
+            if element_type == 'VIDEO':
                 # Сбрасываем указатель файла в начало для повторного чтения
                 file.seek(0)
-                thumbnail_url = generate_video_thumbnail(file, box.project.id, box.id)
+                thumbnail_url = generate_video_thumbnail(file, scene.project.id, scene.id)
             
-            # Создание Asset
-            from apps.assets.models import Asset
-            from apps.assets.serializers import AssetSerializer
+            # Создание Element
+            from apps.assets.models import Element
+            from apps.assets.serializers import ElementSerializer
             
             # Автоматически ставим order_index
-            next_order_index = box.assets.count()
+            next_order_index = scene.elements.count()
             
-            asset_data = {
-                'box': box.id,
-                'asset_type': asset_type,
+            element_data = {
+                'scene': scene.id,
+                'element_type': element_type,
                 'file_url': file_url,
                 'order_index': next_order_index,
                 'prompt_text': request.data.get('prompt_text', ''),
@@ -155,20 +155,20 @@ class BoxViewSet(viewsets.ModelViewSet):
             
             # Добавляем thumbnail_url если был сгенерирован
             if thumbnail_url:
-                asset_data['thumbnail_url'] = thumbnail_url
+                element_data['thumbnail_url'] = thumbnail_url
             
             # Если есть AI модель
             ai_model_id = request.data.get('ai_model')
             if ai_model_id:
-                asset_data['ai_model'] = ai_model_id
+                element_data['ai_model'] = ai_model_id
             
             # Создаем через serializer для валидации
-            serializer = AssetSerializer(data=asset_data)
+            serializer = ElementSerializer(data=element_data)
             serializer.is_valid(raise_exception=True)
-            asset = serializer.save()
+            element = serializer.save()
             
             return Response(
-                AssetSerializer(asset).data,
+                ElementSerializer(element).data,
                 status=status.HTTP_201_CREATED
             )
         
@@ -183,18 +183,18 @@ class BoxViewSet(viewsets.ModelViewSet):
         """
         Запустить AI генерацию элемента.
         
-        POST /api/boxes/{id}/generate/
+        POST /api/scenes/{id}/generate/
         
         Принимает:
         - prompt: текст промпта (обязательно)
         - ai_model_id: ID AI модели (обязательно)
         - generation_config: параметры генерации (опционально, dict)
-        - parent_asset_id: ID родительского элемента для img2vid (опционально)
+        - parent_element_id: ID родительского элемента для img2vid (опционально)
         
         Возвращает:
-        - Данные созданного Asset с status=PENDING
+        - Данные созданного Element с status=PENDING
         """
-        box = self.get_object()
+        scene = self.get_object()
         
         # Валидация входных данных
         prompt = request.data.get('prompt')
@@ -223,72 +223,72 @@ class BoxViewSet(viewsets.ModelViewSet):
             )
         
         # Проверка родительского элемента (если указан)
-        parent_asset = None
-        parent_asset_id = request.data.get('parent_asset_id')
-        if parent_asset_id:
-            from apps.assets.models import Asset
+        parent_element = None
+        parent_element_id = request.data.get('parent_element_id')
+        if parent_element_id:
+            from apps.assets.models import Element
             try:
-                parent_asset = Asset.objects.get(
-                    id=parent_asset_id,
-                    box__project__user=request.user  # Проверка владения
+                parent_element = Element.objects.get(
+                    id=parent_element_id,
+                    scene__project__user=request.user  # Проверка владения
                 )
-            except Asset.DoesNotExist:
+            except Element.DoesNotExist:
                 return Response(
-                    {'error': 'Parent asset not found or you do not have permission'},
+                    {'error': 'Parent element not found or you do not have permission'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
         
         # Определение типа элемента по модели
-        asset_type = ai_model.model_type  # IMAGE или VIDEO
+        element_type = ai_model.model_type  # IMAGE или VIDEO
         
         # Проверяем лимит элементов в сцене
         user_quota = request.user.quota
-        current_assets_count = box.assets.count()
+        current_elements_count = scene.elements.count()
         
-        if current_assets_count >= user_quota.max_assets_per_box:
+        if current_elements_count >= user_quota.max_elements_per_scene:
             return Response(
-                {'detail': f'Достигнут лимит элементов в сцене ({user_quota.max_assets_per_box}). Обратитесь к администратору.'},
+                {'detail': f'Достигнут лимит элементов в сцене ({user_quota.max_elements_per_scene}). Обратитесь к администратору.'},
                 status=status.HTTP_403_FORBIDDEN
             )
         
         # Определение source_type
-        from apps.assets.models import Asset
-        if parent_asset:
-            source_type = Asset.SOURCE_IMG2VID
+        from apps.assets.models import Element
+        if parent_element:
+            source_type = Element.SOURCE_IMG2VID
         else:
-            source_type = Asset.SOURCE_GENERATED
+            source_type = Element.SOURCE_GENERATED
         
         try:
             # Автоматически ставим order_index
-            next_order_index = box.assets.count()
-            # Создание Asset
-            from apps.assets.serializers import AssetSerializer
+            next_order_index = scene.elements.count()
+            # Создание Element
+            from apps.assets.serializers import ElementSerializer
             
-            asset_data = {
-                'box': box.id,
-                'asset_type': asset_type,
+            element_data = {
+                'scene': scene.id,
+                'element_type': element_type,
                 'order_index': next_order_index,
                 'prompt_text': prompt,
                 'ai_model': ai_model_id,
                 'generation_config': request.data.get('generation_config', {}),
-                'status': Asset.STATUS_PENDING,
+                'status': Element.STATUS_PENDING,
                 'source_type': source_type,
             }
             
-            if parent_asset:
-                asset_data['parent_asset'] = parent_asset.id
+            if parent_element:
+                element_data['parent_element'] = parent_element.id
             
             # Создаем через serializer для валидации
-            serializer = AssetSerializer(data=asset_data)
+            serializer = ElementSerializer(data=element_data)
             serializer.is_valid(raise_exception=True)
-            asset = serializer.save()
+            element = serializer.save()
             
             # Запускаем асинхронную генерацию
             from apps.assets.tasks import start_generation
-            start_generation.delay(asset.id)
+            start_generation.delay(element.id)
             
             return Response(
-                AssetSerializer(asset).data,
+                ElementSerializer(element).data,
                 status=status.HTTP_201_CREATED
             )
         
@@ -303,59 +303,59 @@ class BoxViewSet(viewsets.ModelViewSet):
         """
         Назначить лучший элемент для сцены.
         
-        POST /api/boxes/{id}/set_headliner/
+        POST /api/scenes/{id}/set_headliner/
         
         Принимает:
-        - asset_id: ID элемента (обязательно). Передать null для сброса.
+        - element_id: ID элемента (обязательно). Передать null для сброса.
         """
-        box = self.get_object()
-        asset_id = request.data.get('asset_id')
+        scene = self.get_object()
+        element_id = request.data.get('element_id')
 
-        if asset_id is None:
-            box.headliner = None
-            box.save(update_fields=['headliner', 'updated_at'])
-            return Response(BoxSerializer(box).data)
+        if element_id is None:
+            scene.headliner = None
+            scene.save(update_fields=['headliner', 'updated_at'])
+            return Response(SceneSerializer(scene).data)
 
-        from apps.assets.models import Asset
+        from apps.assets.models import Element
         try:
-            asset = Asset.objects.get(id=asset_id, box=box)
-        except Asset.DoesNotExist:
+            element = Element.objects.get(id=element_id, scene=scene)
+        except Element.DoesNotExist:
             return Response(
                 {'error': 'Элемент не найден или не принадлежит этой сцене.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        box.headliner = asset
-        box.save(update_fields=['headliner', 'updated_at'])
-        return Response(BoxSerializer(box).data)
+        scene.headliner = element
+        scene.save(update_fields=['headliner', 'updated_at'])
+        return Response(SceneSerializer(scene).data)
 
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
     def reorder(self, request):
         """
         Изменить порядок сцен.
         
-        POST /api/boxes/reorder/
+        POST /api/scenes/reorder/
         
         Принимает:
-        - box_ids: [1, 3, 2, ...] — список ID сцен в новом порядке
+        - scene_ids: [1, 3, 2, ...] — список ID сцен в новом порядке
         """
         serializer = ReorderSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        box_ids = serializer.validated_data['box_ids']
+        scene_ids = serializer.validated_data['scene_ids']
 
         # Проверяем, что все сцены принадлежат пользователю
-        user_box_ids = set(
-            Box.objects.filter(
+        user_scene_ids = set(
+            Scene.objects.filter(
                 project__user=request.user,
-                id__in=box_ids
+                id__in=scene_ids
             ).values_list('id', flat=True)
         )
-        if set(box_ids) != user_box_ids:
+        if set(scene_ids) != user_scene_ids:
             return Response(
                 {'error': 'Некоторые сцены не найдены или не принадлежат вам.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        reorder_boxes(box_ids)
+        reorder_scenes(scene_ids)
         return Response({'status': 'ok'})

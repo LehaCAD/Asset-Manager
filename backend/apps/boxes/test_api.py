@@ -4,18 +4,17 @@ from rest_framework.test import APITestCase
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from apps.projects.models import Project
-from apps.boxes.models import Box
-from apps.assets.models import Asset
+from apps.boxes.models import Scene
+from apps.assets.models import Element
 from unittest.mock import patch
 
 User = get_user_model()
 
 
-class BoxAPITest(APITestCase):
-    """Тесты для Boxes API."""
+class SceneAPITest(APITestCase):
+    """Тесты для Scenes API."""
     
     def setUp(self):
-        """Создание тестовых пользователей и данных."""
         self.user1 = User.objects.create_user(
             username='user1',
             email='user1@example.com',
@@ -36,81 +35,75 @@ class BoxAPITest(APITestCase):
             name='Проект пользователя 2'
         )
         
-        self.box1 = Box.objects.create(
+        self.scene1 = Scene.objects.create(
             project=self.project1,
-            name='Бокс 1',
+            name='Сцена 1',
             order_index=0
         )
-        self.box2 = Box.objects.create(
+        self.scene2 = Scene.objects.create(
             project=self.project1,
-            name='Бокс 2',
+            name='Сцена 2',
             order_index=1
         )
-        self.box3 = Box.objects.create(
+        self.scene3 = Scene.objects.create(
             project=self.project2,
-            name='Бокс пользователя 2',
+            name='Сцена пользователя 2',
             order_index=0
         )
         
-        # Создать ассеты для подсчета
-        Asset.objects.create(
-            box=self.box1,
-            asset_type=Asset.ASSET_TYPE_IMAGE,
+        Element.objects.create(
+            scene=self.scene1,
+            element_type=Element.ELEMENT_TYPE_IMAGE,
             file_url='https://example.com/1.jpg'
         )
-        Asset.objects.create(
-            box=self.box1,
-            asset_type=Asset.ASSET_TYPE_IMAGE,
+        Element.objects.create(
+            scene=self.scene1,
+            element_type=Element.ELEMENT_TYPE_IMAGE,
             file_url='https://example.com/2.jpg'
         )
         
-        self.list_url = reverse('box-list')
+        self.list_url = reverse('scene-list')
     
-    def test_list_boxes_unauthorized(self):
-        """Тест: неавторизованный пользователь не может получить список."""
+    def test_list_scenes_unauthorized(self):
         response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
     
-    def test_list_boxes_authenticated(self):
-        """Тест: пользователь видит только боксы своих проектов."""
+    def test_list_scenes_authenticated(self):
         self.client.force_authenticate(user=self.user1)
         response = self.client.get(self.list_url)
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 2)
-        self.assertEqual(response.data[0]['assets_count'], 2)
+        self.assertEqual(response.data[0]['elements_count'], 2)
     
-    def test_list_boxes_filtered_by_project(self):
-        """Тест: фильтрация боксов по project."""
+    def test_list_scenes_filtered_by_project(self):
         self.client.force_authenticate(user=self.user1)
         response = self.client.get(f'{self.list_url}?project={self.project1.id}')
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 2)
-        for box in response.data:
-            self.assertEqual(box['project'], self.project1.id)
+        for scene in response.data:
+            self.assertEqual(scene['project'], self.project1.id)
     
-    def test_create_box(self):
-        """Тест: создание бокса."""
+    def test_create_scene(self):
         self.client.force_authenticate(user=self.user1)
         data = {
             'project': self.project1.id,
-            'name': 'Новый бокс',
+            'name': 'Новая сцена',
             'order_index': 2
         }
         response = self.client.post(self.list_url, data)
         
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data['name'], 'Новый бокс')
-        self.assertEqual(response.data['assets_count'], 0)
+        self.assertEqual(response.data['name'], 'Новая сцена')
+        self.assertEqual(response.data['elements_count'], 0)
         self.assertEqual(response.data['project_name'], 'Проект пользователя 1')
     
-    def test_create_box_for_other_user_project(self):
-        """Тест: нельзя создать бокс в чужом проекте."""
+    def test_create_scene_for_other_user_project(self):
         self.client.force_authenticate(user=self.user1)
         data = {
-            'project': self.project2.id,  # Проект user2
-            'name': 'Попытка создать бокс',
+            'project': self.project2.id,
+            'name': 'Попытка создать сцену',
             'order_index': 0
         }
         response = self.client.post(self.list_url, data)
@@ -118,29 +111,26 @@ class BoxAPITest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('project', response.data)
     
-    def test_retrieve_box(self):
-        """Тест: получение деталей бокса."""
+    def test_retrieve_scene(self):
         self.client.force_authenticate(user=self.user1)
-        url = reverse('box-detail', kwargs={'pk': self.box1.pk})
+        url = reverse('scene-detail', kwargs={'pk': self.scene1.pk})
         response = self.client.get(url)
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['name'], 'Бокс 1')
-        self.assertEqual(response.data['assets_count'], 2)
+        self.assertEqual(response.data['name'], 'Сцена 1')
+        self.assertEqual(response.data['elements_count'], 2)
         self.assertEqual(response.data['project_name'], 'Проект пользователя 1')
     
-    def test_retrieve_other_user_box(self):
-        """Тест: пользователь не может получить чужой бокс."""
+    def test_retrieve_other_user_scene(self):
         self.client.force_authenticate(user=self.user1)
-        url = reverse('box-detail', kwargs={'pk': self.box3.pk})
+        url = reverse('scene-detail', kwargs={'pk': self.scene3.pk})
         response = self.client.get(url)
         
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
     
-    def test_update_box(self):
-        """Тест: обновление бокса (PUT)."""
+    def test_update_scene(self):
         self.client.force_authenticate(user=self.user1)
-        url = reverse('box-detail', kwargs={'pk': self.box1.pk})
+        url = reverse('scene-detail', kwargs={'pk': self.scene1.pk})
         data = {
             'project': self.project1.id,
             'name': 'Обновленное название',
@@ -152,70 +142,61 @@ class BoxAPITest(APITestCase):
         self.assertEqual(response.data['name'], 'Обновленное название')
         self.assertEqual(response.data['order_index'], 5)
     
-    def test_partial_update_box(self):
-        """Тест: частичное обновление бокса (PATCH)."""
+    def test_partial_update_scene(self):
         self.client.force_authenticate(user=self.user1)
-        url = reverse('box-detail', kwargs={'pk': self.box1.pk})
-        data = {'name': 'Частично обновлен'}
+        url = reverse('scene-detail', kwargs={'pk': self.scene1.pk})
+        data = {'name': 'Частично обновлена'}
         response = self.client.patch(url, data)
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['name'], 'Частично обновлен')
-        self.assertEqual(response.data['order_index'], 0)  # Не изменился
+        self.assertEqual(response.data['name'], 'Частично обновлена')
+        self.assertEqual(response.data['order_index'], 0)
     
-    def test_delete_box(self):
-        """Тест: удаление бокса."""
+    def test_delete_scene(self):
         self.client.force_authenticate(user=self.user1)
-        url = reverse('box-detail', kwargs={'pk': self.box2.pk})
+        url = reverse('scene-detail', kwargs={'pk': self.scene2.pk})
         response = self.client.delete(url)
         
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(Box.objects.filter(pk=self.box2.pk).exists())
+        self.assertFalse(Scene.objects.filter(pk=self.scene2.pk).exists())
     
-    def test_delete_other_user_box(self):
-        """Тест: пользователь не может удалить чужой бокс."""
+    def test_delete_other_user_scene(self):
         self.client.force_authenticate(user=self.user1)
-        url = reverse('box-detail', kwargs={'pk': self.box3.pk})
+        url = reverse('scene-detail', kwargs={'pk': self.scene3.pk})
         response = self.client.delete(url)
         
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertTrue(Box.objects.filter(pk=self.box3.pk).exists())
+        self.assertTrue(Scene.objects.filter(pk=self.scene3.pk).exists())
     
-    def test_assets_count_field(self):
-        """Тест: поле assets_count правильно подсчитывает ассеты."""
+    def test_elements_count_field(self):
         self.client.force_authenticate(user=self.user1)
-        url = reverse('box-detail', kwargs={'pk': self.box1.pk})
+        url = reverse('scene-detail', kwargs={'pk': self.scene1.pk})
         response = self.client.get(url)
         
-        self.assertEqual(response.data['assets_count'], 2)
+        self.assertEqual(response.data['elements_count'], 2)
         
-        # Добавить еще ассет
-        Asset.objects.create(
-            box=self.box1,
-            asset_type=Asset.ASSET_TYPE_VIDEO,
+        Element.objects.create(
+            scene=self.scene1,
+            element_type=Element.ELEMENT_TYPE_VIDEO,
             file_url='https://example.com/video.mp4'
         )
         response = self.client.get(url)
-        self.assertEqual(response.data['assets_count'], 3)
+        self.assertEqual(response.data['elements_count'], 3)
     
     def test_project_name_field(self):
-        """Тест: поле project_name возвращает название проекта."""
         self.client.force_authenticate(user=self.user1)
-        url = reverse('box-detail', kwargs={'pk': self.box1.pk})
+        url = reverse('scene-detail', kwargs={'pk': self.scene1.pk})
         response = self.client.get(url)
         
         self.assertEqual(response.data['project_name'], 'Проект пользователя 1')
     
     @patch('apps.boxes.views.upload_file_to_s3')
     def test_upload_file(self, mock_upload):
-        """Тест: загрузка файла на S3 и создание Asset."""
-        # Мокаем загрузку на S3
         mock_upload.return_value = ('https://s3.example.com/uploads/test.jpg', 'test.jpg')
         
         self.client.force_authenticate(user=self.user1)
-        url = reverse('box-upload', kwargs={'pk': self.box1.pk})
+        url = reverse('scene-upload', kwargs={'pk': self.scene1.pk})
         
-        # Создаем тестовый файл
         file_content = b'fake image content'
         file = SimpleUploadedFile('test.jpg', file_content, content_type='image/jpeg')
         
@@ -228,48 +209,43 @@ class BoxAPITest(APITestCase):
         response = self.client.post(url, data, format='multipart')
         
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data['box'], self.box1.id)
-        self.assertEqual(response.data['asset_type'], Asset.ASSET_TYPE_IMAGE)
+        self.assertEqual(response.data['scene'], self.scene1.id)
+        self.assertEqual(response.data['element_type'], Element.ELEMENT_TYPE_IMAGE)
         self.assertEqual(response.data['file_url'], 'https://s3.example.com/uploads/test.jpg')
         self.assertEqual(response.data['prompt_text'], 'Test prompt')
         self.assertTrue(response.data['is_favorite'])
         
-        # Проверить, что Asset создан в БД
-        self.assertTrue(Asset.objects.filter(box=self.box1, file_url='https://s3.example.com/uploads/test.jpg').exists())
+        self.assertTrue(Element.objects.filter(scene=self.scene1, file_url='https://s3.example.com/uploads/test.jpg').exists())
     
     @patch('apps.boxes.views.upload_file_to_s3')
     def test_upload_video_file(self, mock_upload):
-        """Тест: загрузка видео файла."""
         mock_upload.return_value = ('https://s3.example.com/uploads/test.mp4', 'test.mp4')
         
         self.client.force_authenticate(user=self.user1)
-        url = reverse('box-upload', kwargs={'pk': self.box1.pk})
+        url = reverse('scene-upload', kwargs={'pk': self.scene1.pk})
         
         file = SimpleUploadedFile('test.mp4', b'fake video', content_type='video/mp4')
         
         response = self.client.post(url, {'file': file}, format='multipart')
         
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data['asset_type'], Asset.ASSET_TYPE_VIDEO)
+        self.assertEqual(response.data['element_type'], Element.ELEMENT_TYPE_VIDEO)
     
     def test_upload_without_file(self):
-        """Тест: ошибка при загрузке без файла."""
         self.client.force_authenticate(user=self.user1)
-        url = reverse('box-upload', kwargs={'pk': self.box1.pk})
+        url = reverse('scene-upload', kwargs={'pk': self.scene1.pk})
         
         response = self.client.post(url, {}, format='multipart')
         
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('error', response.data)
     
-    def test_upload_to_other_user_box(self):
-        """Тест: нельзя загрузить файл в чужой бокс."""
+    def test_upload_to_other_user_scene(self):
         self.client.force_authenticate(user=self.user1)
-        url = reverse('box-upload', kwargs={'pk': self.box3.pk})  # Бокс user2
+        url = reverse('scene-upload', kwargs={'pk': self.scene3.pk})
         
         file = SimpleUploadedFile('test.jpg', b'fake image', content_type='image/jpeg')
         
         response = self.client.post(url, {'file': file}, format='multipart')
         
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-

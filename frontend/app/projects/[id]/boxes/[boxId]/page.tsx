@@ -20,7 +20,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { apiClient, type Asset, type Box, type Project } from '@/lib/api';
+import { apiClient, type Element, type Scene, type Project } from '@/lib/api';
 import { useAuthStore } from '@/lib/store/auth';
 import AssetThumbnail from '@/components/AssetThumbnail';
 import DropZone from '@/components/DropZone';
@@ -37,9 +37,9 @@ const STATUS_CONFIG = {
   APPROVED: { label: 'Утверждён', color: 'bg-green-100 text-green-700' },
 } as const;
 
-// Sortable wrapper for AssetThumbnail
-interface SortableAssetProps {
-  asset: Asset;
+// Sortable wrapper for ElementThumbnail
+interface SortableElementProps {
+  asset: Element;
   index: number;
   isSelected: boolean;
   isHeadliner: boolean;
@@ -51,7 +51,7 @@ interface SortableAssetProps {
   aspectClass?: string;
 }
 
-function SortableAssetThumbnail(props: SortableAssetProps) {
+function SortableElementThumbnail(props: SortableElementProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: props.asset.id,
   });
@@ -69,24 +69,24 @@ function SortableAssetThumbnail(props: SortableAssetProps) {
   );
 }
 
-export default function BoxDetailPage() {
+export default function SceneDetailPage() {
   const params = useParams();
   const router = useRouter();
   const projectId = Number(params.id);
-  const boxId = Number(params.boxId);
+  const sceneId = Number(params.boxId);
   const { user } = useAuthStore();
 
   const [project, setProject] = useState<Project | null>(null);
-  const [box, setBox] = useState<Box | null>(null);
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+  const [scene, setScene] = useState<Scene | null>(null);
+  const [elements, setElements] = useState<Element[]>([]);
+  const [selectedElement, setSelectedElement] = useState<Element | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterType>('all');
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [statusLoading, setStatusLoading] = useState(false);
   const [uploads, setUploads] = useState<UploadItem[]>([]);
-  const [activeAssetId, setActiveAssetId] = useState<number | null>(null);
+  const [activeElementId, setActiveElementId] = useState<number | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -99,22 +99,22 @@ export default function BoxDetailPage() {
   useEffect(() => {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [boxId]);
+  }, [sceneId]);
 
   const loadData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [projectData, boxData, assetsData] = await Promise.all([
+      const [projectData, sceneData, elementsData] = await Promise.all([
         apiClient.getProject(projectId),
-        apiClient.getBox(boxId),
-        apiClient.getAssets(boxId),
+        apiClient.getScene(sceneId),
+        apiClient.getElements(sceneId),
       ]);
       setProject(projectData);
-      setBox(boxData);
-      setAssets(assetsData);
-      if (assetsData.length > 0 && !selectedAsset) {
-        setSelectedAsset(assetsData[0]);
+      setScene(sceneData);
+      setElements(elementsData);
+      if (elementsData.length > 0 && !selectedElement) {
+        setSelectedElement(elementsData[0]);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось загрузить данные');
@@ -123,10 +123,10 @@ export default function BoxDetailPage() {
     }
   };
 
-  const handleSetHeadliner = async (assetId: number) => {
+  const handleSetHeadliner = async (elementId: number) => {
     try {
-      const updatedBox = await apiClient.setHeadliner(boxId, assetId);
-      setBox(updatedBox);
+      const updatedScene = await apiClient.setHeadliner(sceneId, elementId);
+      setScene(updatedScene);
       toast.success('Лучший элемент установлен');
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Ошибка';
@@ -134,14 +134,14 @@ export default function BoxDetailPage() {
     }
   };
 
-  const handleToggleFavorite = async (asset: Asset) => {
+  const handleToggleFavorite = async (element: Element) => {
     try {
-      const updated = await apiClient.updateAsset(asset.id, {
-        is_favorite: !asset.is_favorite,
+      const updated = await apiClient.updateElement(element.id, {
+        is_favorite: !element.is_favorite,
       });
-      setAssets(assets.map((a) => (a.id === updated.id ? updated : a)));
-      if (selectedAsset?.id === updated.id) {
-        setSelectedAsset(updated);
+      setElements(elements.map((a) => (a.id === updated.id ? updated : a)));
+      if (selectedElement?.id === updated.id) {
+        setSelectedElement(updated);
       }
       toast.success(updated.is_favorite ? 'Добавлено в избранное' : 'Удалено из избранного');
     } catch (e) {
@@ -150,17 +150,17 @@ export default function BoxDetailPage() {
     }
   };
 
-  const handleDeleteAsset = async (assetId: number) => {
+  const handleDeleteElement = async (elementId: number) => {
     try {
-      await apiClient.deleteAsset(assetId);
-      const newAssets = assets.filter((a) => a.id !== assetId);
-      setAssets(newAssets);
-      if (selectedAsset?.id === assetId) {
-        setSelectedAsset(newAssets[0] || null);
+      await apiClient.deleteElement(elementId);
+      const newElements = elements.filter((a) => a.id !== elementId);
+      setElements(newElements);
+      if (selectedElement?.id === elementId) {
+        setSelectedElement(newElements[0] || null);
       }
-      // Reload box to update counter
-      const updatedBox = await apiClient.getBox(boxId);
-      setBox(updatedBox);
+      // Reload scene to update counter
+      const updatedScene = await apiClient.getScene(sceneId);
+      setScene(updatedScene);
       toast.success('Элемент удалён');
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Ошибка';
@@ -168,12 +168,12 @@ export default function BoxDetailPage() {
     }
   };
 
-  const handleStatusChange = async (newStatus: Box['status']) => {
-    if (!box) return;
+  const handleStatusChange = async (newStatus: Scene['status']) => {
+    if (!scene) return;
     setStatusLoading(true);
     try {
-      const updated = await apiClient.updateBox(box.id, { status: newStatus });
-      setBox(updated);
+      const updated = await apiClient.updateScene(scene.id, { status: newStatus });
+      setScene(updated);
       setShowStatusModal(false);
       toast.success('Статус сцены изменён');
     } catch (e) {
@@ -186,14 +186,14 @@ export default function BoxDetailPage() {
 
   const handleFilesSelected = async (files: File[]) => {
     // Check quota limits
-    if (user?.quota && assets.length >= user.quota.max_assets_per_box) {
-      toast.error(`Достигнут лимит элементов (${user.quota.max_assets_per_box}). Обратитесь к администратору.`);
+    if (user?.quota && elements.length >= user.quota.max_elements_per_scene) {
+      toast.error(`Достигнут лимит элементов (${user.quota.max_elements_per_scene}). Обратитесь к администратору.`);
       return;
     }
 
     // Check if adding these files will exceed the limit
-    if (user?.quota && assets.length + files.length > user.quota.max_assets_per_box) {
-      toast.error(`Можно загрузить только ${user.quota.max_assets_per_box - assets.length} файлов (лимит: ${user.quota.max_assets_per_box})`);
+    if (user?.quota && elements.length + files.length > user.quota.max_elements_per_scene) {
+      toast.error(`Можно загрузить только ${user.quota.max_elements_per_scene - elements.length} файлов (лимит: ${user.quota.max_elements_per_scene})`);
       return;
     }
 
@@ -208,7 +208,7 @@ export default function BoxDetailPage() {
 
     for (const upload of newUploads) {
       try {
-        const asset = await apiClient.uploadFile(boxId, upload.file, (progress) => {
+        const element = await apiClient.uploadFile(sceneId, upload.file, (progress) => {
           setUploads((prev) =>
             prev.map((u) => (u.id === upload.id ? { ...u, progress } : u))
           );
@@ -219,16 +219,16 @@ export default function BoxDetailPage() {
           prev.map((u) => (u.id === upload.id ? { ...u, status: 'completed' as const } : u))
         );
 
-        // Add asset to the list
-        setAssets((prev) => [...prev, asset]);
+        // Add element to the list
+        setElements((prev) => [...prev, element]);
 
-        // Reload box to update counter
-        const updatedBox = await apiClient.getBox(boxId);
-        setBox(updatedBox);
+        // Reload scene to update counter
+        const updatedScene = await apiClient.getScene(sceneId);
+        setScene(updatedScene);
 
-        // Auto-select first asset if none selected
-        if (!selectedAsset) {
-          setSelectedAsset(asset);
+        // Auto-select first element if none selected
+        if (!selectedElement) {
+          setSelectedElement(element);
         }
 
         toast.success(`${upload.file.name} загружен`);
@@ -256,36 +256,36 @@ export default function BoxDetailPage() {
   };
 
   const handleDragStart = (event: DragStartEvent) => {
-    setActiveAssetId(event.active.id as number);
+    setActiveElementId(event.active.id as number);
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
-    setActiveAssetId(null);
+    setActiveElementId(null);
 
     if (!over || active.id === over.id) return;
 
-    const oldIndex = filteredAssets.findIndex((a) => a.id === active.id);
-    const newIndex = filteredAssets.findIndex((a) => a.id === over.id);
+    const oldIndex = filteredElements.findIndex((a) => a.id === active.id);
+    const newIndex = filteredElements.findIndex((a) => a.id === over.id);
 
     if (oldIndex === -1 || newIndex === -1) return;
 
     // Optimistic update
-    const newAssets = [...filteredAssets];
-    const [movedAsset] = newAssets.splice(oldIndex, 1);
-    newAssets.splice(newIndex, 0, movedAsset);
+    const newElements = [...filteredElements];
+    const [movedElement] = newElements.splice(oldIndex, 1);
+    newElements.splice(newIndex, 0, movedElement);
 
-    // Update order_index for all assets
-    const updatedAssets = newAssets.map((asset, index) => ({
-      ...asset,
+    // Update order_index for all elements
+    const updatedElements = newElements.map((element, index) => ({
+      ...element,
       order_index: index,
     }));
 
-    setAssets(updatedAssets);
+    setElements(updatedElements);
 
     try {
       // Send reorder request
-      await apiClient.reorderAssets(updatedAssets.map((a) => a.id));
+      await apiClient.reorderElements(updatedElements.map((a) => a.id));
       toast.success('Порядок элементов обновлён');
     } catch (e) {
       // Revert on error
@@ -295,15 +295,15 @@ export default function BoxDetailPage() {
     }
   };
 
-  const filteredAssets = assets.filter((asset) => {
-    if (filter === 'favorite') return asset.is_favorite;
-    if (filter === 'image') return asset.asset_type === 'IMAGE';
-    if (filter === 'video') return asset.asset_type === 'VIDEO';
+  const filteredElements = elements.filter((element) => {
+    if (filter === 'favorite') return element.is_favorite;
+    if (filter === 'image') return element.asset_type === 'IMAGE';
+    if (filter === 'video') return element.asset_type === 'VIDEO';
     return true;
   });
 
   const aspectClass = project ? getAspectClass(project.aspect_ratio) : 'aspect-square';
-  const assetsGridClass = project ? getGridClass(project.aspect_ratio, 'box') : 'grid-cols-2';
+  const elementsGridClass = project ? getGridClass(project.aspect_ratio, 'box') : 'grid-cols-2';
 
   if (loading) {
     return (
@@ -317,7 +317,7 @@ export default function BoxDetailPage() {
     );
   }
 
-  if (error || !box) {
+  if (error || !scene) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="bg-red-50 border border-red-200 rounded-xl p-4">
@@ -348,41 +348,41 @@ export default function BoxDetailPage() {
           onClick={() => router.push(`/projects/${projectId}`)}
           className="hover:text-txt-secondary transition-colors"
         >
-          {box.project_name}
+          {scene.project_name}
         </button>
         <span>/</span>
-        <span className="text-txt-primary font-medium">{box.name}</span>
+        <span className="text-txt-primary font-medium">{scene.name}</span>
       </nav>
 
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl sm:text-3xl font-bold text-txt-primary">
-            {box.name}
+            {scene.name}
           </h1>
           <button
             onClick={() => setShowStatusModal(true)}
-            className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${STATUS_CONFIG[box.status].color} hover:opacity-80`}
+            className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${STATUS_CONFIG[scene.status].color} hover:opacity-80`}
           >
-            {STATUS_CONFIG[box.status].label}
+            {STATUS_CONFIG[scene.status].label}
           </button>
         </div>
         <div className="text-sm text-txt-muted">
           {user?.quota ? (
             <>
-              {assets.length}/{user.quota.max_assets_per_box} {formatElementCount(user.quota.max_assets_per_box)}
-              {assets.length >= user.quota.max_assets_per_box && (
+              {elements.length}/{user.quota.max_elements_per_scene} {formatElementCount(user.quota.max_elements_per_scene)}
+              {elements.length >= user.quota.max_elements_per_scene && (
                 <span className="ml-2 text-red-500 font-medium">• Лимит</span>
               )}
             </>
           ) : (
-            <>{assets.length} {formatElementCount(assets.length)}</>
+            <>{elements.length} {formatElementCount(elements.length)}</>
           )}
         </div>
       </div>
 
       {/* Main content */}
-      {assets.length === 0 ? (
+      {elements.length === 0 ? (
         /* Empty state: fullscreen DropZone */
         <div className="min-h-[calc(100vh-300px)] flex items-center justify-center">
           <div className="w-full max-w-2xl">
@@ -393,20 +393,20 @@ export default function BoxDetailPage() {
         <div className="flex flex-col sm:flex-row gap-6">
           {/* Main viewer (70%) */}
           <div className="flex-1 bg-surface-secondary rounded-xl overflow-hidden flex items-center justify-center min-h-[300px] max-h-[calc(100vh-200px)]">
-            {selectedAsset ? (
+            {selectedElement ? (
               <div className="relative w-full h-full flex items-center justify-center p-8">
                 <div className="rounded-xl overflow-hidden shadow-lg">
-                  {selectedAsset.asset_type === 'VIDEO' ? (
+                  {selectedElement.asset_type === 'VIDEO' ? (
                     <video
-                      src={selectedAsset.file_url}
+                      src={selectedElement.file_url}
                       controls
                       loop
                       className="max-w-full max-h-[70vh] object-contain"
                     />
                   ) : (
                     <Image
-                      src={selectedAsset.file_url}
-                      alt={`Элемент #${selectedAsset.order_index + 1}`}
+                      src={selectedElement.file_url}
+                      alt={`Элемент #${selectedElement.order_index + 1}`}
                       width={1200}
                       height={800}
                       className="max-w-full max-h-[70vh] object-contain"
@@ -458,7 +458,7 @@ export default function BoxDetailPage() {
               ))}
             </div>
 
-            {/* Asset grid */}
+            {/* Element grid */}
             <div className="flex-1 overflow-y-auto bg-surface-secondary rounded-xl p-4">
               <DndContext
                 sensors={sensors}
@@ -467,27 +467,27 @@ export default function BoxDetailPage() {
                 onDragEnd={handleDragEnd}
               >
                 <SortableContext
-                  items={filteredAssets.map((a) => a.id)}
+                  items={filteredElements.map((a) => a.id)}
                   strategy={rectSortingStrategy}
                 >
-                  <div className={`grid ${assetsGridClass} gap-3`}>
-                    {filteredAssets.map((asset, index) => (
-                      <SortableAssetThumbnail
-                        key={asset.id}
-                        asset={asset}
+                  <div className={`grid ${elementsGridClass} gap-3`}>
+                    {filteredElements.map((element, index) => (
+                      <SortableElementThumbnail
+                        key={element.id}
+                        asset={element}
                         index={index}
-                        isSelected={selectedAsset?.id === asset.id}
-                        isHeadliner={box.headliner === asset.id}
-                        onSelect={() => setSelectedAsset(asset)}
-                        onSetHeadliner={() => handleSetHeadliner(asset.id)}
-                        onToggleFavorite={() => handleToggleFavorite(asset)}
-                        onDelete={() => handleDeleteAsset(asset.id)}
+                        isSelected={selectedElement?.id === element.id}
+                        isHeadliner={scene.headliner === element.id}
+                        onSelect={() => setSelectedElement(element)}
+                        onSetHeadliner={() => handleSetHeadliner(element.id)}
+                        onToggleFavorite={() => handleToggleFavorite(element)}
+                        onDelete={() => handleDeleteElement(element.id)}
                         aspectClass={aspectClass}
                       />
                     ))}
                     
-                    {/* Add Asset Slot */}
-                    {user?.quota && assets.length < user.quota.max_assets_per_box && (
+                    {/* Add Element Slot */}
+                    {user?.quota && elements.length < user.quota.max_elements_per_scene && (
                       <AddAssetSlot
                         onFilesSelected={handleFilesSelected}
                         disabled={uploads.some((u) => u.status === 'uploading')}
@@ -498,13 +498,13 @@ export default function BoxDetailPage() {
                 </SortableContext>
 
                 <DragOverlay>
-                  {activeAssetId ? (
+                  {activeElementId ? (
                     <div className="opacity-80 scale-110">
                       <AssetThumbnail
-                        asset={filteredAssets.find((a) => a.id === activeAssetId)!}
-                        index={filteredAssets.findIndex((a) => a.id === activeAssetId)}
+                        asset={filteredElements.find((a) => a.id === activeElementId)!}
+                        index={filteredElements.findIndex((a) => a.id === activeElementId)}
                         isSelected={false}
-                        isHeadliner={box.headliner === activeAssetId}
+                        isHeadliner={scene.headliner === activeElementId}
                         onSelect={() => {}}
                         onSetHeadliner={() => {}}
                         onToggleFavorite={() => {}}
@@ -533,9 +533,9 @@ export default function BoxDetailPage() {
                 <button
                   key={status}
                   onClick={() => handleStatusChange(status)}
-                  disabled={statusLoading || box.status === status}
+                        disabled={statusLoading || scene.status === status}
                   className={`w-full px-4 py-3 text-left rounded-lg border transition-all ${
-                    box.status === status
+                    scene.status === status
                       ? 'border-accent bg-accent/5 cursor-default'
                       : 'border-surface-border hover:border-accent/50 hover:bg-surface-secondary'
                   } disabled:opacity-50`}
@@ -544,7 +544,7 @@ export default function BoxDetailPage() {
                     <span className="text-sm font-medium text-txt-primary">
                       {STATUS_CONFIG[status].label}
                     </span>
-                    {box.status === status && (
+                    {scene.status === status && (
                       <svg
                         width="16"
                         height="16"

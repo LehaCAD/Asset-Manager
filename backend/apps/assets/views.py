@@ -2,20 +2,20 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from .models import Asset
-from .serializers import AssetSerializer, ReorderSerializer
-from .services import reorder_assets
+from .models import Element
+from .serializers import ElementSerializer, ReorderSerializer
+from .services import reorder_elements
 from apps.boxes.s3_utils import delete_file_from_s3
 
 
-class IsBoxProjectOwner(permissions.BasePermission):
+class IsSceneProjectOwner(permissions.BasePermission):
     """Пермишен: пользователь может работать только с элементами сцен своих проектов."""
     
     def has_object_permission(self, request, view, obj):
-        return obj.box.project.user == request.user
+        return obj.scene.project.user == request.user
 
 
-class AssetViewSet(viewsets.ModelViewSet):
+class ElementViewSet(viewsets.ModelViewSet):
     """
     ViewSet для CRUD операций с элементами.
     
@@ -26,8 +26,8 @@ class AssetViewSet(viewsets.ModelViewSet):
     partial_update: Частично обновить элемент (PATCH)
     destroy: Удалить элемент
     """
-    serializer_class = AssetSerializer
-    permission_classes = [IsAuthenticated, IsBoxProjectOwner]
+    serializer_class = ElementSerializer
+    permission_classes = [IsAuthenticated, IsSceneProjectOwner]
     
     def perform_destroy(self, instance):
         """Удаление элемента с очисткой файлов из S3."""
@@ -41,19 +41,19 @@ class AssetViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """Возвращает только элементы сцен проектов текущего пользователя с фильтрацией."""
-        queryset = Asset.objects.filter(
-            box__project__user=self.request.user
-        ).select_related('box', 'box__project', 'ai_model')
+        queryset = Element.objects.filter(
+            scene__project__user=self.request.user
+        ).select_related('scene', 'scene__project', 'ai_model')
         
-        # Фильтрация по box через query params
-        box_id = self.request.query_params.get('box', None)
-        if box_id is not None:
-            queryset = queryset.filter(box_id=box_id)
+        # Фильтрация по scene через query params
+        scene_id = self.request.query_params.get('scene', None)
+        if scene_id is not None:
+            queryset = queryset.filter(scene_id=scene_id)
         
-        # Фильтрация по asset_type
-        asset_type = self.request.query_params.get('asset_type', None)
-        if asset_type is not None:
-            queryset = queryset.filter(asset_type=asset_type)
+        # Фильтрация по element_type
+        element_type = self.request.query_params.get('element_type', None)
+        if element_type is not None:
+            queryset = queryset.filter(element_type=element_type)
         
         # Фильтрация по is_favorite
         is_favorite = self.request.query_params.get('is_favorite', None)
@@ -69,28 +69,28 @@ class AssetViewSet(viewsets.ModelViewSet):
         """
         Изменить порядок элементов.
         
-        POST /api/assets/reorder/
+        POST /api/elements/reorder/
         
         Принимает:
-        - asset_ids: [1, 3, 2, ...] — список ID элементов в новом порядке
+        - element_ids: [1, 3, 2, ...] — список ID элементов в новом порядке
         """
         serializer = ReorderSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        asset_ids = serializer.validated_data['asset_ids']
+        element_ids = serializer.validated_data['element_ids']
 
         # Проверяем, что все элементы принадлежат пользователю
-        user_asset_ids = set(
-            Asset.objects.filter(
-                box__project__user=request.user,
-                id__in=asset_ids
+        user_element_ids = set(
+            Element.objects.filter(
+                scene__project__user=request.user,
+                id__in=element_ids
             ).values_list('id', flat=True)
         )
-        if set(asset_ids) != user_asset_ids:
+        if set(element_ids) != user_element_ids:
             return Response(
                 {'error': 'Некоторые элементы не найдены или не принадлежат вам.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        reorder_assets(asset_ids)
+        reorder_elements(element_ids)
         return Response({'status': 'ok'})

@@ -50,8 +50,8 @@ class UserSerializer(serializers.ModelSerializer):
     def get_quota(self, obj: User) -> dict:
         """Получение информации о квотах пользователя."""
         from apps.projects.models import Project
-        from apps.boxes.models import Box
-        from apps.assets.models import Asset
+        from apps.scenes.models import Scene
+        from apps.elements.models import Element
         from apps.users.models import UserQuota
         
         # Получаем квоты, создаем если не существует (защита от legacy users)
@@ -66,25 +66,25 @@ class UserSerializer(serializers.ModelSerializer):
         
         # Для сцен и элементов считаем максимальное использование в одном проекте/сцене
         projects = Project.objects.filter(user=obj)
-        max_boxes_used = 0
-        max_assets_used = 0
+        max_scenes_used = 0
+        max_elements_used = 0
         
         for project in projects:
-            boxes_count = Box.objects.filter(project=project).count()
-            if boxes_count > max_boxes_used:
-                max_boxes_used = boxes_count
+            scenes_count = Scene.objects.filter(project=project).count()
+            if scenes_count > max_scenes_used:
+                max_scenes_used = scenes_count
             
-            boxes = Box.objects.filter(project=project)
-            for box in boxes:
-                assets_count = Asset.objects.filter(box=box).count()
-                if assets_count > max_assets_used:
-                    max_assets_used = assets_count
+            scenes = Scene.objects.filter(project=project)
+            for scene in scenes:
+                elements_count = Element.objects.filter(scene=scene).count()
+                if elements_count > max_elements_used:
+                    max_elements_used = elements_count
         
         return {
             'max_projects': user_quota.max_projects,
             'used_projects': used_projects,
-            'max_boxes_per_project': user_quota.max_boxes_per_project,
-            'max_boxes_used': max_boxes_used,
-            'max_assets_per_box': user_quota.max_assets_per_box,
-            'max_assets_used': max_assets_used,
+            'max_scenes_per_project': user_quota.max_scenes_per_project,
+            'max_scenes_used': max_scenes_used,
+            'max_elements_per_scene': user_quota.max_elements_per_scene,
+            'max_elements_used': max_elements_used,
         }

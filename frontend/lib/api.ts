@@ -6,8 +6,8 @@ interface TokenPair {
 interface UserQuota {
   max_projects: number;
   used_projects: number;
-  max_boxes_per_project: number;
-  max_assets_per_box: number;
+  max_scenes_per_project: number;
+  max_elements_per_scene: number;
 }
 
 interface User {
@@ -23,13 +23,13 @@ interface Project {
   status: 'ACTIVE' | 'PAUSED' | 'COMPLETED';
   status_display: string;
   aspect_ratio: '16:9' | '9:16';
-  boxes_count: number;
-  boxes_approved_count: number;
+  scenes_count: number;
+  scenes_approved_count: number;
   created_at: string;
   updated_at: string;
 }
 
-interface Box {
+interface Scene {
   id: number;
   project: number;
   project_name: string;
@@ -41,15 +41,15 @@ interface Box {
   headliner_url: string;
   headliner_thumbnail_url: string;
   headliner_type: string;
-  assets_count: number;
+  elements_count: number;
   created_at: string;
   updated_at: string;
 }
 
-interface Asset {
+interface Element {
   id: number;
-  box: number;
-  box_name: string;
+  scene: number;
+  scene_name: string;
   asset_type: 'IMAGE' | 'VIDEO';
   order_index: number;
   file_url: string;
@@ -65,7 +65,7 @@ interface Asset {
   error_message: string;
   source_type: 'GENERATED' | 'UPLOADED' | 'IMG2VID';
   source_type_display: string;
-  parent_asset: number | null;
+  parent_element: number | null;
   external_task_id: string;
   created_at: string;
   updated_at: string;
@@ -301,93 +301,93 @@ class APIClient {
     });
   }
 
-  // ─── Boxes ───────────────────────────────────────────────
+  // ─── Scenes ──────────────────────────────────────────────
 
-  async getBoxes(projectId: number): Promise<Box[]> {
-    return this.request<Box[]>(`/api/boxes/?project=${projectId}`);
+  async getScenes(projectId: number): Promise<Scene[]> {
+    return this.request<Scene[]>(`/api/scenes/?project=${projectId}`);
   }
 
-  async getBox(id: number): Promise<Box> {
-    return this.request<Box>(`/api/boxes/${id}/`);
+  async getScene(id: number): Promise<Scene> {
+    return this.request<Scene>(`/api/scenes/${id}/`);
   }
 
-  async createBox(projectId: number, name: string): Promise<Box> {
-    return this.request<Box>('/api/boxes/', {
+  async createScene(projectId: number, name: string): Promise<Scene> {
+    return this.request<Scene>('/api/scenes/', {
       method: 'POST',
       body: JSON.stringify({ project: projectId, name }),
     });
   }
 
-  async updateBox(id: number, data: Partial<Pick<Box, 'name' | 'status'>>): Promise<Box> {
-    return this.request<Box>(`/api/boxes/${id}/`, {
+  async updateScene(id: number, data: Partial<Pick<Scene, 'name' | 'status'>>): Promise<Scene> {
+    return this.request<Scene>(`/api/scenes/${id}/`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
   }
 
-  async deleteBox(id: number): Promise<void> {
-    await this.request<void>(`/api/boxes/${id}/`, {
+  async deleteScene(id: number): Promise<void> {
+    await this.request<void>(`/api/scenes/${id}/`, {
       method: 'DELETE',
     });
   }
 
-  async reorderBoxes(boxIds: number[]): Promise<void> {
-    await this.request<void>('/api/boxes/reorder/', {
+  async reorderScenes(sceneIds: number[]): Promise<void> {
+    await this.request<void>('/api/scenes/reorder/', {
       method: 'POST',
-      body: JSON.stringify({ box_ids: boxIds }),
+      body: JSON.stringify({ scene_ids: sceneIds }),
     });
   }
 
-  async setHeadliner(boxId: number, assetId: number | null): Promise<Box> {
-    return this.request<Box>(`/api/boxes/${boxId}/set_headliner/`, {
+  async setHeadliner(sceneId: number, elementId: number | null): Promise<Scene> {
+    return this.request<Scene>(`/api/scenes/${sceneId}/set_headliner/`, {
       method: 'POST',
-      body: JSON.stringify({ asset_id: assetId }),
+      body: JSON.stringify({ element_id: elementId }),
     });
   }
 
-  // ─── Assets ──────────────────────────────────────────────
+  // ─── Elements ────────────────────────────────────────────
 
-  async getAssets(boxId: number, filters?: { asset_type?: string; is_favorite?: boolean }): Promise<Asset[]> {
-    let url = `/api/assets/?box=${boxId}`;
+  async getElements(sceneId: number, filters?: { asset_type?: string; is_favorite?: boolean }): Promise<Element[]> {
+    let url = `/api/elements/?scene=${sceneId}`;
     if (filters?.asset_type) {
       url += `&asset_type=${filters.asset_type}`;
     }
     if (filters?.is_favorite !== undefined) {
       url += `&is_favorite=${filters.is_favorite}`;
     }
-    return this.request<Asset[]>(url);
+    return this.request<Element[]>(url);
   }
 
-  async getAsset(id: number): Promise<Asset> {
-    return this.request<Asset>(`/api/assets/${id}/`);
+  async getElement(id: number): Promise<Element> {
+    return this.request<Element>(`/api/elements/${id}/`);
   }
 
-  async updateAsset(id: number, data: Partial<Pick<Asset, 'is_favorite' | 'prompt_text'>>): Promise<Asset> {
-    return this.request<Asset>(`/api/assets/${id}/`, {
+  async updateElement(id: number, data: Partial<Pick<Element, 'is_favorite' | 'prompt_text'>>): Promise<Element> {
+    return this.request<Element>(`/api/elements/${id}/`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
   }
 
-  async deleteAsset(id: number): Promise<void> {
-    await this.request<void>(`/api/assets/${id}/`, {
+  async deleteElement(id: number): Promise<void> {
+    await this.request<void>(`/api/elements/${id}/`, {
       method: 'DELETE',
     });
   }
 
-  async reorderAssets(assetIds: number[]): Promise<void> {
-    await this.request<void>('/api/assets/reorder/', {
+  async reorderElements(elementIds: number[]): Promise<void> {
+    await this.request<void>('/api/elements/reorder/', {
       method: 'POST',
-      body: JSON.stringify({ asset_ids: assetIds }),
+      body: JSON.stringify({ element_ids: elementIds }),
     });
   }
 
   async uploadFile(
-    boxId: number,
+    sceneId: number,
     file: File,
     onProgress?: (progress: number) => void
-  ): Promise<Asset> {
-    const url = `${this.baseURL}/api/boxes/${boxId}/upload/`;
+  ): Promise<Element> {
+    const url = `${this.baseURL}/api/scenes/${sceneId}/upload/`;
     const accessToken = this.getAccessToken();
 
     const formData = new FormData();
@@ -443,4 +443,4 @@ class APIClient {
 }
 
 export const apiClient = new APIClient();
-export type { User, UserQuota, TokenPair, Project, Box, Asset };
+export type { User, UserQuota, TokenPair, Project, Scene, Element };

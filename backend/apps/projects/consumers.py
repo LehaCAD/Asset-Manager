@@ -11,7 +11,7 @@ from django.contrib.auth.models import AnonymousUser
 class ProjectConsumer(AsyncJsonWebsocketConsumer):
     """
     Consumer для проекта. Клиент подключается и получает события:
-    - asset_status_changed: статус ассета изменился (PROCESSING -> COMPLETED/FAILED)
+    - element_status_changed: статус элемента изменился (PROCESSING -> COMPLETED/FAILED)
     - new_comment: новый комментарий (V2)
     """
 
@@ -48,11 +48,11 @@ class ProjectConsumer(AsyncJsonWebsocketConsumer):
 
     # --- Handlers для событий из Channel Layer ---
 
-    async def asset_status_changed(self, event):
-        """Обработчик события изменения статуса ассета."""
+    async def element_status_changed(self, event):
+        """Обработчик события изменения статуса элемента."""
         await self.send_json({
-            'type': 'asset_status_changed',
-            'asset_id': event['asset_id'],
+            'type': 'element_status_changed',
+            'element_id': event['element_id'],
             'status': event['status'],
             'file_url': event.get('file_url', ''),
             'thumbnail_url': event.get('thumbnail_url', ''),

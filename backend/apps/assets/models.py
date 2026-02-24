@@ -1,16 +1,16 @@
 from django.db import models
 
 
-class Asset(models.Model):
+class Element(models.Model):
     """Модель элемента (изображение или видео)."""
     
     # Типы элементов
-    ASSET_TYPE_IMAGE = 'IMAGE'
-    ASSET_TYPE_VIDEO = 'VIDEO'
+    ELEMENT_TYPE_IMAGE = 'IMAGE'
+    ELEMENT_TYPE_VIDEO = 'VIDEO'
     
-    ASSET_TYPE_CHOICES = [
-        (ASSET_TYPE_IMAGE, 'Изображение'),
-        (ASSET_TYPE_VIDEO, 'Видео'),
+    ELEMENT_TYPE_CHOICES = [
+        (ELEMENT_TYPE_IMAGE, 'Изображение'),
+        (ELEMENT_TYPE_VIDEO, 'Видео'),
     ]
     
     # Статусы генерации
@@ -37,15 +37,15 @@ class Asset(models.Model):
         (SOURCE_IMG2VID, 'Img2Vid преобразование'),
     ]
     
-    box = models.ForeignKey(
-        'boxes.Box',
+    scene = models.ForeignKey(
+        'boxes.Scene',
         on_delete=models.CASCADE,
-        related_name='assets',
+        related_name='elements',
         verbose_name='Сцена'
     )
-    asset_type = models.CharField(
+    element_type = models.CharField(
         max_length=10,
-        choices=ASSET_TYPE_CHOICES,
+        choices=ELEMENT_TYPE_CHOICES,
         verbose_name='Тип элемента'
     )
     order_index = models.IntegerField(
@@ -78,7 +78,7 @@ class Asset(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='generated_assets',
+        related_name='generated_elements',
         verbose_name='AI Модель',
         help_text='Модель, которая сгенерировала этот элемент'
     )
@@ -115,12 +115,12 @@ class Asset(models.Model):
         verbose_name='Тип источника',
         help_text='Способ создания элемента'
     )
-    parent_asset = models.ForeignKey(
+    parent_element = models.ForeignKey(
         'self',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='child_assets',
+        related_name='child_elements',
         verbose_name='Родительский элемент',
         help_text='Исходный элемент для img2vid или вариаций'
     )
@@ -147,4 +147,4 @@ class Asset(models.Model):
         ordering = ['order_index', 'created_at']
 
     def __str__(self) -> str:
-        return f'{self.get_asset_type_display()} #{self.id} (Сцена: {self.box.name})'
+        return f'{self.get_element_type_display()} #{self.id} (Сцена: {self.scene.name})'

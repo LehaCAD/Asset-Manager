@@ -141,5 +141,5 @@ class Command(BaseCommand):
             self.stdout.write('\n✅ API ключ установлен!')
         
         self.stdout.write('\n📝 Теперь можно использовать генерацию:')
-        self.stdout.write('   POST /api/boxes/{id}/generate/')
+        self.stdout.write('   POST /api/scenes/{id}/generate/')
         self.stdout.write('\n')

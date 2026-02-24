@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { apiClient, type Project, type Box } from '../api';
+import { apiClient, type Project, type Scene } from '../api';
 
 interface ProjectsState {
   // Projects
@@ -7,11 +7,11 @@ interface ProjectsState {
   projectsLoading: boolean;
   projectsError: string | null;
 
-  // Current project & boxes
+  // Current project & scenes
   currentProject: Project | null;
-  boxes: Box[];
-  boxesLoading: boolean;
-  boxesError: string | null;
+  scenes: Scene[];
+  scenesLoading: boolean;
+  scenesError: string | null;
 
   // Actions — Projects
   fetchProjects: () => Promise<void>;
@@ -19,14 +19,14 @@ interface ProjectsState {
   updateProject: (id: number, data: Partial<Pick<Project, 'name' | 'status' | 'aspect_ratio'>>) => Promise<void>;
   deleteProject: (id: number) => Promise<void>;
 
-  // Actions — Boxes
-  fetchBoxes: (projectId: number) => Promise<void>;
+  // Actions — Scenes
+  fetchScenes: (projectId: number) => Promise<void>;
   fetchProject: (projectId: number) => Promise<void>;
-  createBox: (projectId: number, name: string) => Promise<Box>;
-  updateBox: (id: number, data: Partial<Pick<Box, 'name' | 'status'>>) => Promise<void>;
-  deleteBox: (id: number) => Promise<void>;
-  reorderBoxes: (boxIds: number[]) => Promise<void>;
-  optimisticallyReorderBoxes: (boxIds: number[]) => void;
+  createScene: (projectId: number, name: string) => Promise<Scene>;
+  updateScene: (id: number, data: Partial<Pick<Scene, 'name' | 'status'>>) => Promise<void>;
+  deleteScene: (id: number) => Promise<void>;
+  reorderScenes: (sceneIds: number[]) => Promise<void>;
+  optimisticallyReorderScenes: (sceneIds: number[]) => void;
 
   // Utilities
   clearCurrentProject: () => void;
@@ -38,9 +38,9 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
   projectsError: null,
 
   currentProject: null,
-  boxes: [],
-  boxesLoading: false,
-  boxesError: null,
+  scenes: [],
+  scenesLoading: false,
+  scenesError: null,
 
   // ─── Projects ────────────────────────────────────────────
 
@@ -76,7 +76,7 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
     }));
   },
 
-  // ─── Boxes ───────────────────────────────────────────────
+  // ─── Scenes ──────────────────────────────────────────────
 
   fetchProject: async (projectId: number) => {
     try {
@@ -84,79 +84,79 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
       set({ currentProject: project });
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Не удалось загрузить проект';
-      set({ boxesError: msg });
+      set({ scenesError: msg });
     }
   },
 
-  fetchBoxes: async (projectId: number) => {
-    set({ boxesLoading: true, boxesError: null });
+  fetchScenes: async (projectId: number) => {
+    set({ scenesLoading: true, scenesError: null });
     try {
-      const boxes = await apiClient.getBoxes(projectId);
-      set({ boxes, boxesLoading: false });
+      const scenes = await apiClient.getScenes(projectId);
+      set({ scenes, scenesLoading: false });
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Не удалось загрузить сцены';
-      set({ boxesError: msg, boxesLoading: false });
+      set({ scenesError: msg, scenesLoading: false });
     }
   },
 
-  createBox: async (projectId: number, name: string) => {
-    const box = await apiClient.createBox(projectId, name);
+  createScene: async (projectId: number, name: string) => {
+    const scene = await apiClient.createScene(projectId, name);
     set((state) => ({
-      boxes: [...state.boxes, box],
-      // Update project boxes_count in list
+      scenes: [...state.scenes, scene],
+      // Update project scenes_count in list
       projects: state.projects.map((p) =>
-        p.id === projectId ? { ...p, boxes_count: p.boxes_count + 1 } : p
+        p.id === projectId ? { ...p, scenes_count: p.scenes_count + 1 } : p
       ),
       currentProject: state.currentProject?.id === projectId
-        ? { ...state.currentProject, boxes_count: state.currentProject.boxes_count + 1 }
+        ? { ...state.currentProject, scenes_count: state.currentProject.scenes_count + 1 }
         : state.currentProject,
     }));
-    return box;
+    return scene;
   },
 
-  updateBox: async (id: number, data: Partial<Pick<Box, 'name' | 'status'>>) => {
-    const updated = await apiClient.updateBox(id, data);
+  updateScene: async (id: number, data: Partial<Pick<Scene, 'name' | 'status'>>) => {
+    const updated = await apiClient.updateScene(id, data);
     set((state) => ({
-      boxes: state.boxes.map((b) => (b.id === id ? updated : b)),
+      scenes: state.scenes.map((s) => (s.id === id ? updated : s)),
     }));
   },
 
-  deleteBox: async (id: number) => {
-    const box = get().boxes.find((b) => b.id === id);
-    await apiClient.deleteBox(id);
+  deleteScene: async (id: number) => {
+    const scene = get().scenes.find((s) => s.id === id);
+    await apiClient.deleteScene(id);
     set((state) => ({
-      boxes: state.boxes.filter((b) => b.id !== id),
-      // Update project boxes_count
-      projects: box
+      scenes: state.scenes.filter((s) => s.id !== id),
+      // Update project scenes_count
+      projects: scene
         ? state.projects.map((p) =>
-            p.id === box.project ? { ...p, boxes_count: Math.max(0, p.boxes_count - 1) } : p
+            p.id === scene.project ? { ...p, scenes_count: Math.max(0, p.scenes_count - 1) } : p
           )
         : state.projects,
       currentProject:
-        state.currentProject && box && state.currentProject.id === box.project
-          ? { ...state.currentProject, boxes_count: Math.max(0, state.currentProject.boxes_count - 1) }
+        state.currentProject && scene && state.currentProject.id === scene.project
+          ? { ...state.currentProject, scenes_count: Math.max(0, state.currentProject.scenes_count - 1) }
           : state.currentProject,
     }));
   },
 
-  reorderBoxes: async (boxIds: number[]) => {
-    await apiClient.reorderBoxes(boxIds);
+  reorderScenes: async (sceneIds: number[]) => {
+    await apiClient.reorderScenes(sceneIds);
     // Refetch to ensure consistency
     const projectId = get().currentProject?.id;
     if (projectId) {
-      await get().fetchBoxes(projectId);
+      await get().fetchScenes(projectId);
     }
   },
 
-  optimisticallyReorderBoxes: (boxIds: number[]) => {
+  optimisticallyReorderScenes: (sceneIds: number[]) => {
     set((state) => {
-      const boxesMap = new Map(state.boxes.map((b) => [b.id, b]));
-      const reordered = boxIds.map((id) => boxesMap.get(id)).filter((b): b is Box => b !== undefined);
-      return { boxes: reordered };
+      const scenesMap = new Map(state.scenes.map((s) => [s.id, s]));
+      const reordered = sceneIds.map((id) => scenesMap.get(id)).filter((s): s is Scene => s !== undefined);
+      return { scenes: reordered };
     });
   },
 
   clearCurrentProject: () => {
-    set({ currentProject: null, boxes: [], boxesError: null });
+    set({ currentProject: null, scenes: [], scenesError: null });
   },
 }));

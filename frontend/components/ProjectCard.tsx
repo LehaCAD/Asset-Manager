@@ -177,7 +177,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
               </svg>
               <span className="text-xs text-txt-muted/60 font-medium">
-                {project.boxes_count} {formatSceneCount(project.boxes_count)}
+                {project.scenes_count} {formatSceneCount(project.scenes_count)}
               </span>
             </div>
           </div>
@@ -200,19 +200,19 @@ export default function ProjectCard({ project }: ProjectCardProps) {
           </p>
           
           {/* Progress bar */}
-          {project.boxes_count > 0 && (
+          {project.scenes_count > 0 && (
             <div className="space-y-1">
               <div className="flex items-center justify-between text-[10px] text-txt-muted">
                 <span>Прогресс</span>
                 <span className="font-medium">
-                  {project.boxes_approved_count}/{project.boxes_count} утверждено
+                  {project.scenes_approved_count}/{project.scenes_count} утверждено
                 </span>
               </div>
               <div className="w-full bg-surface-tertiary rounded-full h-1.5 overflow-hidden">
                 <div
                   className="bg-accent h-full rounded-full transition-all duration-500"
                   style={{
-                    width: `${project.boxes_count > 0 ? (project.boxes_approved_count / project.boxes_count) * 100 : 0}%`
+                    width: `${project.scenes_count > 0 ? (project.scenes_approved_count / project.scenes_count) * 100 : 0}%`
                   }}
                 />
               </div>

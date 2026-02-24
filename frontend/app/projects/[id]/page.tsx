@@ -21,7 +21,7 @@ import {
 } from '@dnd-kit/sortable';
 import { useProjectsStore } from '@/lib/store/projects';
 import { useAuthStore } from '@/lib/store/auth';
-import BoxCard from '@/components/BoxCard';
+import SceneCard from '@/components/BoxCard';
 import NewItemSlot from '@/components/NewItemSlot';
 import Modal from '@/components/ui/Modal';
 import { getAspectClass, getGridClass } from '@/lib/utils/aspectRatio';
@@ -34,15 +34,15 @@ export default function ProjectDetailPage() {
 
   const {
     currentProject,
-    boxes,
-    boxesLoading,
-    boxesError,
+    scenes,
+    scenesLoading,
+    scenesError,
     fetchProject,
-    fetchBoxes,
-    createBox,
+    fetchScenes,
+    createScene,
     clearCurrentProject,
-    optimisticallyReorderBoxes,
-    reorderBoxes,
+    optimisticallyReorderScenes,
+    reorderScenes,
   } = useProjectsStore();
 
   const [showCreate, setShowCreate] = useState(false);
@@ -61,17 +61,17 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     if (projectId) {
       fetchProject(projectId);
-      fetchBoxes(projectId);
+      fetchScenes(projectId);
     }
     return () => clearCurrentProject();
-  }, [projectId, fetchProject, fetchBoxes, clearCurrentProject]);
+  }, [projectId, fetchProject, fetchScenes, clearCurrentProject]);
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
     setCreateLoading(true);
     setCreateError('');
     try {
-      await createBox(projectId, newName.trim());
+      await createScene(projectId, newName.trim());
       toast.success('Сцена создана');
       setNewName('');
       setShowCreate(false);
@@ -93,27 +93,27 @@ export default function ProjectDetailPage() {
     setActiveId(null);
 
     if (over && active.id !== over.id) {
-      const oldIndex = boxes.findIndex((b) => b.id === active.id);
-      const newIndex = boxes.findIndex((b) => b.id === over.id);
+      const oldIndex = scenes.findIndex((b) => b.id === active.id);
+      const newIndex = scenes.findIndex((b) => b.id === over.id);
 
       if (oldIndex !== -1 && newIndex !== -1) {
-        const reordered = arrayMove(boxes, oldIndex, newIndex);
-        const boxIds = reordered.map((b) => b.id);
+        const reordered = arrayMove(scenes, oldIndex, newIndex);
+        const sceneIds = reordered.map((b) => b.id);
         
         // Optimistic update
-        optimisticallyReorderBoxes(boxIds);
+        optimisticallyReorderScenes(sceneIds);
         
         // API call
-        reorderBoxes(boxIds).catch((e) => {
+        reorderScenes(sceneIds).catch((e) => {
           console.error('Failed to reorder:', e);
           // Refetch on error to restore correct order
-          fetchBoxes(projectId);
+          fetchScenes(projectId);
         });
       }
     }
   };
 
-  const activeBox = boxes.find((b) => b.id === activeId);
+  const activeScene = scenes.find((b) => b.id === activeId);
   const aspectClass = currentProject ? getAspectClass(currentProject.aspect_ratio) : 'aspect-video';
   const gridClass = currentProject ? getGridClass(currentProject.aspect_ratio) : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4';
 
@@ -144,23 +144,23 @@ export default function ProjectDetailPage() {
                   <>
                     <span>•</span>
                     <span>
-                      {boxes.length}/{user.quota.max_boxes_per_project} {formatSceneCount(user.quota.max_boxes_per_project)}
-                      {boxes.length >= user.quota.max_boxes_per_project && (
+                      {scenes.length}/{user.quota.max_scenes_per_project} {formatSceneCount(user.quota.max_scenes_per_project)}
+                      {scenes.length >= user.quota.max_scenes_per_project && (
                         <span className="ml-1 text-red-500 font-medium">• Лимит</span>
                       )}
                     </span>
                   </>
                 )}
-                {!user?.quota && boxes.length > 0 && (
+                {!user?.quota && scenes.length > 0 && (
                   <>
                     <span>•</span>
-                    <span>{boxes.length} {formatSceneCount(boxes.length)}</span>
+                    <span>{scenes.length} {formatSceneCount(scenes.length)}</span>
                   </>
                 )}
-                {boxes.length > 0 && (
+                {scenes.length > 0 && (
                   <>
                     <span>•</span>
-                    <span>{boxes.filter(b => b.status === 'APPROVED').length} утверждено</span>
+                    <span>{scenes.filter(b => b.status === 'APPROVED').length} утверждено</span>
                   </>
                 )}
               </div>
@@ -174,19 +174,19 @@ export default function ProjectDetailPage() {
         </div>
         <button
           onClick={() => {
-            if (user?.quota && boxes.length >= user.quota.max_boxes_per_project) {
-              toast.error(`Достигнут лимит сцен (${user.quota.max_boxes_per_project}). Обратитесь к администратору.`);
+            if (user?.quota && scenes.length >= user.quota.max_scenes_per_project) {
+              toast.error(`Достигнут лимит сцен (${user.quota.max_scenes_per_project}). Обратитесь к администратору.`);
               return;
             }
             setNewName('');
             setCreateError('');
             setShowCreate(true);
           }}
-          disabled={user?.quota ? boxes.length >= user.quota.max_boxes_per_project : false}
+          disabled={user?.quota ? scenes.length >= user.quota.max_scenes_per_project : false}
           className="flex items-center gap-2 px-4 py-2.5 bg-accent hover:bg-accent-hover text-white text-sm font-medium rounded-xl transition-colors flex-shrink-0 ml-4 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
           title={
-            user?.quota && boxes.length >= user.quota.max_boxes_per_project
-              ? `Достигнут лимит сцен (${user.quota.max_boxes_per_project})`
+            user?.quota && scenes.length >= user.quota.max_scenes_per_project
+              ? `Достигнут лимит сцен (${user.quota.max_scenes_per_project})`
               : undefined
           }
         >
@@ -199,7 +199,7 @@ export default function ProjectDetailPage() {
       </div>
 
       {/* Loading state */}
-      {boxesLoading && boxes.length === 0 && (
+      {scenesLoading && scenes.length === 0 && (
         <div className={`grid ${gridClass} gap-4`}>
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="rounded-xl overflow-hidden border border-surface-border">
@@ -214,11 +214,11 @@ export default function ProjectDetailPage() {
       )}
 
       {/* Error state */}
-      {boxesError && (
+      {scenesError && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
-          <p className="text-red-600 text-sm">{boxesError}</p>
+          <p className="text-red-600 text-sm">{scenesError}</p>
           <button
-            onClick={() => fetchBoxes(projectId)}
+            onClick={() => fetchScenes(projectId)}
             className="text-red-500 text-sm underline mt-2 hover:text-red-700"
           >
             Попробовать снова
@@ -227,7 +227,7 @@ export default function ProjectDetailPage() {
       )}
 
       {/* Empty state */}
-      {!boxesLoading && !boxesError && boxes.length === 0 && currentProject && (
+      {!scenesLoading && !scenesError && scenes.length === 0 && currentProject && (
         <div className="flex flex-col items-center justify-center py-20 animate-fade-in">
           <div className="w-20 h-20 rounded-2xl bg-surface-secondary flex items-center justify-center mb-6">
             <svg className="w-10 h-10 text-txt-muted/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -258,20 +258,20 @@ export default function ProjectDetailPage() {
       )}
 
       {/* Boxes grid */}
-      {!boxesLoading && boxes.length > 0 && (
+      {!scenesLoading && scenes.length > 0 && (
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          <SortableContext items={boxes.map((b) => b.id)} strategy={rectSortingStrategy}>
+          <SortableContext items={scenes.map((b) => b.id)} strategy={rectSortingStrategy}>
             <div className={`grid ${gridClass} gap-4`}>
-              {boxes.map((box, index) => (
-                <BoxCard key={box.id} box={box} index={index} aspectClass={aspectClass} />
+              {scenes.map((scene, index) => (
+                <SceneCard key={scene.id} scene={scene} index={index} aspectClass={aspectClass} />
               ))}
               {/* New Scene Slot */}
-              {(!user?.quota || boxes.length < user.quota.max_boxes_per_project) && (
+              {(!user?.quota || scenes.length < user.quota.max_scenes_per_project) && (
                 <NewItemSlot
                   label="Новая сцена"
                   aspectClass={aspectClass}
@@ -285,9 +285,9 @@ export default function ProjectDetailPage() {
             </div>
           </SortableContext>
           <DragOverlay>
-            {activeBox ? (
+            {activeScene ? (
               <div className="opacity-50">
-                <BoxCard box={activeBox} index={boxes.findIndex((b) => b.id === activeBox.id)} aspectClass={aspectClass} />
+                <SceneCard scene={activeScene} index={scenes.findIndex((b) => b.id === activeScene.id)} aspectClass={aspectClass} />
               </div>
             ) : null}
           </DragOverlay>

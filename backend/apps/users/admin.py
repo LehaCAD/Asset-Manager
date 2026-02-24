@@ -13,7 +13,7 @@ class CustomUserAdmin(UserAdmin):
 
 @admin.register(UserQuota)
 class UserQuotaAdmin(admin.ModelAdmin):
-    list_display = ('user', 'max_projects', 'max_boxes_per_project', 'max_assets_per_box', 'created_at')
+    list_display = ('user', 'max_projects', 'max_scenes_per_project', 'max_elements_per_scene', 'created_at')
     search_fields = ('user__username', 'user__email')
-    list_filter = ('max_projects', 'max_boxes_per_project', 'max_assets_per_box')
+    list_filter = ('max_projects', 'max_scenes_per_project', 'max_elements_per_scene')
     ordering = ('-created_at',)
