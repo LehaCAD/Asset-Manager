@@ -1,24 +1,21 @@
 import type { Metadata } from "next";
-import localFont from "next/font/local";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import AuthProvider from "@/components/AuthProvider";
-import Navbar from "@/components/Navbar";
-import ToastProvider from "@/components/ToastProvider";
+import { Providers } from "./providers";
 
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
-  weight: "100 900",
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin", "cyrillic"],
 });
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
-  weight: "100 900",
+
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
+  subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
   title: "Раскадровка",
-  description: "Визуальный менеджер нейро-продакшена",
+  description: "AI neuro-production visual manager",
 };
 
 export default function RootLayout({
@@ -27,15 +24,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ru">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white text-txt-primary min-h-screen`}
-      >
-        <AuthProvider>
-          <Navbar />
-          <main>{children}</main>
-          <ToastProvider />
-        </AuthProvider>
+    <html lang="ru" suppressHydrationWarning>
+      <body className={`${inter.variable} ${jetbrainsMono.variable}`}>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

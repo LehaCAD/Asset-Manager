@@ -1,73 +1,72 @@
-import { create } from 'zustand';
-import { apiClient, type User } from '../api';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+
+interface User {
+  id: number;
+  username: string;
+  email: string;
+}
 
 interface AuthState {
   user: User | null;
+  accessToken: string | null;
+  refreshToken: string | null;
   isAuthenticated: boolean;
-  isLoading: boolean;
-  error: string | null;
-  
-  // Actions
-  login: (username: string, password: string) => Promise<void>;
-  register: (username: string, email: string, password: string, password_confirm: string) => Promise<void>;
+
+  setTokens: (access: string, refresh: string) => void;
+  setUser: (user: User) => void;
   logout: () => void;
-  fetchUser: () => Promise<void>;
-  clearError: () => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  isAuthenticated: false,
-  isLoading: false,
-  error: null,
+function syncTokenCookie(token: string | null) {
+  if (typeof document === "undefined") return;
+  if (token) {
+    document.cookie = `access_token=${token}; path=/; max-age=${60 * 30}; SameSite=Lax`;
+  } else {
+    document.cookie = "access_token=; path=/; max-age=0";
+  }
+}
 
-  login: async (username: string, password: string) => {
-    set({ isLoading: true, error: null });
-    try {
-      await apiClient.login(username, password);
-      const user = await apiClient.getMe();
-      set({ user, isAuthenticated: true, isLoading: false });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Login failed';
-      set({ error: errorMessage, isLoading: false });
-      throw error;
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set) => ({
+      user: null,
+      accessToken: null,
+      refreshToken: null,
+      isAuthenticated: false,
+
+      setTokens: (access, refresh) => {
+        syncTokenCookie(access);
+        set({ accessToken: access, refreshToken: refresh, isAuthenticated: true });
+      },
+
+      setUser: (user) => set({ user }),
+
+      logout: () => {
+        syncTokenCookie(null);
+        set({
+          user: null,
+          accessToken: null,
+          refreshToken: null,
+          isAuthenticated: false,
+        });
+      },
+    }),
+    {
+      name: "auth-storage",
+      partialize: (state) => ({
+        accessToken: state.accessToken,
+        refreshToken: state.refreshToken,
+        user: state.user,
+        isAuthenticated: state.isAuthenticated,
+      }),
+      onRehydrate: () => {
+        return (state) => {
+          if (state?.accessToken) {
+            syncTokenCookie(state.accessToken);
+          }
+        };
+      },
     }
-  },
-
-  register: async (username: string, email: string, password: string, password_confirm: string) => {
-    set({ isLoading: true, error: null });
-    try {
-      await apiClient.register(username, email, password, password_confirm);
-      const user = await apiClient.getMe();
-      set({ user, isAuthenticated: true, isLoading: false });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Registration failed';
-      set({ error: errorMessage, isLoading: false });
-      throw error;
-    }
-  },
-
-  logout: () => {
-    apiClient.logout();
-    set({ user: null, isAuthenticated: false, error: null });
-  },
-
-  fetchUser: async () => {
-    const token = apiClient.getAccessToken();
-    if (!token) {
-      set({ isAuthenticated: false, user: null });
-      return;
-    }
-
-    set({ isLoading: true });
-    try {
-      const user = await apiClient.getMe();
-      set({ user, isAuthenticated: true, isLoading: false });
-    } catch {
-      set({ isAuthenticated: false, user: null, isLoading: false });
-      apiClient.clearTokens();
-    }
-  },
-
-  clearError: () => set({ error: null }),
-}));
+  )
+);

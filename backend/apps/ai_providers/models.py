@@ -83,10 +83,34 @@ class AIModel(models.Model):
         help_text='Полная структура запроса с плейсхолдерами {{variable}}, например: {"prompt": "{{prompt}}", "width": {{width}}}'
     )
     parameters_schema = models.JSONField(
-        default=dict,
+        default=list,
         blank=True,
         verbose_name='Схема параметров',
-        help_text='Описание параметров для UI: типы, опции, дефолты. Например: {"width": {"type": "select", "options": [512, 1024], "default": 1024}}'
+        help_text='Описание параметров для UI в виде списка: [{"key": "aspect_ratio", "label": "Соотношение сторон", "type": "toggle_group", "options": [...], "default": "1:1"}]'
+    )
+    preview_url = models.URLField(
+        max_length=500,
+        blank=True,
+        verbose_name='URL превью',
+        help_text='URL превью-картинки для карточки модели в селекторе'
+    )
+    description = models.TextField(
+        blank=True,
+        verbose_name='Описание',
+        help_text='Краткое описание модели для UI, например: "Высокое качество и детализация"'
+    )
+    tags = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name='Теги',
+        help_text='Теги-бейджи для карточки модели, например: ["Style Ref", "Content Ref", "Image Ref"]'
+    )
+    image_inputs_schema = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name='Схема входных изображений',
+        help_text='Описание слотов изображений для промпт-бара. '
+                  'Пример: [{"key": "style_ref", "label": "Style Ref", "min": 0, "max": 4, "required": false}]'
     )
     is_active = models.BooleanField(
         default=True,

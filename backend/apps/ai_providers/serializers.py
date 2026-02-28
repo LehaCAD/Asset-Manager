@@ -15,6 +15,7 @@ class AIModelSerializer(serializers.ModelSerializer):
     """
     Сериализатор AI-модели для фронтенда.
     Отдает name, type, parameters_schema (для динамической формы),
+    preview_url, description, tags, image_inputs_schema (для UI селектора и промпт-бара),
     но НЕ отдает request_schema и api_endpoint (внутренние детали).
     """
     provider_name = serializers.CharField(source='provider.name', read_only=True)
@@ -27,6 +28,10 @@ class AIModelSerializer(serializers.ModelSerializer):
             'model_type',
             'provider_name',
             'parameters_schema',
+            'preview_url',
+            'description',
+            'tags',
+            'image_inputs_schema',
             'is_active',
         )
         read_only_fields = fields

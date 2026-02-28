@@ -14,6 +14,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     )
     password_confirm = serializers.CharField(
         write_only=True,
+        required=False,
         style={'input_type': 'password'},
     )
 
@@ -27,12 +28,13 @@ class RegisterSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, attrs: dict) -> dict:
-        if attrs['password'] != attrs['password_confirm']:
+        password_confirm = attrs.get('password_confirm')
+        if password_confirm and attrs['password'] != password_confirm:
             raise serializers.ValidationError({"password_confirm": "Пароли не совпадают."})
         return attrs
 
     def create(self, validated_data: dict) -> User:
-        validated_data.pop('password_confirm')
+        validated_data.pop('password_confirm', None)
         user = User.objects.create_user(**validated_data)
         return user
 
