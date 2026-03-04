@@ -70,6 +70,10 @@ export function ProjectCard({ project }: ProjectCardProps) {
     router.push(`/projects/${project.id}`);
   }
 
+  function blockCardNavigation(e: React.SyntheticEvent) {
+    e.stopPropagation();
+  }
+
   const aspectClass = ASPECT_RATIO_STYLE[project.aspect_ratio] ?? "aspect-video";
 
   return (
@@ -106,14 +110,24 @@ export function ProjectCard({ project }: ProjectCardProps) {
                   size="icon"
                   className="h-7 w-7 bg-background/80 backdrop-blur-sm hover:bg-background shadow-sm"
                   aria-label="Действия"
+                  onPointerDown={blockCardNavigation}
+                  onClick={blockCardNavigation}
                 >
                   <MoreHorizontal className="h-3.5 w-3.5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuContent
+                align="end"
+                className="w-44"
+                onClick={blockCardNavigation}
+              >
                 <DropdownMenuItem
                   className="cursor-pointer"
-                  onClick={() => setSettingsOpen(true)}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setSettingsOpen(true);
+                  }}
                 >
                   <Pencil className="mr-2 h-3.5 w-3.5" />
                   Редактировать
@@ -121,7 +135,11 @@ export function ProjectCard({ project }: ProjectCardProps) {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
-                  onClick={() => setDeleteOpen(true)}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setDeleteOpen(true);
+                  }}
                 >
                   <Trash2 className="mr-2 h-3.5 w-3.5" />
                   Удалить

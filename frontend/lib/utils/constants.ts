@@ -34,3 +34,9 @@ export const WS_BASE_URL =
 export const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 export const ACCEPTED_VIDEO_TYPES = ["video/mp4", "video/webm", "video/mov"];
 export const MAX_FILE_SIZE_MB = 100;
+
+export const GRID_DENSITY_CONFIG = {
+  sm: { minSize: "140px", gap: "8px" },
+  md: { minSize: "200px", gap: "12px" },
+  lg: { minSize: "280px", gap: "16px" },
+} as const;

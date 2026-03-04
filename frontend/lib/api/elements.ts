@@ -1,17 +1,19 @@
 import { apiClient, normalizeError } from "./client";
 import type {
   Element,
-  GenerateElementPayload,
   UpdateElementPayload,
   ReorderElementsPayload,
-  Img2VidPayload,
 } from "@/lib/types";
 
 export const elementsApi = {
-  async getByScene(sceneId: number): Promise<Element[]> {
+  async getByScene(
+    sceneId: number,
+    options?: { signal?: AbortSignal }
+  ): Promise<Element[]> {
     try {
       const { data } = await apiClient.get<Element[]>("/api/elements/", {
         params: { scene: sceneId },
+        signal: options?.signal,
       });
       return data;
     } catch (error) {
@@ -22,35 +24,6 @@ export const elementsApi = {
   async getById(id: number): Promise<Element> {
     try {
       const { data } = await apiClient.get<Element>(`/api/elements/${id}/`);
-      return data;
-    } catch (error) {
-      throw normalizeError(error);
-    }
-  },
-
-  async generate(payload: GenerateElementPayload): Promise<Element> {
-    try {
-      const { data } = await apiClient.post<Element>(
-        "/api/elements/generate/",
-        payload
-      );
-      return data;
-    } catch (error) {
-      throw normalizeError(error);
-    }
-  },
-
-  async upload(sceneId: number, file: File): Promise<Element> {
-    try {
-      const formData = new FormData();
-      formData.append("scene", String(sceneId));
-      formData.append("file", file);
-
-      const { data } = await apiClient.post<Element>(
-        "/api/elements/upload/",
-        formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
-      );
       return data;
     } catch (error) {
       throw normalizeError(error);
@@ -93,18 +66,6 @@ export const elementsApi = {
       const { data } = await apiClient.patch<Element>(`/api/elements/${id}/`, {
         is_favorite: isFavorite,
       });
-      return data;
-    } catch (error) {
-      throw normalizeError(error);
-    }
-  },
-
-  async img2vid(payload: Img2VidPayload): Promise<Element> {
-    try {
-      const { data } = await apiClient.post<Element>(
-        "/api/elements/img2vid/",
-        payload
-      );
       return data;
     } catch (error) {
       throw normalizeError(error);

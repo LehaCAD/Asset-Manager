@@ -3,6 +3,7 @@ import type { WSEvent } from "@/lib/types";
 
 type EventHandler = (event: WSEvent) => void;
 type ConnectionHandler = () => void;
+type ReconnectExhaustedHandler = () => void;
 
 const PING_INTERVAL_MS = 30_000;
 const RECONNECT_DELAY_BASE_MS = 1_000;
@@ -20,6 +21,8 @@ export class WebSocketManager {
   private eventHandlers = new Set<EventHandler>();
   private connectHandlers = new Set<ConnectionHandler>();
   private disconnectHandlers = new Set<ConnectionHandler>();
+  private reconnectExhaustedHandlers = new Set<ReconnectExhaustedHandler>();
+  private hasNotifiedReconnectExhausted = false;
 
   connect(projectId: number): void {
     if (
@@ -33,6 +36,7 @@ export class WebSocketManager {
     this.projectId = projectId;
     this.shouldReconnect = true;
     this.reconnectAttempts = 0;
+    this.hasNotifiedReconnectExhausted = false;
     this.openSocket();
   }
 
@@ -62,6 +66,11 @@ export class WebSocketManager {
     return () => this.disconnectHandlers.delete(handler);
   }
 
+  onReconnectExhausted(handler: ReconnectExhaustedHandler): () => void {
+    this.reconnectExhaustedHandlers.add(handler);
+    return () => this.reconnectExhaustedHandlers.delete(handler);
+  }
+
   get isConnected(): boolean {
     return this.socket?.readyState === WebSocket.OPEN;
   }
@@ -78,6 +87,7 @@ export class WebSocketManager {
 
     this.socket.onopen = () => {
       this.reconnectAttempts = 0;
+      this.hasNotifiedReconnectExhausted = false;
       this.startPing();
       this.connectHandlers.forEach((h) => h());
     };
@@ -106,7 +116,13 @@ export class WebSocketManager {
   }
 
   private scheduleReconnect(): void {
-    if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) return;
+    if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+      if (!this.hasNotifiedReconnectExhausted) {
+        this.hasNotifiedReconnectExhausted = true;
+        this.reconnectExhaustedHandlers.forEach((h) => h());
+      }
+      return;
+    }
 
     const delay = Math.min(
       RECONNECT_DELAY_BASE_MS * 2 ** this.reconnectAttempts,
@@ -142,6 +158,11 @@ export class WebSocketManager {
 
   private getToken(): string | null {
     if (typeof window === "undefined") return null;
+    const tokenFromCookie = document.cookie
+      .split("; ")
+      .find((cookie) => cookie.startsWith("access_token="))
+      ?.split("=")[1];
+    if (tokenFromCookie) return tokenFromCookie;
     try {
       const stored = localStorage.getItem("auth-storage");
       if (!stored) return null;
@@ -149,7 +170,8 @@ export class WebSocketManager {
         state?: { accessToken?: string };
       };
       return parsed?.state?.accessToken ?? null;
-    } catch {
+    } catch (error) {
+      console.error("Failed to parse auth-storage for websocket token", error);
       return null;
     }
   }

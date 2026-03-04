@@ -2,7 +2,6 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import {
   GripVertical,
   MoreHorizontal,
@@ -87,6 +86,10 @@ export function SceneCard({ scene, projectId, index }: SceneCardProps) {
     router.push(`/projects/${projectId}/scenes/${scene.id}`);
   }
 
+  function blockCardNavigation(e: React.SyntheticEvent) {
+    e.stopPropagation();
+  }
+
   async function handleEditSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!editName.trim()) return;
@@ -95,8 +98,10 @@ export function SceneCard({ scene, projectId, index }: SceneCardProps) {
       await updateScene(scene.id, { name: editName.trim() });
       toast.success("Сцена обновлена");
       setEditOpen(false);
-    } catch {
-      toast.error("Не удалось обновить сцену");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Не удалось обновить сцену";
+      toast.error(message);
     } finally {
       setIsSaving(false);
     }
@@ -108,8 +113,10 @@ export function SceneCard({ scene, projectId, index }: SceneCardProps) {
       await deleteScene(scene.id);
       toast.success("Сцена удалена");
       setDeleteOpen(false);
-    } catch {
-      toast.error("Не удалось удалить сцену");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Не удалось удалить сцену";
+      toast.error(message);
     } finally {
       setIsDeleting(false);
     }
@@ -147,12 +154,11 @@ export function SceneCard({ scene, projectId, index }: SceneCardProps) {
                 }}
               />
             ) : (
-              <Image
+              <img
                 src={scene.headliner_url}
                 alt={scene.name}
-                fill
-                className="object-cover"
-                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                loading="lazy"
+                className="absolute inset-0 w-full h-full object-cover"
               />
             )
           ) : (
@@ -222,14 +228,22 @@ export function SceneCard({ scene, projectId, index }: SceneCardProps) {
                   size="icon"
                   className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
                   aria-label="Действия"
+                  onPointerDown={blockCardNavigation}
+                  onClick={blockCardNavigation}
                 >
                   <MoreHorizontal className="h-3.5 w-3.5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuContent
+                align="end"
+                className="w-44"
+                onClick={blockCardNavigation}
+              >
                 <DropdownMenuItem
                   className="cursor-pointer"
-                  onClick={() => {
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     setEditName(scene.name);
                     setEditOpen(true);
                   }}
@@ -240,7 +254,11 @@ export function SceneCard({ scene, projectId, index }: SceneCardProps) {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
-                  onClick={() => setDeleteOpen(true)}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setDeleteOpen(true);
+                  }}
                 >
                   <Trash2 className="mr-2 h-3.5 w-3.5" />
                   Удалить

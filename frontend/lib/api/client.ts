@@ -1,14 +1,28 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
 import { API_BASE_URL } from "@/lib/utils/constants";
 
+export const DEFAULT_API_TIMEOUT_MS = 15_000;
+export const LONG_API_TIMEOUT_MS = 120_000;
+
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
+  timeout: DEFAULT_API_TIMEOUT_MS,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
 const PUBLIC_API_PATHS = ["/api/auth/register/", "/api/auth/login/", "/api/auth/token/refresh/"];
+const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
+
+function readCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const value = document.cookie
+    .split("; ")
+    .find((cookie) => cookie.startsWith(`${name}=`))
+    ?.split("=")[1];
+  return value || null;
+}
 
 /* ── Request interceptor: attach JWT ────────────────────── */
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
@@ -18,16 +32,19 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (isPublic) return config;
 
   const stored = localStorage.getItem("auth-storage");
+  let tokenFromStorage: string | null = null;
   if (stored) {
     try {
       const parsed = JSON.parse(stored) as { state?: { accessToken?: string } };
-      const token = parsed?.state?.accessToken;
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
+      tokenFromStorage = parsed?.state?.accessToken ?? null;
     } catch {
       // malformed storage — skip
     }
+  }
+
+  const token = readCookie("access_token") || tokenFromStorage;
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
@@ -81,7 +98,7 @@ apiClient.interceptors.response.use(
       const parsed = stored
         ? (JSON.parse(stored) as { state?: { refreshToken?: string } })
         : null;
-      const refreshToken = parsed?.state?.refreshToken;
+      const refreshToken = parsed?.state?.refreshToken || readCookie("refresh_token");
 
       if (!refreshToken) {
         throw new Error("Нет токена обновления");
@@ -102,7 +119,7 @@ apiClient.interceptors.response.use(
         localStorage.setItem("auth-storage", JSON.stringify(updated));
       }
 
-      document.cookie = `access_token=${newAccess}; path=/; max-age=${60 * 30}; SameSite=Lax`;
+      document.cookie = `access_token=${newAccess}; path=/; max-age=${ONE_YEAR_SECONDS}; SameSite=Lax`;
 
       apiClient.defaults.headers.common.Authorization = `Bearer ${newAccess}`;
       originalRequest.headers.Authorization = `Bearer ${newAccess}`;
@@ -113,6 +130,7 @@ apiClient.interceptors.response.use(
       processQueue(refreshError, null);
       localStorage.removeItem("auth-storage");
       document.cookie = "access_token=; path=/; max-age=0";
+      document.cookie = "refresh_token=; path=/; max-age=0";
       if (typeof window !== "undefined") {
         window.location.href = "/login";
       }
@@ -125,6 +143,11 @@ apiClient.interceptors.response.use(
 
 export function normalizeError(error: unknown): Error {
   if (axios.isAxiosError(error)) {
+    const timeoutLike =
+      error.code === "ECONNABORTED" || error.message.toLowerCase().includes("timeout");
+    if (timeoutLike) {
+      return new Error("Превышено время ожидания ответа сервера");
+    }
     const data = error.response?.data as Record<string, unknown> | undefined;
     if (data) {
       // Plain string detail/message

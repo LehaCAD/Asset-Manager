@@ -1,3 +1,4 @@
+from django.db import transaction
 from rest_framework import viewsets, permissions, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -5,7 +6,7 @@ from rest_framework.decorators import action
 from .models import Scene
 from .serializers import SceneSerializer, ReorderSerializer
 from .services import reorder_scenes
-from .s3_utils import upload_file_to_s3, detect_element_type, validate_file_type, generate_video_thumbnail
+from .s3_utils import upload_file_to_s3, detect_element_type, validate_file_type, save_to_staging
 
 
 class IsProjectOwner(permissions.BasePermission):
@@ -64,16 +65,15 @@ class SceneViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Проверяем лимит сцен в проекте
-        user_quota = request.user.quota
-        current_scenes_count = Scene.objects.filter(project=project).count()
-        
-        if current_scenes_count >= user_quota.max_scenes_per_project:
-            return Response(
-                {'detail': f'Достигнут лимит сцен в проекте ({user_quota.max_scenes_per_project}). Обратитесь к администратору.'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
+        # # Проверяем лимит сцен в проекте
+        # user_quota = request.user.quota
+        # current_scenes_count = Scene.objects.filter(project=project).count()
+        # if current_scenes_count >= user_quota.max_scenes_per_project:
+        #     return Response(
+        #         {'detail': f'Достигнут лимит сцен в проекте ({user_quota.max_scenes_per_project}). Обратитесь к администратору.'},
+        #         status=status.HTTP_403_FORBIDDEN
+        #     )
+        #
         return super().create(request, *args, **kwargs)
     
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsProjectOwner])
@@ -112,67 +112,68 @@ class SceneViewSet(viewsets.ModelViewSet):
         # Определение типа элемента по расширению
         element_type = detect_element_type(file.name)
         
-        # Проверяем лимит элементов в сцене
-        user_quota = request.user.quota
-        current_elements_count = scene.elements.count()
-        
-        if current_elements_count >= user_quota.max_elements_per_scene:
-            return Response(
-                {'detail': f'Достигнут лимит элементов в сцене ({user_quota.max_elements_per_scene}). Обратитесь к администратору.'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
+        # # Быстрый precheck: если лимит уже заполнен, не тратим время на upload в S3.
+        # user_quota = request.user.quota
+        # if scene.elements.count() >= user_quota.max_elements_per_scene:
+        #     return Response(
+        #         {'detail': f'Достигнут лимит элементов в сцене ({user_quota.max_elements_per_scene}). Обратитесь к администратору.'},
+        #         status=status.HTTP_403_FORBIDDEN
+        #     )
+        #
         try:
-            # Загрузка файла на S3 с новой структурой папок
-            file_url, filename = upload_file_to_s3(
-                file, 
-                project_id=scene.project.id,
-                scene_id=scene.id
+            staging_path = save_to_staging(file)
+        except Exception as e:
+            return Response(
+                {'error': f'Не удалось сохранить файл: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-            
-            # Генерация превью для видео
-            thumbnail_url = None
-            if element_type == 'VIDEO':
-                # Сбрасываем указатель файла в начало для повторного чтения
-                file.seek(0)
-                thumbnail_url = generate_video_thumbnail(file, scene.project.id, scene.id)
-            
-            # Создание Element
+
+        try:
             from apps.elements.models import Element
             from apps.elements.serializers import ElementSerializer
-            
-            # Автоматически ставим order_index
-            next_order_index = scene.elements.count()
-            
+
             element_data = {
                 'scene': scene.id,
                 'element_type': element_type,
-                'file_url': file_url,
-                'order_index': next_order_index,
+                'order_index': 0,
                 'prompt_text': request.data.get('prompt_text', ''),
                 'is_favorite': request.data.get('is_favorite', False),
+                'status': Element.STATUS_PROCESSING,
+                'source_type': Element.SOURCE_UPLOADED,
             }
-            
-            # Добавляем thumbnail_url если был сгенерирован
-            if thumbnail_url:
-                element_data['thumbnail_url'] = thumbnail_url
-            
-            # Если есть AI модель
+
             ai_model_id = request.data.get('ai_model')
             if ai_model_id:
                 element_data['ai_model'] = ai_model_id
-            
-            # Создаем через serializer для валидации
-            serializer = ElementSerializer(data=element_data)
-            serializer.is_valid(raise_exception=True)
-            element = serializer.save()
-            
+
+            with transaction.atomic():
+                locked_scene = Scene.objects.select_for_update().get(pk=scene.pk)
+                # user_quota = request.user.quota
+                current_elements_count = locked_scene.elements.count()
+                # if current_elements_count >= user_quota.max_elements_per_scene:
+                #     import os
+                #     os.unlink(staging_path)
+                #     return Response(
+                #         {'detail': f'Достигнут лимит элементов в сцене ({user_quota.max_elements_per_scene}). Обратитесь к администратору.'},
+                #         status=status.HTTP_403_FORBIDDEN
+                #     )
+                element_data['order_index'] = current_elements_count
+                serializer = ElementSerializer(data=element_data)
+                serializer.is_valid(raise_exception=True)
+                element = serializer.save()
+
+            from apps.elements.tasks import process_uploaded_file
+            process_uploaded_file.delay(element.id, staging_path)
+
             return Response(
                 ElementSerializer(element).data,
                 status=status.HTTP_201_CREATED
             )
-        
+
         except Exception as e:
+            import os
+            if os.path.exists(staging_path):
+                os.unlink(staging_path)
             return Response(
                 {'error': f'Failed to upload file: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -241,16 +242,6 @@ class SceneViewSet(viewsets.ModelViewSet):
         # Определение типа элемента по модели
         element_type = ai_model.model_type  # IMAGE или VIDEO
         
-        # Проверяем лимит элементов в сцене
-        user_quota = request.user.quota
-        current_elements_count = scene.elements.count()
-        
-        if current_elements_count >= user_quota.max_elements_per_scene:
-            return Response(
-                {'detail': f'Достигнут лимит элементов в сцене ({user_quota.max_elements_per_scene}). Обратитесь к администратору.'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
         # Определение source_type
         from apps.elements.models import Element
         if parent_element:
@@ -259,15 +250,12 @@ class SceneViewSet(viewsets.ModelViewSet):
             source_type = Element.SOURCE_GENERATED
         
         try:
-            # Автоматически ставим order_index
-            next_order_index = scene.elements.count()
-            # Создание Element
+            # Создание Element с атомарной проверкой лимита
             from apps.elements.serializers import ElementSerializer
             
             element_data = {
                 'scene': scene.id,
                 'element_type': element_type,
-                'order_index': next_order_index,
                 'prompt_text': prompt,
                 'ai_model': ai_model_id,
                 'generation_config': request.data.get('generation_config', {}),
@@ -278,10 +266,19 @@ class SceneViewSet(viewsets.ModelViewSet):
             if parent_element:
                 element_data['parent_element'] = parent_element.id
             
-            # Создаем через serializer для валидации
-            serializer = ElementSerializer(data=element_data)
-            serializer.is_valid(raise_exception=True)
-            element = serializer.save()
+            with transaction.atomic():
+                locked_scene = Scene.objects.select_for_update().get(pk=scene.pk)
+                # user_quota = request.user.quota
+                current_elements_count = locked_scene.elements.count()
+                # if current_elements_count >= user_quota.max_elements_per_scene:
+                #     return Response(
+                #         {'detail': f'Достигнут лимит элементов в сцене ({user_quota.max_elements_per_scene}). Обратитесь к администратору.'},
+                #         status=status.HTTP_403_FORBIDDEN
+                #     )
+                element_data['order_index'] = current_elements_count
+                serializer = ElementSerializer(data=element_data)
+                serializer.is_valid(raise_exception=True)
+                element = serializer.save()
             
             # Запускаем асинхронную генерацию
             from apps.elements.tasks import start_generation

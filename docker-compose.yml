@@ -59,7 +59,7 @@ services:
   celery:
     build: ./backend
     container_name: apom_celery
-    command: celery -A config worker -l info
+    command: celery -A config worker -l info --concurrency=2 --max-memory-per-child=300000
     volumes:
       - ./backend:/app
     environment:
@@ -85,6 +85,7 @@ services:
   frontend:
     build: ./frontend
     container_name: apom_frontend
+    command: npm run dev -- --hostname 0.0.0.0 --webpack
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -93,6 +94,8 @@ services:
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
       - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
+      - CHOKIDAR_INTERVAL=300
     depends_on:
       - backend
 

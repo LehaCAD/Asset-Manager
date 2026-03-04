@@ -1,3 +1,5 @@
+import { SceneWorkspace } from "@/components/element/SceneWorkspace";
+
 interface SceneWorkspacePageProps {
   params: Promise<{ id: string; sceneId: string }>;
 }
@@ -5,10 +7,11 @@ interface SceneWorkspacePageProps {
 export default async function SceneWorkspacePage({ params }: SceneWorkspacePageProps) {
   const { id, sceneId } = await params;
   return (
-    <main className="flex h-screen flex-col">
-      <p className="text-muted-foreground p-8">
-        Рабочее пространство сцены {sceneId} (проект {id}) — Phase 6
-      </p>
+    <main className="flex h-[calc(100vh-64px)] flex-col">
+      <SceneWorkspace
+        projectId={Number(id)}
+        sceneId={Number(sceneId)}
+      />
     </main>
   );
 }

@@ -14,12 +14,13 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const token = request.cookies.get("access_token")?.value;
+  const accessToken = request.cookies.get("access_token")?.value;
+  const refreshToken = request.cookies.get("refresh_token")?.value;
 
-  if (!token) {
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("next", pathname);
-    return NextResponse.redirect(loginUrl);
+  // Do not hard-redirect on server when tokens are absent.
+  // AuthGuard + API refresh flow handles auth on the client.
+  if (!accessToken && !refreshToken) {
+    return NextResponse.next();
   }
 
   return NextResponse.next();

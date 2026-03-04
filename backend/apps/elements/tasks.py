@@ -2,13 +2,18 @@
 Celery tasks для работы с элементами.
 """
 from celery import shared_task
+from celery.exceptions import Retry
 import time
 import requests
-from typing import Optional
 from django.core.files.base import ContentFile
 from .models import Element
 from .services import substitute_variables
-from apps.scenes.s3_utils import upload_file_to_s3, generate_unique_filename
+import os
+from apps.scenes.s3_utils import (
+    generate_unique_filename,
+    generate_video_thumbnail_from_path,
+    upload_staging_to_s3,
+)
 
 
 def notify_element_status(element: Element, status: str, file_url: str = '', error_message: str = '') -> None:
@@ -195,23 +200,25 @@ def start_generation(self, element_id: int) -> dict:
             'status': 'processing'
         }
         
+    except Retry:
+        raise
     except Exception as e:
         print(f"❌ Ошибка при запуске генерации: {e}")
-        
-        # Обновляем статус элемента
+
+        # Retry при сетевых ошибках: не переводим элемент в FAILED до исчерпания ретраев
+        if isinstance(e, (requests.RequestException, requests.Timeout)):
+            raise self.retry(exc=e, countdown=60)
+
+        # Критическая ошибка — переводим в FAILED и уведомляем фронтенд
         try:
             element = Element.objects.get(id=element_id)
             element.status = Element.STATUS_FAILED
             element.error_message = str(e)
-            element.save()
+            element.save(update_fields=['status', 'error_message', 'updated_at'])
             notify_element_status(element, 'FAILED', error_message=str(e))
         except Element.DoesNotExist:
             pass
-        
-        # Retry при сетевых ошибках
-        if isinstance(e, (requests.RequestException, requests.Timeout)):
-            raise self.retry(exc=e, countdown=60)
-        
+
         raise
 
 
@@ -298,13 +305,6 @@ def check_generation_status(self, element_id: int) -> dict:
             # Генерируем уникальное имя
             filename = generate_unique_filename(f"generated{ext}")
             
-            # Создаем ContentFile для загрузки
-            from django.core.files.uploadedfile import InMemoryUploadedFile
-            from io import BytesIO
-            
-            file_content = BytesIO(file_response.content)
-            file_content.seek(0)
-            
             # Загружаем на S3
             from django.core.files.storage import default_storage
             file_path = f"generated/{filename}"
@@ -353,6 +353,8 @@ def check_generation_status(self, element_id: int) -> dict:
             # Retry через 10 секунд
             raise self.retry(countdown=10, max_retries=60)
         
+    except Retry:
+        raise
     except Exception as e:
         print(f"❌ Ошибка при проверке статуса: {e}")
         
@@ -366,8 +368,132 @@ def check_generation_status(self, element_id: int) -> dict:
             if element.status != Element.STATUS_COMPLETED:
                 element.status = Element.STATUS_FAILED
                 element.error_message = str(e)
-                element.save()
+                element.save(update_fields=['status', 'error_message', 'updated_at'])
+                notify_element_status(element, 'FAILED', error_message=str(e))
         except Element.DoesNotExist:
             pass
         
         raise
+
+
+@shared_task(bind=True, max_retries=3)
+def process_uploaded_file(self, element_id: int, staging_path: str) -> dict:
+    """
+    FIFO-задача: загрузка файла из staging в S3 + генерация thumbnail.
+    Вызывается из upload view вместо синхронной загрузки в S3.
+    """
+    try:
+        element = Element.objects.select_related('scene', 'scene__project').get(id=element_id)
+
+        file_url = upload_staging_to_s3(
+            staging_path,
+            project_id=element.scene.project_id,
+            scene_id=element.scene_id,
+        )
+
+        element.file_url = file_url
+        element.status = Element.STATUS_COMPLETED
+
+        if element.element_type == Element.ELEMENT_TYPE_IMAGE:
+            element.thumbnail_url = file_url
+            element.save(update_fields=['file_url', 'thumbnail_url', 'status', 'updated_at'])
+        elif element.element_type == Element.ELEMENT_TYPE_VIDEO:
+            thumbnail_url = generate_video_thumbnail_from_path(
+                staging_path,
+                project_id=element.scene.project_id,
+                scene_id=element.scene_id,
+            )
+            element.thumbnail_url = thumbnail_url or ''
+            element.save(update_fields=['file_url', 'thumbnail_url', 'status', 'updated_at'])
+        else:
+            element.save(update_fields=['file_url', 'status', 'updated_at'])
+
+        notify_element_status(element, 'COMPLETED', file_url=file_url)
+
+        return {'element_id': element_id, 'status': 'completed', 'file_url': file_url}
+
+    except Retry:
+        raise
+    except Exception as e:
+        print(f"❌ Ошибка обработки загруженного файла Element #{element_id}: {e}")
+        try:
+            element = Element.objects.get(id=element_id)
+            element.status = Element.STATUS_FAILED
+            element.error_message = str(e)
+            element.save(update_fields=['status', 'error_message', 'updated_at'])
+            notify_element_status(element, 'FAILED', error_message=str(e))
+        except Element.DoesNotExist:
+            pass
+
+        if isinstance(e, (IOError, OSError)):
+            raise self.retry(exc=e, countdown=30)
+        raise
+    finally:
+        try:
+            if staging_path and os.path.exists(staging_path):
+                os.unlink(staging_path)
+        except Exception:
+            pass
+
+
+@shared_task(bind=True, max_retries=3)
+def generate_upload_thumbnail(self, element_id: int) -> dict:
+    """
+    Асинхронная генерация thumbnail для загруженного видео.
+    """
+    tmp_path = None
+    try:
+        import tempfile as _tempfile
+        import os as _os
+
+        element = Element.objects.select_related('scene', 'scene__project').get(id=element_id)
+
+        if element.element_type != Element.ELEMENT_TYPE_VIDEO:
+            return {'element_id': element_id, 'status': 'skipped', 'reason': 'not_video'}
+
+        if not element.file_url:
+            raise ValueError("У элемента отсутствует file_url для генерации превью")
+
+        with _tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
+            with requests.get(element.file_url, timeout=120, stream=True) as r:
+                r.raise_for_status()
+                for chunk in r.iter_content(chunk_size=8192):
+                    tmp.write(chunk)
+            tmp_path = tmp.name
+
+        thumbnail_url = generate_video_thumbnail_from_path(
+            tmp_path,
+            project_id=element.scene.project_id,
+            scene_id=element.scene_id,
+        )
+        if not thumbnail_url:
+            raise ValueError("Не удалось сгенерировать thumbnail для видео")
+
+        element.thumbnail_url = thumbnail_url
+        element.save(update_fields=['thumbnail_url', 'updated_at'])
+
+        # Используем существующий websocket event для актуализации карточки
+        notify_element_status(element, 'COMPLETED', file_url=element.file_url)
+
+        return {
+            'element_id': element_id,
+            'status': 'completed',
+            'thumbnail_url': thumbnail_url,
+        }
+    except Retry:
+        raise
+    except Exception as e:
+        print(f"❌ Ошибка генерации thumbnail для Element #{element_id}: {e}")
+        if isinstance(e, (requests.RequestException, requests.Timeout)):
+            raise self.retry(exc=e, countdown=30)
+        return {
+            'element_id': element_id,
+            'status': 'failed',
+            'error': str(e),
+        }
+    finally:
+        try:
+            if tmp_path and _os.path.exists(tmp_path):
+                _os.unlink(tmp_path)
+        except Exception:
+            pass

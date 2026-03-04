@@ -4,6 +4,16 @@ export interface User {
   id: number;
   username: string;
   email: string;
+  quota?: UserQuota;
+}
+
+export interface UserQuota {
+  max_projects: number;
+  used_projects: number;
+  max_scenes_per_project: number;
+  max_scenes_used: number;
+  max_elements_per_scene: number;
+  max_elements_used: number;
 }
 
 export interface TokenPair {
@@ -55,12 +65,17 @@ export type SceneStatus = "DRAFT" | "IN_PROGRESS" | "REVIEW" | "APPROVED";
 export interface Scene {
   id: number;
   project: number;
+  project_name?: string;
   name: string;
   status: SceneStatus;
+  status_display?: string;
   order_index: number;
   headliner: number | null;
   headliner_url?: string | null;
+  headliner_thumbnail_url?: string | null;
+  headliner_type?: ElementType | null;
   element_count?: number;
+  elements_count?: number;
   created_at: string;
   updated_at: string;
 }
@@ -108,11 +123,11 @@ export interface Element {
   updated_at: string;
 }
 
-export interface GenerateElementPayload {
-  scene: number;
-  ai_model: number;
-  prompt_text: string;
+export interface GeneratePayload {
+  prompt: string;
+  ai_model_id: number;
   generation_config?: Record<string, unknown>;
+  parent_element_id?: number;
 }
 
 export interface UploadElementPayload {
@@ -134,12 +149,7 @@ export interface SetHeadlinerPayload {
   element_id: number;
 }
 
-export interface Img2VidPayload {
-  parent_element: number;
-  ai_model: number;
-  prompt_text?: string;
-  generation_config?: Record<string, unknown>;
-}
+
 
 /* ── AI Models ────────────────────────────────────────────── */
 
@@ -148,17 +158,26 @@ export type ModelType = "IMAGE" | "VIDEO";
 export interface ParameterOption {
   value: string | number;
   label: string;
+  icon?: string;
 }
 
-export interface ParameterSchema {
-  type: "select" | "toggle" | "slider" | "number" | "text";
+export interface ParameterSchemaItem {
+  key: string;
   label: string;
+  type: "toggle_group" | "select" | "switch" | "slider" | "number";
   options?: ParameterOption[];
   default?: unknown;
   min?: number;
   max?: number;
   step?: number;
-  placeholder?: string;
+}
+
+export interface ImageInputSchemaItem {
+  key: string;
+  label: string;
+  min: number;
+  max: number;
+  required: boolean;
 }
 
 export interface AIModel {
@@ -166,8 +185,11 @@ export interface AIModel {
   name: string;
   model_type: ModelType;
   provider_name: string;
-  api_endpoint: string;
-  parameters_schema: Record<string, ParameterSchema>;
+  parameters_schema: ParameterSchemaItem[];
+  preview_url: string;
+  description: string;
+  tags: string[];
+  image_inputs_schema: ImageInputSchemaItem[];
   is_active: boolean;
 }
 
@@ -193,12 +215,21 @@ export interface PublicProject {
   scenes: PublicScene[];
 }
 
+export interface PublicElement {
+  id: number;
+  element_type: ElementType;
+  file_url: string;
+  thumbnail_url: string;
+  is_favorite: boolean;
+}
+
 export interface PublicScene {
   id: number;
   name: string;
   status: SceneStatus;
   order_index: number;
   headliner_url: string | null;
+  elements: PublicElement[];
   comments: Comment[];
 }
 
@@ -229,6 +260,11 @@ export interface WSElementStatusChangedEvent {
 }
 
 export type WSEvent = WSElementStatusChangedEvent;
+
+/* ── UI Types ─────────────────────────────────────────────── */
+
+export type GridDensity = "sm" | "md" | "lg";
+export type ElementFilter = "all" | "favorites" | "images" | "videos";
 
 /* ── API responses ────────────────────────────────────────── */
 

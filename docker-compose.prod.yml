@@ -56,7 +56,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: apom_celery_prod
-    command: celery -A config worker -l info
+    command: celery -A config worker -l info --concurrency=2 --max-memory-per-child=300000
     volumes:
       - ./backend:/app
     env_file:

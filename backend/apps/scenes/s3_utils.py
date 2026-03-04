@@ -133,6 +133,42 @@ def delete_file_from_s3(file_url: str) -> bool:
         return False
 
 
+STAGING_DIR = '/app/tmp_uploads'
+
+
+def save_to_staging(file: UploadedFile) -> str:
+    """
+    Быстро сохраняет загруженный файл в локальную staging-директорию.
+    Возвращает полный путь к файлу.
+    """
+    os.makedirs(STAGING_DIR, exist_ok=True)
+    ext = get_file_extension(file.name)
+    unique_name = f"{uuid.uuid4().hex}{ext}"
+    staging_path = os.path.join(STAGING_DIR, unique_name)
+
+    with open(staging_path, 'wb') as dest:
+        for chunk in file.chunks():
+            dest.write(chunk)
+
+    return staging_path
+
+
+def upload_staging_to_s3(staging_path: str, project_id: int, scene_id: int) -> str:
+    """
+    Загрузить файл из staging-директории в S3.
+    Возвращает публичный S3 URL.
+    """
+    from django.core.files import File
+
+    filename = os.path.basename(staging_path)
+    s3_key = f"projects/{project_id}/scenes/{scene_id}/{filename}"
+
+    with open(staging_path, 'rb') as f:
+        saved_path = default_storage.save(s3_key, File(f))
+
+    return default_storage.url(saved_path)
+
+
 def generate_video_thumbnail(file: UploadedFile, project_id: int, scene_id: int) -> Optional[str]:
     """
     Сгенерировать превью для видео файла используя ffmpeg.
@@ -190,4 +226,80 @@ def generate_video_thumbnail(file: UploadedFile, project_id: int, scene_id: int)
     
     except Exception as e:
         print(f"Error generating video thumbnail: {e}")
+        return None
+
+
+def generate_video_thumbnail_from_path(
+    video_path: str, project_id: int, scene_id: int
+) -> Optional[str]:
+    """
+    Сгенерировать превью для видео из файла на диске (для async-задач).
+    Не загружает видео в RAM — работает напрямую с файлом через ffmpeg.
+
+    Args:
+        video_path: путь к видео файлу на диске
+        project_id: ID проекта
+        scene_id: ID сцены
+
+    Returns:
+        URL превью или None в случае ошибки
+    """
+    temp_thumbnail_path = tempfile.mktemp(suffix=".jpg")
+    try:
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-i",
+                video_path,
+                "-vframes",
+                "1",
+                "-f",
+                "image2",
+                "-y",
+                temp_thumbnail_path,
+            ],
+            check=True,
+            capture_output=True,
+        )
+
+        with open(temp_thumbnail_path, "rb") as thumbnail_file:
+            thumbnail_content = thumbnail_file.read()
+
+        thumbnail_filename = f"{uuid.uuid4().hex}_thumb.jpg"
+        thumbnail_path = (
+            f"projects/{project_id}/scenes/{scene_id}/{thumbnail_filename}"
+        )
+        saved_path = default_storage.save(
+            thumbnail_path, ContentFile(thumbnail_content)
+        )
+        return default_storage.url(saved_path)
+    except Exception as e:
+        print(f"Error generating video thumbnail from path: {e}")
+        return None
+    finally:
+        if os.path.exists(temp_thumbnail_path):
+            os.unlink(temp_thumbnail_path)
+
+
+def generate_video_thumbnail_from_bytes(
+    video_bytes: bytes, project_id: int, scene_id: int
+) -> Optional[str]:
+    """
+    Сгенерировать превью для видео из набора байт.
+    Обёртка над generate_video_thumbnail_from_path для обратной совместимости.
+    """
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as temp_video:
+            temp_video.write(video_bytes)
+            temp_video_path = temp_video.name
+
+        try:
+            return generate_video_thumbnail_from_path(
+                temp_video_path, project_id, scene_id
+            )
+        finally:
+            if os.path.exists(temp_video_path):
+                os.unlink(temp_video_path)
+    except Exception as e:
+        print(f"Error generating video thumbnail from bytes: {e}")
         return None

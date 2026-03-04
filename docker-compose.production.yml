@@ -36,6 +36,8 @@ services:
     container_name: apom_backend
     restart: always
     command: daphne -b 0.0.0.0 -p 8000 config.asgi:application
+    volumes:
+      - upload_staging:/app/tmp_uploads
     expose:
       - "8000"
     environment:
@@ -69,7 +71,9 @@ services:
       dockerfile: Dockerfile.production
     container_name: apom_celery
     restart: always
-    command: celery -A config worker -l info
+    command: celery -A config worker -l info --concurrency=2 --max-memory-per-child=300000
+    volumes:
+      - upload_staging:/app/tmp_uploads
     environment:
       - DEBUG=${DEBUG}
       - SECRET_KEY=${SECRET_KEY}
@@ -136,6 +140,7 @@ services:
 
 volumes:
   postgres_data:
+  upload_staging:
 
 networks:
   apom_network:
