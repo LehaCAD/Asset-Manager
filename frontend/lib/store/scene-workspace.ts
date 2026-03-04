@@ -597,12 +597,13 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
   },
 
   toggleSelectAll: () => {
-    const { selectedIds, elements } = get();
-    if (elements.length === 0) return;
-    if (selectedIds.size === elements.length) {
+    const { selectedIds, getFilteredElements } = get();
+    const filtered = getFilteredElements();
+    if (filtered.length === 0) return;
+    if (selectedIds.size === filtered.length) {
       set({ selectedIds: new Set(), isMultiSelectMode: false });
     } else {
-      const ids = new Set(elements.map((e) => e.id));
+      const ids = new Set(filtered.map((e) => e.id));
       set({ selectedIds: ids, isMultiSelectMode: true });
     }
   },

@@ -58,6 +58,7 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
     deleteElements,
     clearSelection,
     toggleSelectAll,
+    getFilteredElements,
     updateElement,
   } = useSceneWorkspaceStore();
   const [confirmDeleteIds, setConfirmDeleteIds] = useState<number[]>([]);
@@ -237,7 +238,7 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
       {/* Bulk actions bar - shown when items selected */}
       <ElementBulkBar
         selectedCount={selectedIds.size}
-        totalCount={elements.length}
+        totalCount={getFilteredElements().length}
         onDeleteSelected={() => openDeleteDialog(Array.from(selectedIds))}
         onClearSelection={clearSelection}
         onToggleSelectAll={toggleSelectAll}
