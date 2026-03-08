@@ -31,7 +31,6 @@ class ElementSerializer(serializers.ModelSerializer):
             'error_message',
             'source_type',
             'source_type_display',
-            'parent_element',
             'external_task_id',
             'created_at',
             'updated_at'

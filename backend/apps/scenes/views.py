@@ -189,8 +189,7 @@ class SceneViewSet(viewsets.ModelViewSet):
         Принимает:
         - prompt: текст промпта (обязательно)
         - ai_model_id: ID AI модели (обязательно)
-        - generation_config: параметры генерации (опционально, dict)
-        - parent_element_id: ID родительского элемента для img2vid (опционально)
+        - generation_config: параметры генерации, включая input_urls для img2vid (опционально, dict)
         
         Возвращает:
         - Данные созданного Element с status=PENDING
@@ -223,28 +222,18 @@ class SceneViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Проверка родительского элемента (если указан)
-        parent_element = None
-        parent_element_id = request.data.get('parent_element_id')
-        if parent_element_id:
-            from apps.elements.models import Element
-            try:
-                parent_element = Element.objects.get(
-                    id=parent_element_id,
-                    scene__project__user=request.user  # Проверка владения
-                )
-            except Element.DoesNotExist:
-                return Response(
-                    {'error': 'Parent element not found or you do not have permission'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-        
         # Определение типа элемента по модели
         element_type = ai_model.model_type  # IMAGE или VIDEO
         
-        # Определение source_type
+        # Определение source_type: IMG2VID если модель VIDEO и в generation_config есть input_urls
         from apps.elements.models import Element
-        if parent_element:
+        generation_config = request.data.get('generation_config') or {}
+        input_urls = generation_config.get('input_urls')
+        if (
+            element_type == 'VIDEO'
+            and isinstance(input_urls, list)
+            and len(input_urls) > 0
+        ):
             source_type = Element.SOURCE_IMG2VID
         else:
             source_type = Element.SOURCE_GENERATED
@@ -258,13 +247,10 @@ class SceneViewSet(viewsets.ModelViewSet):
                 'element_type': element_type,
                 'prompt_text': prompt,
                 'ai_model': ai_model_id,
-                'generation_config': request.data.get('generation_config', {}),
+                'generation_config': generation_config,
                 'status': Element.STATUS_PENDING,
                 'source_type': source_type,
             }
-            
-            if parent_element:
-                element_data['parent_element'] = parent_element.id
             
             with transaction.atomic():
                 locked_scene = Scene.objects.select_for_update().get(pk=scene.pk)

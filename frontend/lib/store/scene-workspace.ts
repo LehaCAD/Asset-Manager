@@ -497,7 +497,6 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
         status: "PROCESSING",
         error_message: "",
         source_type: "UPLOADED",
-        parent_element: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };

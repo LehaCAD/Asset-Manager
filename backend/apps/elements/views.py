@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework import viewsets, permissions, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -6,6 +8,8 @@ from .models import Element
 from .serializers import ElementSerializer, ReorderSerializer
 from .services import reorder_elements
 from apps.scenes.s3_utils import delete_file_from_s3
+
+logger = logging.getLogger(__name__)
 
 
 class IsSceneProjectOwner(permissions.BasePermission):
@@ -31,13 +35,20 @@ class ElementViewSet(viewsets.ModelViewSet):
     
     def perform_destroy(self, instance):
         """Удаление элемента с очисткой файлов из S3."""
+        logger.info(f"Deleting element {instance.id}: file_url={instance.file_url}, thumbnail_url={instance.thumbnail_url}")
+        
         # Удаляем основной файл из S3
         if instance.file_url:
-            delete_file_from_s3(instance.file_url)
+            result = delete_file_from_s3(instance.file_url)
+            logger.info(f"Deleted main file for element {instance.id}: success={result}")
+        
         # Удаляем превью из S3
         if instance.thumbnail_url:
-            delete_file_from_s3(instance.thumbnail_url)
+            result = delete_file_from_s3(instance.thumbnail_url)
+            logger.info(f"Deleted thumbnail for element {instance.id}: success={result}")
+        
         instance.delete()
+        logger.info(f"Element {instance.id} deleted successfully")
     
     def get_queryset(self):
         """Возвращает только элементы сцен проектов текущего пользователя с фильтрацией."""

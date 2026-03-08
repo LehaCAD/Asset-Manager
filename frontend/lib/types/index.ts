@@ -118,7 +118,6 @@ export interface Element {
   status: ElementStatus;
   error_message: string;
   source_type: ElementSource;
-  parent_element: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -127,7 +126,6 @@ export interface GeneratePayload {
   prompt: string;
   ai_model_id: number;
   generation_config?: Record<string, unknown>;
-  parent_element_id?: number;
 }
 
 export interface UploadElementPayload {
@@ -161,11 +159,24 @@ export interface ParameterOption {
   icon?: string;
 }
 
+export type UISemantic =
+  | "aspect_ratio"
+  | "resolution"
+  | "quality"
+  | "output_format"
+  | "duration"
+  | "switch"
+  | "slider"
+  | "number"
+  | "select"
+  | "toggle_group";
+
 export interface ParameterSchemaItem {
-  key: string;
+  request_key: string;        // field name in API request body (placeholder in request_schema)
   label: string;
-  type: "toggle_group" | "select" | "switch" | "slider" | "number";
+  ui_semantic: UISemantic;
   options?: ParameterOption[];
+  custom_options?: ParameterOption[];  // optional: options for Custom panel
   default?: unknown;
   min?: number;
   max?: number;

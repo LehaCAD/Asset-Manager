@@ -5,15 +5,23 @@ from celery import shared_task
 from celery.exceptions import Retry
 import time
 import requests
-from django.core.files.base import ContentFile
+import logging
+from django.conf import settings
 from .models import Element
-from .services import substitute_variables
+from .services import substitute_variables, collect_unresolved_placeholders
 import os
 from apps.scenes.s3_utils import (
-    generate_unique_filename,
     generate_video_thumbnail_from_path,
     upload_staging_to_s3,
 )
+from apps.common.generation import (
+    extract_result_url,
+    finalize_generation_failure,
+    finalize_generation_success,
+    is_public_callback_url,
+)
+
+logger = logging.getLogger(__name__)
 
 
 def notify_element_status(element: Element, status: str, file_url: str = '', error_message: str = '') -> None:
@@ -44,7 +52,7 @@ def notify_element_status(element: Element, status: str, file_url: str = '', err
             }
         )
     except Exception as e:
-        print(f"⚠️ Не удалось отправить WebSocket-уведомление: {e}")
+        logger.warning("Не удалось отправить WebSocket-уведомление: %s", e)
 
 
 @shared_task
@@ -109,7 +117,6 @@ def start_generation(self, element_id: int) -> dict:
         element = Element.objects.select_related(
             'ai_model',
             'ai_model__provider',
-            'parent_element'
         ).get(id=element_id)
         
         if not element.ai_model:
@@ -123,19 +130,35 @@ def start_generation(self, element_id: int) -> dict:
             'prompt': element.prompt_text or '',
             'model': ai_model.name,
         }
+
+        callback_base = settings.BACKEND_BASE_URL
+        if is_public_callback_url(callback_base):
+            callback_url = f"{callback_base}/api/ai/callback/"
+            if settings.KIE_CALLBACK_TOKEN:
+                callback_url = f"{callback_url}?token={settings.KIE_CALLBACK_TOKEN}"
+            context['callback_url'] = callback_url
         
-        # Добавляем параметры из generation_config
+        # Добавляем параметры из generation_config (единственный источник input_urls и др.)
         if element.generation_config:
             context.update(element.generation_config)
-        
-        # Если есть родительский элемент (для img2vid) — передаем URL в input_urls
-        if element.parent_element and element.parent_element.file_url:
-            context['input_urls'] = [element.parent_element.file_url]
-        else:
+        # input_urls опционален для image-моделей (text-to-image): если не передан — пустой список
+        if 'input_urls' not in context:
             context['input_urls'] = []
         
         # Подставляем переменные в request_schema
         request_body = substitute_variables(ai_model.request_schema, context)
+        if not isinstance(request_body, dict):
+            raise ValueError("request_schema должен формировать JSON object")
+        if context.get('callback_url'):
+            request_body['callBackUrl'] = context['callback_url']
+        elif request_body.get('callBackUrl') == '{{callback_url}}':
+            request_body.pop('callBackUrl', None)
+        unresolved_placeholders = sorted(set(collect_unresolved_placeholders(request_body)))
+        if unresolved_placeholders:
+            raise ValueError(
+                "AI model request_schema содержит неподставленные переменные: "
+                + ", ".join(unresolved_placeholders)
+            )
         
         # URL для запроса
         full_url = f"{provider.base_url.rstrip('/')}{ai_model.api_endpoint}"
@@ -148,9 +171,7 @@ def start_generation(self, element_id: int) -> dict:
         if provider.api_key:
             headers['Authorization'] = f'Bearer {provider.api_key}'
         
-        print(f"🚀 Отправка запроса на генерацию для Element #{element_id}")
-        print(f"URL: {full_url}")
-        print(f"Body: {request_body}")
+        logger.info("Отправка запроса на генерацию Element #%s URL=%s", element_id, full_url)
         
         # Отправляем запрос
         response = requests.post(
@@ -163,7 +184,7 @@ def start_generation(self, element_id: int) -> dict:
         response.raise_for_status()
         result = response.json()
         
-        print(f"✅ Ответ от провайдера: {result}")
+        logger.info("Получен ответ от провайдера для Element #%s", element_id)
         
         # Проверка кода ответа
         code = result.get('code')
@@ -186,7 +207,7 @@ def start_generation(self, element_id: int) -> dict:
         element.status = Element.STATUS_PROCESSING
         element.save()
         
-        print(f"✅ Element #{element_id} обновлен: task_id={task_id}, status=PROCESSING")
+        logger.info("Element #%s обновлен: task_id=%s, status=PROCESSING", element_id, task_id)
         
         # Запускаем polling задачу
         check_generation_status.apply_async(
@@ -203,7 +224,7 @@ def start_generation(self, element_id: int) -> dict:
     except Retry:
         raise
     except Exception as e:
-        print(f"❌ Ошибка при запуске генерации: {e}")
+        logger.exception("Ошибка при запуске генерации Element #%s: %s", element_id, e)
 
         # Retry при сетевых ошибках: не переводим элемент в FAILED до исчерпания ретраев
         if isinstance(e, (requests.RequestException, requests.Timeout)):
@@ -211,11 +232,10 @@ def start_generation(self, element_id: int) -> dict:
 
         # Критическая ошибка — переводим в FAILED и уведомляем фронтенд
         try:
-            element = Element.objects.get(id=element_id)
-            element.status = Element.STATUS_FAILED
-            element.error_message = str(e)
-            element.save(update_fields=['status', 'error_message', 'updated_at'])
-            notify_element_status(element, 'FAILED', error_message=str(e))
+            applied = finalize_generation_failure(element_id=element_id, error_message=str(e))
+            if applied:
+                element = Element.objects.get(id=element_id)
+                notify_element_status(element, 'FAILED', error_message=str(e))
         except Element.DoesNotExist:
             pass
 
@@ -238,6 +258,9 @@ def check_generation_status(self, element_id: int) -> dict:
             'ai_model',
             'ai_model__provider'
         ).get(id=element_id)
+
+        if element.status in (Element.STATUS_COMPLETED, Element.STATUS_FAILED):
+            return {'element_id': element_id, 'status': element.status, 'skipped': True}
         
         if not element.external_task_id:
             raise ValueError("External task_id не найден")
@@ -265,90 +288,45 @@ def check_generation_status(self, element_id: int) -> dict:
         data = result.get('data', {})
         state = data.get('state', '').lower()
         
-        print(f"📊 Статус генерации Element #{element_id}: {state}")
+        logger.info("Статус генерации Element #%s: %s", element_id, state)
         
         if state == 'success':
-            # Генерация завершена успешно
-            result_json = data.get('resultJson', '{}')
-            
-            # Парсим resultJson (может быть строкой)
-            if isinstance(result_json, str):
-                import json
-                result_data = json.loads(result_json)
-            else:
-                result_data = result_json
-            
-            # Получаем URL результата
-            result_urls = result_data.get('resultUrls', [])
-            
-            if not result_urls:
-                raise ValueError("Result URLs не найдены")
-            
-            file_url = result_urls[0]
-            
-            print(f"✅ Генерация завершена! Скачиваем файл: {file_url}")
-            
-            # Скачиваем файл
-            file_response = requests.get(file_url, timeout=60)
-            file_response.raise_for_status()
-            
-            # Определяем расширение из URL или Content-Type
-            if file_url.endswith('.mp4'):
-                ext = '.mp4'
-            elif file_url.endswith('.jpg') or file_url.endswith('.jpeg'):
-                ext = '.jpg'
-            elif file_url.endswith('.png'):
-                ext = '.png'
-            else:
-                ext = '.jpg'  # По умолчанию
-            
-            # Генерируем уникальное имя
-            filename = generate_unique_filename(f"generated{ext}")
-            
-            # Загружаем на S3
-            from django.core.files.storage import default_storage
-            file_path = f"generated/{filename}"
-            saved_path = default_storage.save(file_path, ContentFile(file_response.content))
-            s3_url = default_storage.url(saved_path)
-            
-            # Обновляем элемент
-            element.file_url = s3_url
-            element.status = Element.STATUS_COMPLETED
-            element.save()
-            
-            # WebSocket-уведомление
-            notify_element_status(element, 'COMPLETED', file_url=s3_url)
-            
-            print(f"✅ Element #{element_id} завершен! URL: {s3_url}")
+            source_url = extract_result_url(result)
+            applied, s3_url = finalize_generation_success(element_id=element_id, source_url=source_url)
+            if applied:
+                updated_element = Element.objects.get(id=element_id)
+                notify_element_status(updated_element, 'COMPLETED', file_url=s3_url)
             
             return {
                 'element_id': element_id,
                 'status': 'completed',
-                'file_url': s3_url
+                'file_url': s3_url,
+                'applied': applied,
             }
             
         elif state == 'failed':
             # Генерация failed
             fail_msg = data.get('failMsg', 'Unknown error')
-            
-            element.status = Element.STATUS_FAILED
-            element.error_message = fail_msg
-            element.save()
-            
-            # WebSocket-уведомление
-            notify_element_status(element, 'FAILED', error_message=fail_msg)
-            
-            print(f"❌ Генерация failed: {fail_msg}")
+            applied = finalize_generation_failure(element_id=element_id, error_message=fail_msg)
+            if applied:
+                updated_element = Element.objects.get(id=element_id)
+                notify_element_status(updated_element, 'FAILED', error_message=fail_msg)
+            logger.warning("Генерация failed для Element #%s: %s", element_id, fail_msg)
             
             return {
                 'element_id': element_id,
                 'status': 'failed',
-                'error': fail_msg
+                'error': fail_msg,
+                'applied': applied,
             }
             
         else:
             # Еще в процессе (pending, processing, etc.)
-            print(f"⏳ Генерация в процессе: {state}, повторная проверка через 10 сек")
+            logger.info(
+                "Генерация в процессе Element #%s: %s, повтор через 10 сек",
+                element_id,
+                state,
+            )
             
             # Retry через 10 секунд
             raise self.retry(countdown=10, max_retries=60)
@@ -356,7 +334,7 @@ def check_generation_status(self, element_id: int) -> dict:
     except Retry:
         raise
     except Exception as e:
-        print(f"❌ Ошибка при проверке статуса: {e}")
+        logger.exception("Ошибка при проверке статуса Element #%s: %s", element_id, e)
         
         # Retry при сетевых ошибках
         if isinstance(e, (requests.RequestException, requests.Timeout)):
@@ -364,11 +342,9 @@ def check_generation_status(self, element_id: int) -> dict:
         
         # Обновляем статус элемента при критической ошибке
         try:
-            element = Element.objects.get(id=element_id)
-            if element.status != Element.STATUS_COMPLETED:
-                element.status = Element.STATUS_FAILED
-                element.error_message = str(e)
-                element.save(update_fields=['status', 'error_message', 'updated_at'])
+            applied = finalize_generation_failure(element_id=element_id, error_message=str(e))
+            if applied:
+                element = Element.objects.get(id=element_id)
                 notify_element_status(element, 'FAILED', error_message=str(e))
         except Element.DoesNotExist:
             pass
@@ -415,7 +391,7 @@ def process_uploaded_file(self, element_id: int, staging_path: str) -> dict:
     except Retry:
         raise
     except Exception as e:
-        print(f"❌ Ошибка обработки загруженного файла Element #{element_id}: {e}")
+        logger.exception("Ошибка обработки загруженного файла Element #%s: %s", element_id, e)
         try:
             element = Element.objects.get(id=element_id)
             element.status = Element.STATUS_FAILED
@@ -483,7 +459,7 @@ def generate_upload_thumbnail(self, element_id: int) -> dict:
     except Retry:
         raise
     except Exception as e:
-        print(f"❌ Ошибка генерации thumbnail для Element #{element_id}: {e}")
+        logger.exception("Ошибка генерации thumbnail для Element #%s: %s", element_id, e)
         if isinstance(e, (requests.RequestException, requests.Timeout)):
             raise self.retry(exc=e, countdown=30)
         return {

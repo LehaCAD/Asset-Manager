@@ -76,8 +76,8 @@ class Command(BaseCommand):
                 
                 self.stdout.write(self.style.SUCCESS(f'✅ Изображение загружено: {image_url}'))
                 
-                # Создать parent element (исходное изображение)
-                parent_element = Element.objects.create(
+                # Создать элемент с исходным изображением (для проверки URL)
+                source_element = Element.objects.create(
                     scene=scene,
                     element_type=Element.ELEMENT_TYPE_IMAGE,
                     file_url=image_url,
@@ -85,7 +85,7 @@ class Command(BaseCommand):
                     status=Element.STATUS_COMPLETED,
                     source_type=Element.SOURCE_UPLOADED
                 )
-                self.stdout.write(f'✅ Создан parent Element #{parent_element.id}')
+                self.stdout.write(f'✅ Создан source Element #{source_element.id}')
                 
         except FileNotFoundError:
             self.stdout.write(self.style.ERROR('❌ Файл 123.jpg не найден!'))
@@ -109,27 +109,27 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR('❌ Модель Seedance не найдена!'))
             return
         
-        # Создание элемента для видео
+        # Создание элемента для видео (input_urls в generation_config — единственный источник)
         prompt = "Two people arm wrestling in a vintage room, dynamic movement, cinematic"
-        
+
         element = Element.objects.create(
             scene=scene,
             element_type=Element.ELEMENT_TYPE_VIDEO,
             prompt_text=prompt,
             ai_model=ai_model,
-            parent_element=parent_element,  # Указываем исходное изображение
             generation_config={
                 'aspect_ratio': '16:9',
                 'resolution': '720p',
-                'duration': '8'
+                'duration': '8',
+                'input_urls': [source_element.file_url],
             },
             status=Element.STATUS_PENDING,
             source_type=Element.SOURCE_IMG2VID
         )
-        
+
         self.stdout.write(f'\n✅ Создан Element для видео #{element.id}')
         self.stdout.write(f'   Промпт: {prompt}')
-        self.stdout.write(f'   Parent Element: #{parent_element.id}')
+        self.stdout.write(f'   Source image URL: {source_element.file_url}')
         self.stdout.write(f'   Конфигурация: {element.generation_config}')
         
         # Запуск генерации

@@ -50,6 +50,32 @@ def substitute_variables(request_schema: Dict[str, Any], context: Dict[str, Any]
     return replace_value(request_schema)
 
 
+def collect_unresolved_placeholders(value: Any) -> List[str]:
+    """
+    Собирает все неразрешенные {{placeholders}} после substitute_variables.
+    Нужен для fail-fast в случае неконсистентной конфигурации AIModel.
+    """
+    placeholders: List[str] = []
+    pattern = re.compile(r'\{\{([^}]+)\}\}')
+
+    def walk(node: Any) -> None:
+        if isinstance(node, dict):
+            for nested in node.values():
+                walk(nested)
+            return
+
+        if isinstance(node, list):
+            for nested in node:
+                walk(nested)
+            return
+
+        if isinstance(node, str):
+            placeholders.extend(match.group(1).strip() for match in pattern.finditer(node))
+
+    walk(value)
+    return placeholders
+
+
 def create_element(
     scene: Scene,
     element_type: str,

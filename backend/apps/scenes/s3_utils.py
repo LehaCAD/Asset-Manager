@@ -5,6 +5,8 @@ import os
 import uuid
 import tempfile
 import subprocess
+import logging
+from urllib.parse import urlparse
 from typing import Tuple, Optional
 from django.core.files.uploadedfile import UploadedFile
 from django.core.files.storage import default_storage
@@ -114,22 +116,34 @@ def delete_file_from_s3(file_url: str) -> bool:
     Returns:
         True если успешно удалено, False иначе
     """
+    logger = logging.getLogger(__name__)
+    
     try:
-        # Извлекаем путь из URL
-        # Например: https://bucket.s3.timeweb.com/media/uploads/abc123.jpg -> uploads/abc123.jpg
-        if '/media/' in file_url:
-            file_path = file_url.split('/media/')[1]
+        # Извлекаем путь из URL используя urlparse
+        # Например: https://bucket.s3.timeweb.com/media/uploads/abc123.jpg -> media/uploads/abc123.jpg
+        parsed = urlparse(file_url)
+        path = parsed.path.lstrip('/')
+        
+        # Убираем prefix бакета/media если есть
+        storage_location = getattr(default_storage, 'location', '').strip('/')
+        if storage_location and path.startswith(storage_location + '/'):
+            file_path = path[len(storage_location) + 1:]
         else:
-            # Если формат URL другой, пытаемся извлечь последние части
-            file_path = '/'.join(file_url.split('/')[-2:])
+            file_path = path
+        
+        # Логируем URL и вычисленный путь для отладки
+        logger.info(f"Deleting file from S3: file_url={file_url}, computed file_path={file_path}")
         
         # Удаляем файл
         if default_storage.exists(file_path):
             default_storage.delete(file_path)
+            logger.info(f"Successfully deleted file from S3: {file_path}")
             return True
-        return False
+        else:
+            logger.warning(f"File not found in S3: {file_path}")
+            return False
     except Exception as e:
-        print(f"Error deleting file from S3: {e}")
+        logger.error(f"Error deleting file from S3: file_url={file_url}, error={e}")
         return False
 
 

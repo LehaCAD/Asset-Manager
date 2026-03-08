@@ -28,6 +28,8 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key-change-me')
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,backend,0.0.0.0').split(',')
+BACKEND_BASE_URL = os.getenv('BACKEND_BASE_URL', 'http://localhost:8000').rstrip('/')
+KIE_CALLBACK_TOKEN = os.getenv('KIE_CALLBACK_TOKEN', '')
 
 # Application definition
 

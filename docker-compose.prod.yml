@@ -72,12 +72,16 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile.prod
+      dockerfile: Dockerfile.production
+      args:
+        NEXT_PUBLIC_API_URL: https://raskadrawka.ru/api
+        NEXT_PUBLIC_WS_URL: wss://raskadrawka.ru/ws
     container_name: apom_frontend_prod
     expose:
       - "3000"
     environment:
       - NEXT_PUBLIC_API_URL=https://raskadrawka.ru/api
+      - NEXT_PUBLIC_WS_URL=wss://raskadrawka.ru/ws
     depends_on:
       - backend
     restart: unless-stopped

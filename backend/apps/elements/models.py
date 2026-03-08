@@ -115,15 +115,6 @@ class Element(models.Model):
         verbose_name='Тип источника',
         help_text='Способ создания элемента'
     )
-    parent_element = models.ForeignKey(
-        'self',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='child_elements',
-        verbose_name='Родительский элемент',
-        help_text='Исходный элемент для img2vid или вариаций'
-    )
     external_task_id = models.CharField(
         max_length=255,
         blank=True,

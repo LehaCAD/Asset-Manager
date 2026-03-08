@@ -64,7 +64,6 @@ User 1──N Project
               └── 1──N SharedLink
 
 AIProvider 1──N AIModel 1──N Element (nullable)
-Element ──> Element (parent_element, self-FK для img2vid)
 
 User 1──1 UserQuota
 ```
@@ -81,7 +80,7 @@ User 1──1 UserQuota
 
 ## Ключевые механики
 
-- **Генерация:** `POST /api/scenes/{id}/generate/` создаёт Element со статусом `PENDING`, запускает Celery-задачу `start_generation` → polling `check_generation_status` → скачивание результата на S3 → статус `COMPLETED`.
+- **Генерация:** `POST /api/scenes/{id}/generate/` создаёт Element со статусом `PENDING`, запускает Celery-задачу `start_generation` → polling `check_generation_status` → скачивание результата на S3 → статус `COMPLETED`. Входные изображения (image refs, img2vid source) передаются через `generation_config.input_urls` и др. ключи из `image_inputs_schema`.
 - **WebSocket:** Клиент подключается к `ws/projects/{id}/`, получает `element_status_changed` при завершении/ошибке генерации.
 - **Загрузка файлов:** `POST /api/scenes/{id}/upload/` загружает файл на S3, создаёт Element с `source_type=UPLOADED`.
 - **Публичный доступ:** `SharedLink` даёт readonly-доступ к проекту по токену. Через него клиент оставляет `Comment` к сцене.

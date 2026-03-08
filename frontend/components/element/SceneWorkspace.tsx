@@ -2,10 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSceneWorkspaceStore } from "@/lib/store/scene-workspace";
+import { useGenerationStore } from "@/lib/store/generation";
 import { wsManager } from "@/lib/api/websocket";
 import { ElementGrid } from "@/components/element/ElementGrid";
 import { ElementFilters } from "@/components/element/ElementFilters";
 import { ElementBulkBar } from "@/components/element/ElementBulkBar";
+import { ConfigPanel } from "@/components/generation/ConfigPanel";
+import { PromptBar } from "@/components/generation/PromptBar";
 import {
   Dialog,
   DialogContent,
@@ -61,6 +64,9 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
     getFilteredElements,
     updateElement,
   } = useSceneWorkspaceStore();
+
+  const { loadModels } = useGenerationStore();
+
   const [confirmDeleteIds, setConfirmDeleteIds] = useState<number[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const fallbackRefetchIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -68,6 +74,7 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
 
   const resetWorkspace = useSceneWorkspaceStore((s) => s.resetWorkspace);
 
+  // Load scene data
   useEffect(() => {
     loadScene(sceneId);
     return () => {
@@ -75,6 +82,12 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
     };
   }, [sceneId, loadScene, resetWorkspace]);
 
+  // Load models for generation
+  useEffect(() => {
+    loadModels();
+  }, [loadModels]);
+
+  // Hydrate density preference
   useEffect(() => {
     hydrateDensityPreference();
   }, [hydrateDensityPreference]);
@@ -206,72 +219,84 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
   };
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Header: scene name + element count */}
-      <div className="flex items-center justify-between border-b px-4 py-3">
-        <div>
-          <h2 className="text-lg font-semibold">
-            {isLoading ? "Загрузка..." : scene?.name ?? "Сцена"}
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            {elements.length} {elementsCountLabel}
-          </p>
+    <div className="flex h-full overflow-hidden">
+      {/* Zone 1: Config Panel (left sidebar) */}
+      <div className="hidden md:block">
+        <ConfigPanel />
+      </div>
+
+      {/* Main content area */}
+      <div className="flex flex-1 flex-col min-w-0">
+        {/* Header: scene name + element count */}
+        <div className="flex items-center justify-between border-b px-4 py-3 shrink-0">
+          <div>
+            <h2 className="text-lg font-semibold">
+              {isLoading ? "Загрузка..." : scene?.name ?? "Сцена"}
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {elements.length} {elementsCountLabel}
+            </p>
+          </div>
         </div>
-      </div>
 
-      {/* Filters toolbar */}
-      <div className="border-b px-4 py-2">
-        <ElementFilters
-          filter={filter}
-          onFilterChange={setFilter}
-          density={density}
-          onDensityChange={setDensity}
-          counts={filterCounts}
+        {/* Filters toolbar */}
+        <div className="border-b px-4 py-2 shrink-0">
+          <ElementFilters
+            filter={filter}
+            onFilterChange={setFilter}
+            density={density}
+            onDensityChange={setDensity}
+            counts={filterCounts}
+          />
+        </div>
+
+        {/* Zone 3: Grid area - scrollable */}
+        <div className="flex-1 overflow-auto p-4 relative min-h-0">
+          <ElementGrid onRequestDelete={openDeleteDialog} />
+        </div>
+
+        {/* Zone 2: Prompt Bar (bottom) */}
+        <PromptBar sceneId={sceneId} />
+
+        {/* Bulk actions bar - shown when items selected */}
+        <ElementBulkBar
+          selectedCount={selectedIds.size}
+          totalCount={getFilteredElements().length}
+          onDeleteSelected={() => openDeleteDialog(Array.from(selectedIds))}
+          onClearSelection={clearSelection}
+          onToggleSelectAll={toggleSelectAll}
         />
+
+        {/* Delete confirmation dialog */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>
+                {isGroupDelete ? "Удалить выбранные элементы?" : "Удалить элемент?"}
+              </DialogTitle>
+              <DialogDescription>
+                {isGroupDelete
+                  ? `Будет удалено ${confirmDeleteIds.length} элементов. Это действие нельзя отменить.`
+                  : "Элемент будет удалён безвозвратно."}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="ghost"
+                onClick={() => setDeleteDialogOpen(false)}
+              >
+                Отмена
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleConfirmDelete}
+              >
+                Удалить
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
-
-      {/* Grid area - scrollable */}
-      <div className="relative flex-1 overflow-auto p-4">
-        <ElementGrid onRequestDelete={openDeleteDialog} />
-      </div>
-
-      {/* Bulk actions bar - shown when items selected */}
-      <ElementBulkBar
-        selectedCount={selectedIds.size}
-        totalCount={getFilteredElements().length}
-        onDeleteSelected={() => openDeleteDialog(Array.from(selectedIds))}
-        onClearSelection={clearSelection}
-        onToggleSelectAll={toggleSelectAll}
-      />
-
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>
-              {isGroupDelete ? "Удалить выбранные элементы?" : "Удалить элемент?"}
-            </DialogTitle>
-            <DialogDescription>
-              {isGroupDelete
-                ? `Будет удалено ${confirmDeleteIds.length} элементов. Это действие нельзя отменить.`
-                : "Элемент будет удалён безвозвратно."}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => setDeleteDialogOpen(false)}
-            >
-              Отмена
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleConfirmDelete}
-            >
-              Удалить
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

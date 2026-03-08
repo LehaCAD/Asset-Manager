@@ -16,6 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from apps.elements.views_webhook import generation_callback_view
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -24,4 +25,5 @@ urlpatterns = [
     path('api/scenes/', include('apps.scenes.urls')),
     path('api/elements/', include('apps.elements.urls')),
     path('api/ai-models/', include('apps.ai_providers.urls')),
+    path('api/ai/callback/', generation_callback_view),
 ]

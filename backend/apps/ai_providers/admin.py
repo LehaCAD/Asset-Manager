@@ -64,6 +64,14 @@ class AIModelAdmin(admin.ModelAdmin):
             'fields': ('parameters_schema',),
             'description': 'JSON описание параметров: типы, опции, дефолты'
         }),
+        ('Внешний вид и описание', {
+            'fields': ('preview_url', 'description', 'tags'),
+            'description': 'Поля для отображения модели в UI'
+        }),
+        ('Схема входных изображений', {
+            'fields': ('image_inputs_schema',),
+            'description': 'JSON: [{key, label, min, max, required}]'
+        }),
         ('Временные метки', {
             'fields': ('created_at', 'updated_at'),
             'classes': ('collapse',)
