@@ -37,16 +37,16 @@ export function WorkspaceHeader({ projectId, sceneId }: WorkspaceHeaderProps) {
     router.push(`/projects/${projectId}/scenes/${targetSceneId}`);
   };
 
-  // Используем имя сцены из workspace store если доступно, иначе из neighbors
-  const currentSceneName = scene?.name ?? currentScene?.name;
+  // Используем имя проекта из текущей сцены
+  const projectName = scene?.project_name;
 
   return (
     <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex items-center justify-between px-4 py-3">
-        {/* Left: Breadcrumbs */}
+        {/* Left: Breadcrumbs - только проект, сцена показывается в навигации по центру */}
         <div className="flex-1 min-w-0">
           <Breadcrumbs 
-            projectName={undefined} 
+            projectName={projectName} 
             sceneName={undefined}
             suffix={`· ${total} ${pluralizeScenes(total)}`}
           />

@@ -313,11 +313,14 @@ export type DisplayCardSize = "compact" | "medium" | "large";
 export type DisplayAspectRatio = "landscape" | "square" | "portrait";
 export type DisplayFitMode = "fill" | "fit";
 
-export interface ProjectDisplayPreferences {
+export interface DisplayPreferences {
   size: DisplayCardSize;
   aspectRatio: DisplayAspectRatio;
   fitMode: DisplayFitMode;
 }
+
+// Backward compatibility alias
+export type ProjectDisplayPreferences = DisplayPreferences;
 
 export interface SceneNeighbors {
   currentScene: Scene | null;

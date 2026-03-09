@@ -20,11 +20,21 @@ import { Plus, Clapperboard } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import { SceneCard } from "./SceneCard";
 import { CreateSceneDialog } from "./CreateSceneDialog";
+import { DisplaySettingsPopover } from "@/components/display/DisplaySettingsPopover";
 import { useScenesStore } from "@/lib/store/scenes";
+import { useDisplayStore } from "@/lib/store/project-display";
 import { projectsApi } from "@/lib/api/projects";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
+import { DISPLAY_GRID_CONFIG, ASPECT_RATIO_CLASSES, FIT_MODE_CLASSES, CARD_SIZES } from "@/lib/utils/constants";
+import type { DisplayCardSize, DisplayAspectRatio } from "@/lib/types";
+
+// Helper для получения минимальной ширины карточки
+function getMinCardWidth(size: DisplayCardSize, aspectRatio: DisplayAspectRatio): number {
+  return CARD_SIZES[size][aspectRatio].width;
+}
 import type { Project } from "@/lib/types";
 
 interface ScenarioTableClientProps {
@@ -39,13 +49,15 @@ function pluralizeScenes(count: number): string {
 
 export function ScenarioTableClient({ projectId }: ScenarioTableClientProps) {
   const { scenes, isLoading, loadScenes, reorderScenes, setScenes } = useScenesStore();
+  const { preferences, hydratePreferences } = useDisplayStore();
   const [createOpen, setCreateOpen] = useState(false);
   const [project, setProject] = useState<Project | null>(null);
 
   useEffect(() => {
     loadScenes(projectId);
     projectsApi.getById(projectId).then(setProject).catch(() => null);
-  }, [projectId, loadScenes]);
+    hydratePreferences();
+  }, [projectId, loadScenes, hydratePreferences]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -71,9 +83,14 @@ export function ScenarioTableClient({ projectId }: ScenarioTableClientProps) {
     [scenes, projectId, reorderScenes, setScenes]
   );
 
+  // Get display configuration в зависимости от size И aspect ratio
+  const gridConfig = DISPLAY_GRID_CONFIG[preferences.size][preferences.aspectRatio];
+  const aspectClass = ASPECT_RATIO_CLASSES[preferences.aspectRatio];
+  const fitClass = FIT_MODE_CLASSES[preferences.fitMode];
+
   return (
     <>
-      {/* Header: breadcrumbs + count + button (all left-aligned) */}
+      {/* Header: breadcrumbs + count + button (all left-aligned) + display settings */}
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex items-center gap-4 px-4 py-3">
           <Breadcrumbs 
@@ -84,15 +101,19 @@ export function ScenarioTableClient({ projectId }: ScenarioTableClientProps) {
             <Plus className="h-4 w-4 mr-2" />
             Добавить сцену
           </Button>
+          <DisplaySettingsPopover />
         </div>
       </div>
 
-      {/* Grid - full width, no max-width limit */}
+      {/* Grid - full width, no max-width limit, with display preferences */}
       <div className="flex-1 overflow-auto px-4 py-6">
         {isLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+          <div 
+            className={cn("grid", gridConfig.gap)}
+            style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${getMinCardWidth(preferences.size, preferences.aspectRatio)}px, 1fr))` }}
+          >
             {Array.from({ length: 6 }).map((_, i) => (
-              <SceneCardSkeleton key={i} />
+              <SceneCardSkeleton key={i} aspectClass={aspectClass} />
             ))}
           </div>
         ) : scenes.length === 0 ? (
@@ -100,9 +121,19 @@ export function ScenarioTableClient({ projectId }: ScenarioTableClientProps) {
         ) : (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={scenes.map((s) => s.id)} strategy={rectSortingStrategy}>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+              <div 
+                className={cn("grid", gridConfig.gap)}
+                style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${getMinCardWidth(preferences.size, preferences.aspectRatio)}px, 1fr))` }}
+              >
                 {scenes.map((scene, index) => (
-                  <SceneCard key={scene.id} scene={scene} projectId={projectId} index={index} />
+                  <SceneCard 
+                    key={scene.id} 
+                    scene={scene} 
+                    projectId={projectId} 
+                    index={index}
+                    aspectClass={aspectClass}
+                    fitClass={fitClass}
+                  />
                 ))}
               </div>
             </SortableContext>
@@ -115,10 +146,10 @@ export function ScenarioTableClient({ projectId }: ScenarioTableClientProps) {
   );
 }
 
-function SceneCardSkeleton() {
+function SceneCardSkeleton({ aspectClass = "aspect-video" }: { aspectClass?: string }) {
   return (
     <div className="rounded-xl overflow-hidden border border-border bg-card">
-      <Skeleton className="aspect-video w-full" />
+      <Skeleton className={cn("w-full", aspectClass)} />
       <div className="p-3 flex items-center justify-between">
         <div className="space-y-1.5 flex-1">
           <Skeleton className="h-4 w-3/4" />

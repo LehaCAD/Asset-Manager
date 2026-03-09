@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
-import type { WorkspaceElement, GridDensity } from "@/lib/types";
+import type { WorkspaceElement, DisplayCardSize, DisplayAspectRatio, DisplayFitMode } from "@/lib/types";
+import { ASPECT_RATIO_CLASSES, FIT_MODE_CLASSES, CARD_ICON_SIZES } from "@/lib/utils/constants";
 import {
   Star,
   Trash2,
@@ -15,7 +16,6 @@ import {
 export interface ElementCardProps {
   element: WorkspaceElement;
   index: number;
-  density: GridDensity;
   isSelected: boolean;
   isMultiSelectMode: boolean;
   onSelect: (id: number, addToSelection: boolean) => void;
@@ -24,12 +24,15 @@ export interface ElementCardProps {
   onDelete: (id: number) => void;
   className?: string;
   style?: React.CSSProperties;
+  // Display preferences
+  size?: DisplayCardSize;
+  aspectRatio?: DisplayAspectRatio;
+  fitMode?: DisplayFitMode;
 }
 
 export function ElementCard({
   element,
   index,
-  density,
   isSelected,
   isMultiSelectMode,
   onSelect,
@@ -38,6 +41,9 @@ export function ElementCard({
   onDelete,
   className,
   style,
+  size = "medium",
+  aspectRatio = "landscape",
+  fitMode = "fill",
 }: ElementCardProps) {
   const isProcessing = element.status === "PENDING" || element.status === "PROCESSING";
   const isFailed = element.status === "FAILED";
@@ -45,10 +51,12 @@ export function ElementCard({
     element.client_optimistic_kind === "generation" && 
     element.client_generation_submit_state === "submitting";
   const isVideo = element.element_type === "VIDEO";
-  const isSmallDensity = density === "sm";
   const videoThumbnailSrc = element.thumbnail_url?.trim() || null;
   const videoFileSrc = element.file_url?.trim() || null;
   const mediaSrc = (isVideo ? videoThumbnailSrc || videoFileSrc : element.file_url)?.trim() || null;
+  
+  // Получаем размеры иконок для текущего size
+  const iconSizes = CARD_ICON_SIZES[size];
 
   const handleCardClick = (e: React.MouseEvent) => {
     if (e.ctrlKey || e.metaKey) {
@@ -99,13 +107,18 @@ export function ElementCard({
     anchor.remove();
   };
 
+  // Get aspect ratio and fit mode classes
+  const aspectClass = ASPECT_RATIO_CLASSES[aspectRatio];
+  const fitClass = FIT_MODE_CLASSES[fitMode];
+
   return (
     <div
       className={cn(
-        "group relative aspect-square rounded-xl overflow-hidden cursor-pointer",
+        "group relative rounded-xl overflow-hidden cursor-pointer",
         "bg-muted transition-transform duration-150 ease-out",
         "hover:scale-[1.02] hover:shadow-lg",
         isSelected && "ring-2 ring-primary scale-[1.01]",
+        aspectClass,
         className
       )}
       style={style}
@@ -119,7 +132,7 @@ export function ElementCard({
             alt={`Видео ${index + 1}`}
             loading="lazy"
             decoding="async"
-            className="absolute inset-0 w-full h-full object-contain bg-muted"
+            className={cn("absolute inset-0 w-full h-full bg-muted", fitClass)}
           />
         ) : (
           <div className="absolute inset-0 bg-muted flex items-center justify-center">
@@ -132,7 +145,7 @@ export function ElementCard({
           alt={`Элемент ${index + 1}`}
           loading="lazy"
           decoding="async"
-          className="absolute inset-0 w-full h-full object-contain bg-muted"
+          className={cn("absolute inset-0 w-full h-full bg-muted", fitClass)}
         />
       ) : (
         <div className="absolute inset-0 bg-muted flex items-center justify-center">
@@ -153,37 +166,41 @@ export function ElementCard({
         onClick={handleSelectClick}
         className={cn(
           "absolute top-2 left-2 z-40 rounded-full flex items-center justify-center transition-all duration-150",
+          iconSizes.padding, // Размер как у звездочки
           isMultiSelectMode || isSelected
             ? "opacity-100 pointer-events-auto"
             : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto",
-          isSmallDensity ? "w-6 h-6" : "w-9 h-9",
           isSelected
             ? "bg-primary text-primary-foreground"
             : "bg-black/50 text-white hover:bg-black/70",
           isMultiSelectMode && !isSelected && "bg-white/40 hover:bg-white/60"
         )}
       >
-        {isSelected && <Check className={cn(isSmallDensity ? "w-4 h-4" : "w-6 h-6")} />}
+        {isSelected ? (
+          <Check className={iconSizes.md} />
+        ) : (
+          <Check className={cn(iconSizes.md, "opacity-0")} /> // Placeholder для фиксированного размера
+        )}
       </button>
 
       <div
         className={cn(
           "absolute top-2 right-2 z-40 flex items-center",
-          isSmallDensity ? "gap-1" : "gap-1.5"
+          "gap-1"
         )}
       >
         {/* Element type icon */}
         <div
           className={cn(
             "rounded-full bg-black/50 text-white",
-            isSmallDensity ? "p-1.5" : "p-2.5"
+            iconSizes.padding
           )}
           title={isVideo ? "Видео" : "Изображение"}
         >
           {isVideo ? (
-            <Video className={cn(isSmallDensity ? "w-4 h-4" : "w-6 h-6")} />
+            <Video className={iconSizes.sm} />
           ) : (
-            <Image className={cn(isSmallDensity ? "w-4 h-4" : "w-6 h-6")} />
+            <Image className={iconSizes.sm} />
           )}
         </div>
 
@@ -194,7 +211,7 @@ export function ElementCard({
           onClick={handleToggleFavoriteClick}
           className={cn(
             "rounded-full transition-colors",
-            isSmallDensity ? "p-1.5" : "p-2.5",
+            iconSizes.padding,
             element.is_favorite
               ? "bg-black/50 text-yellow-400 hover:bg-black/70"
               : "bg-black/50 text-white hover:bg-black/70"
@@ -204,7 +221,7 @@ export function ElementCard({
         >
           <Star
             className={cn(
-              isSmallDensity ? "w-4 h-4" : "w-6 h-6",
+              iconSizes.md,
               element.is_favorite && "fill-current"
             )}
           />
@@ -230,10 +247,10 @@ export function ElementCard({
               onClick={handleOpenLightboxClick}
               className={cn(
                 "rounded-full bg-white/20 hover:bg-white/40 transition-colors pointer-events-auto",
-                isSmallDensity ? "p-3" : "p-4"
+                iconSizes.padding
               )}
             >
-              <Play className={cn(isSmallDensity ? "w-6 h-6" : "w-9 h-9", "text-white fill-white")} />
+              <Play className={cn(iconSizes.lg, "text-white fill-white")} />
             </button>
           </div>
         )}
@@ -248,10 +265,10 @@ export function ElementCard({
               onClick={handleDownloadClick}
               className={cn(
                 "rounded-full bg-white/20 hover:bg-white/35 transition-colors text-white",
-                isSmallDensity ? "p-2" : "p-3"
+                iconSizes.padding
               )}
             >
-              <Download className={cn(isSmallDensity ? "w-4 h-4" : "w-6 h-6")} />
+              <Download className={iconSizes.md} />
             </button>
           ) : (
             <button
@@ -261,10 +278,10 @@ export function ElementCard({
               onClick={(e) => e.stopPropagation()}
               className={cn(
                 "rounded-full bg-white/10 text-white/40 cursor-not-allowed",
-                isSmallDensity ? "p-2" : "p-3"
+                iconSizes.padding
               )}
             >
-              <Download className={cn(isSmallDensity ? "w-4 h-4" : "w-6 h-6")} />
+              <Download className={iconSizes.md} />
             </button>
           )}
 
@@ -275,10 +292,10 @@ export function ElementCard({
             onClick={handleDeleteClick}
             className={cn(
               "rounded-full bg-white/20 hover:bg-red-500/50 transition-colors text-white",
-              isSmallDensity ? "p-2" : "p-3"
+              iconSizes.padding
             )}
           >
-            <Trash2 className={cn(isSmallDensity ? "w-4 h-4" : "w-6 h-6")} />
+            <Trash2 className={iconSizes.md} />
           </button>
         </div>
       </div>
@@ -286,18 +303,18 @@ export function ElementCard({
       {/* Status overlay */}
       {isSubmitting && (
         <div className="absolute inset-0 z-30 bg-black/60 flex flex-col items-center justify-center pointer-events-none">
-          <Loader2 className="w-8 h-8 text-white animate-spin mb-2" />
+          <Loader2 className={cn(iconSizes.lg, "text-white animate-spin mb-2")} />
           <span className="text-xs text-white font-medium">Отправка...</span>
         </div>
       )}
       {!isSubmitting && isProcessing && (
         <div className="absolute inset-0 z-30 bg-black/50 flex items-center justify-center pointer-events-none">
-          <Loader2 className="w-8 h-8 text-white animate-spin" />
+          <Loader2 className={cn(iconSizes.lg, "text-white animate-spin")} />
         </div>
       )}
       {isFailed && (
         <div className="absolute inset-0 z-30 bg-red-500/30 flex items-center justify-center pointer-events-none">
-          <AlertCircle className="w-8 h-8 text-red-500" />
+          <AlertCircle className={cn(iconSizes.lg, "text-red-500")} />
         </div>
       )}
     </div>

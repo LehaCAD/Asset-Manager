@@ -1,128 +1,102 @@
 import { create } from "zustand";
-import type { ProjectDisplayPreferences } from "@/lib/types";
-import { DEFAULT_PROJECT_DISPLAY_PREFERENCES } from "@/lib/utils/constants";
+import type { DisplayPreferences } from "@/lib/types";
+import { DEFAULT_DISPLAY_PREFERENCES } from "@/lib/utils/constants";
 
-const STORAGE_KEY = "project-display-preferences";
+const STORAGE_KEY = "display-preferences-v2";
 
-type ProjectDisplayMap = Record<number, ProjectDisplayPreferences>;
-
-function cloneDefaultPreferences(): ProjectDisplayPreferences {
-  return { ...DEFAULT_PROJECT_DISPLAY_PREFERENCES };
+function cloneDefaultPreferences(): DisplayPreferences {
+  return { ...DEFAULT_DISPLAY_PREFERENCES };
 }
 
-function readPersistedPreferences(): ProjectDisplayMap {
+function readPersistedPreferences(): DisplayPreferences | null {
   if (typeof window === "undefined") {
-    return {};
+    return null;
   }
 
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return {};
+    if (!raw) return null;
 
     const parsed = JSON.parse(raw) as unknown;
     if (!parsed || typeof parsed !== "object") {
-      return {};
+      return null;
     }
 
-    const entries = Object.entries(parsed as Record<string, unknown>);
-    return Object.fromEntries(
-      entries
-        .map(([projectId, value]) => {
-          if (!value || typeof value !== "object") {
-            return null;
-          }
+    const prefs = parsed as Partial<DisplayPreferences>;
+    
+    // Validate all fields
+    if (
+      (prefs.size !== "compact" && prefs.size !== "medium" && prefs.size !== "large") ||
+      (prefs.aspectRatio !== "landscape" &&
+        prefs.aspectRatio !== "square" &&
+        prefs.aspectRatio !== "portrait") ||
+      (prefs.fitMode !== "fill" && prefs.fitMode !== "fit")
+    ) {
+      return null;
+    }
 
-          const prefs = value as Partial<ProjectDisplayPreferences>;
-          if (
-            (prefs.size !== "compact" && prefs.size !== "medium" && prefs.size !== "large") ||
-            (prefs.aspectRatio !== "landscape" &&
-              prefs.aspectRatio !== "square" &&
-              prefs.aspectRatio !== "portrait") ||
-            (prefs.fitMode !== "fill" && prefs.fitMode !== "fit")
-          ) {
-            return null;
-          }
-
-          return [Number(projectId), prefs as ProjectDisplayPreferences] as const;
-        })
-        .filter((entry): entry is readonly [number, ProjectDisplayPreferences] => entry !== null)
-    );
+    return prefs as DisplayPreferences;
   } catch {
-    return {};
+    return null;
   }
 }
 
-function persistPreferences(preferencesByProject: ProjectDisplayMap) {
+function persistPreferences(preferences: DisplayPreferences) {
   if (typeof window === "undefined") {
     return;
   }
 
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(preferencesByProject));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));
   } catch {
     // Ignore storage write failures; UI can still use in-memory state.
   }
 }
 
-interface ProjectDisplayState {
-  preferencesByProject: ProjectDisplayMap;
+interface DisplayState {
+  preferences: DisplayPreferences;
+  isHydrated: boolean;
   hydratePreferences: () => void;
-  getProjectPreferences: (projectId: number) => ProjectDisplayPreferences;
-  setProjectPreferences: (projectId: number, preferences: ProjectDisplayPreferences) => void;
-  updateProjectPreferences: (
-    projectId: number,
-    patch: Partial<ProjectDisplayPreferences>
-  ) => void;
-  clearProjectPreferences: (projectId?: number) => void;
+  getPreferences: () => DisplayPreferences;
+  setPreferences: (preferences: DisplayPreferences) => void;
+  updatePreferences: (patch: Partial<DisplayPreferences>) => void;
+  resetPreferences: () => void;
 }
 
-export const useProjectDisplayStore = create<ProjectDisplayState>()((set, get) => ({
-  preferencesByProject: {},
+export const useDisplayStore = create<DisplayState>()((set, get) => ({
+  preferences: cloneDefaultPreferences(),
+  isHydrated: false,
 
   hydratePreferences: () => {
-    set({ preferencesByProject: readPersistedPreferences() });
+    const persisted = readPersistedPreferences();
+    if (persisted) {
+      set({ preferences: persisted, isHydrated: true });
+    } else {
+      set({ isHydrated: true });
+    }
   },
 
-  getProjectPreferences: (projectId) => {
-    return get().preferencesByProject[projectId] ?? cloneDefaultPreferences();
+  getPreferences: () => {
+    return get().preferences;
   },
 
-  setProjectPreferences: (projectId, preferences) => {
-    set((state) => {
-      const preferencesByProject = {
-        ...state.preferencesByProject,
-        [projectId]: preferences,
-      };
-      persistPreferences(preferencesByProject);
-      return { preferencesByProject };
-    });
+  setPreferences: (preferences) => {
+    persistPreferences(preferences);
+    set({ preferences });
   },
 
-  updateProjectPreferences: (projectId, patch) => {
-    set((state) => {
-      const current = state.preferencesByProject[projectId] ?? cloneDefaultPreferences();
-      const preferencesByProject = {
-        ...state.preferencesByProject,
-        [projectId]: { ...current, ...patch },
-      };
-      persistPreferences(preferencesByProject);
-      return { preferencesByProject };
-    });
+  updatePreferences: (patch) => {
+    const newPreferences = { ...get().preferences, ...patch };
+    persistPreferences(newPreferences);
+    set({ preferences: newPreferences });
   },
 
-  clearProjectPreferences: (projectId) => {
-    set((state) => {
-      const preferencesByProject =
-        typeof projectId === "number"
-          ? Object.fromEntries(
-              Object.entries(state.preferencesByProject).filter(
-                ([key]) => Number(key) !== projectId
-              )
-            )
-          : {};
-
-      persistPreferences(preferencesByProject);
-      return { preferencesByProject };
-    });
+  resetPreferences: () => {
+    const defaults = cloneDefaultPreferences();
+    persistPreferences(defaults);
+    set({ preferences: defaults });
   },
 }));
+
+// Backward compatibility export
+export const useProjectDisplayStore = useDisplayStore;

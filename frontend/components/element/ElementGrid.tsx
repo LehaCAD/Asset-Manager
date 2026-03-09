@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useEffect } from "react";
 import {
   DndContext,
   closestCenter,
@@ -16,11 +16,18 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useSceneWorkspaceStore } from "@/lib/store/scene-workspace";
+import { useDisplayStore } from "@/lib/store/project-display";
 import { ElementCard } from "@/components/element/ElementCard";
 import { ElementCardSkeleton } from "@/components/element/ElementCardSkeleton";
 import { cn } from "@/lib/utils";
-import { GRID_DENSITY_CONFIG } from "@/lib/utils/constants";
-import type { Element, GridDensity } from "@/lib/types";
+import { DISPLAY_GRID_CONFIG, ASPECT_RATIO_CLASSES, CARD_SIZES } from "@/lib/utils/constants";
+import type { DisplayCardSize, DisplayAspectRatio } from "@/lib/types";
+
+// Helper для получения минимальной ширины карточки
+function getMinCardWidth(size: DisplayCardSize, aspectRatio: DisplayAspectRatio): number {
+  return CARD_SIZES[size][aspectRatio].width;
+}
+import type { Element } from "@/lib/types";
 
 interface ElementGridProps {
   className?: string;
@@ -30,9 +37,9 @@ interface ElementGridProps {
 interface SortableElementCardProps {
   element: Element;
   index: number;
-  density: GridDensity;
   isSelected: boolean;
   isMultiSelectMode: boolean;
+  size: import("@/lib/types").DisplayCardSize;
   onSelect: (id: number, addToSelection: boolean) => void;
   onOpenLightbox: (id: number) => void;
   onToggleFavorite: (id: number) => void;
@@ -42,6 +49,7 @@ interface SortableElementCardProps {
 function SortableElementCard({
   element,
   index,
+  size,
   ...cardProps
 }: SortableElementCardProps) {
   const {
@@ -61,9 +69,18 @@ function SortableElementCard({
     opacity: isDragging ? 0.5 : 1,
   };
 
+  const { preferences } = useDisplayStore();
+
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <ElementCard element={element} index={index} {...cardProps} />
+      <ElementCard 
+        element={element} 
+        index={index} 
+        size={size}
+        aspectRatio={preferences.aspectRatio}
+        fitMode={preferences.fitMode}
+        {...cardProps} 
+      />
     </div>
   );
 }
@@ -74,13 +91,19 @@ export function ElementGrid({ className, onRequestDelete }: ElementGridProps) {
     selectedIds,
     isMultiSelectMode,
     isLoading,
-    density,
     // actions
     selectElement,
     openLightbox,
     toggleFavorite,
     reorderElements,
   } = useSceneWorkspaceStore();
+
+  const { preferences, hydratePreferences } = useDisplayStore();
+
+  // Hydrate display preferences on mount
+  useEffect(() => {
+    hydratePreferences();
+  }, [hydratePreferences]);
 
   const filteredElements = getFilteredElements();
 
@@ -112,6 +135,11 @@ export function ElementGrid({ className, onRequestDelete }: ElementGridProps) {
     [filteredElements, reorderElements]
   );
 
+  // Get display configuration в зависимости от size И aspect ratio
+  const gridConfig = DISPLAY_GRID_CONFIG[preferences.size][preferences.aspectRatio];
+  const aspectClass = ASPECT_RATIO_CLASSES[preferences.aspectRatio];
+  const cardSize = preferences.size;
+
   // Card callbacks
   const cardCallbacks = useMemo(
     () => ({
@@ -126,20 +154,10 @@ export function ElementGrid({ className, onRequestDelete }: ElementGridProps) {
   // Loading state
   if (isLoading) {
     return (
-      <div
-        className={cn("element-grid", className)}
-        style={{
-          "--card-min-size": GRID_DENSITY_CONFIG[density].minSize,
-          "--grid-gap": GRID_DENSITY_CONFIG[density].gap,
-        } as React.CSSProperties}
-      >
-        <div
-          className="grid"
-          style={{
-            gridTemplateColumns:
-              "repeat(auto-fill, minmax(var(--card-min-size), 1fr))",
-            gap: "var(--grid-gap)",
-          }}
+      <div className={cn("element-grid", className)}>
+        <div 
+          className={cn("grid", gridConfig.gap)}
+          style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${getMinCardWidth(preferences.size, preferences.aspectRatio)}px, 1fr))` }}
         >
           {Array.from({ length: 12 }).map((_, i) => (
             <ElementCardSkeleton key={i} />
@@ -161,13 +179,7 @@ export function ElementGrid({ className, onRequestDelete }: ElementGridProps) {
   }
 
   return (
-    <div
-      className={cn("element-grid", className)}
-      style={{
-        "--card-min-size": GRID_DENSITY_CONFIG[density].minSize,
-        "--grid-gap": GRID_DENSITY_CONFIG[density].gap,
-      } as React.CSSProperties}
-    >
+    <div className={cn("element-grid", className)}>
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -178,22 +190,18 @@ export function ElementGrid({ className, onRequestDelete }: ElementGridProps) {
           strategy={rectSortingStrategy}
           disabled={isMultiSelectMode}
         >
-          <div
-            className="grid"
-            style={{
-              gridTemplateColumns:
-                "repeat(auto-fill, minmax(var(--card-min-size), 1fr))",
-              gap: "var(--grid-gap)",
-            }}
+          <div 
+            className={cn("grid", gridConfig.gap)}
+            style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${getMinCardWidth(preferences.size, preferences.aspectRatio)}px, 1fr))` }}
           >
             {filteredElements.map((element, index) => (
               <SortableElementCard
                 key={element.id}
                 element={element}
                 index={index}
-                density={density}
                 isSelected={selectedIds.has(element.id)}
                 isMultiSelectMode={isMultiSelectMode}
+                size={cardSize}
                 {...cardCallbacks}
               />
             ))}

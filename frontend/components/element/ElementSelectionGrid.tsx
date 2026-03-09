@@ -1,7 +1,16 @@
 "use client";
 
+import { useEffect } from "react";
 import { ElementSelectionCard } from "./ElementSelectionCard";
-import { GRID_DENSITY_CONFIG } from "@/lib/utils/constants";
+import { useDisplayStore } from "@/lib/store/project-display";
+import { DISPLAY_GRID_CONFIG, ASPECT_RATIO_CLASSES, FIT_MODE_CLASSES, CARD_SIZES } from "@/lib/utils/constants";
+import type { DisplayCardSize, DisplayAspectRatio } from "@/lib/types";
+
+// Helper для получения минимальной ширины карточки
+function getMinCardWidth(size: DisplayCardSize, aspectRatio: DisplayAspectRatio): number {
+  return CARD_SIZES[size][aspectRatio].width;
+}
+import { cn } from "@/lib/utils";
 import { ImageOff } from "lucide-react";
 import type { Element } from "@/lib/types";
 
@@ -18,9 +27,16 @@ export function ElementSelectionGrid({
   onToggle,
   maxReached,
 }: ElementSelectionGridProps) {
-  // Fixed density "md" for modal (predictable, consistent experience)
-  const density = "md";
-  const config = GRID_DENSITY_CONFIG[density];
+  const { preferences, hydratePreferences } = useDisplayStore();
+  
+  // Get grid config в зависимости от size И aspect ratio
+  const gridConfig = DISPLAY_GRID_CONFIG[preferences.size][preferences.aspectRatio];
+  const aspectClass = ASPECT_RATIO_CLASSES[preferences.aspectRatio];
+
+  // Hydrate preferences on mount
+  useEffect(() => {
+    hydratePreferences();
+  }, [hydratePreferences]);
 
   // Empty state
   if (elements.length === 0) {
@@ -33,14 +49,12 @@ export function ElementSelectionGrid({
     );
   }
 
+  const fitMode = preferences.fitMode;
+
   return (
-    <div
-      className="p-1"
-      style={{
-        display: "grid",
-        gridTemplateColumns: `repeat(auto-fill, minmax(${config.minSize}, 1fr))`,
-        gap: config.gap,
-      }}
+    <div 
+      className={cn("grid", gridConfig.gap, "p-1")}
+      style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${getMinCardWidth(preferences.size, preferences.aspectRatio)}px, 1fr))` }}
     >
       {elements.map((element) => {
         const isSelected = selectedIds.has(element.id);
@@ -53,6 +67,8 @@ export function ElementSelectionGrid({
             isSelected={isSelected}
             disabled={disabled}
             onClick={() => onToggle(element.id)}
+            aspectClass={aspectClass}
+            fitMode={fitMode}
           />
         );
       })}

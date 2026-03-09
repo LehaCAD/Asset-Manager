@@ -12,6 +12,7 @@ import { ElementBulkBar } from "@/components/element/ElementBulkBar";
 import { ConfigPanel } from "@/components/generation/ConfigPanel";
 import { PromptBar } from "@/components/generation/PromptBar";
 import { EmptyState } from "@/components/element/EmptyState";
+import { DisplaySettingsPopover } from "@/components/display/DisplaySettingsPopover";
 import { Upload } from "lucide-react";
 import {
   Dialog,
@@ -36,11 +37,9 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
   const {
     elements,
     filter,
-    density,
     selectedIds,
     loadScene,
     setFilter,
-    setDensity,
     clearSelection,
     toggleSelectAll,
     getFilteredElements,
@@ -276,13 +275,14 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
 
         {/* Filters toolbar - inside scene workspace */}
         <div className="border-b px-4 py-2 shrink-0 bg-background">
-          <ElementFilters
-            filter={filter}
-            onFilterChange={setFilter}
-            density={density}
-            onDensityChange={setDensity}
-            counts={filterCounts}
-          />
+          <div className="flex items-center gap-4">
+            <ElementFilters
+              filter={filter}
+              onFilterChange={setFilter}
+              counts={filterCounts}
+            />
+            <DisplaySettingsPopover />
+          </div>
         </div>
 
         {/* Zone 3: Grid area - scrollable */}

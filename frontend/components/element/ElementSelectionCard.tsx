@@ -2,13 +2,16 @@
 
 import { cn } from "@/lib/utils";
 import { Star, Image, Video } from "lucide-react";
-import type { Element } from "@/lib/types";
+import { FIT_MODE_CLASSES } from "@/lib/utils/constants";
+import type { Element, DisplayFitMode } from "@/lib/types";
 
 export interface ElementSelectionCardProps {
   element: Element;
   isSelected: boolean;
   disabled: boolean;
   onClick: () => void;
+  aspectClass?: string;
+  fitMode?: DisplayFitMode;
 }
 
 export function ElementSelectionCard({
@@ -16,11 +19,15 @@ export function ElementSelectionCard({
   isSelected,
   disabled,
   onClick,
+  aspectClass = "aspect-video",
+  fitMode = "fill",
 }: ElementSelectionCardProps) {
   const isVideo = element.element_type === "VIDEO";
   const videoThumbnailSrc = element.thumbnail_url?.trim() || null;
   const videoFileSrc = element.file_url?.trim() || null;
   const mediaSrc = (isVideo ? videoThumbnailSrc || videoFileSrc : element.file_url)?.trim() || null;
+  
+  const fitClass = FIT_MODE_CLASSES[fitMode];
 
   return (
     <button
@@ -28,9 +35,10 @@ export function ElementSelectionCard({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "group relative aspect-square rounded-xl overflow-hidden cursor-pointer",
+        "group relative rounded-xl overflow-hidden cursor-pointer",
         "bg-muted transition-all duration-150",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+        aspectClass,
         isSelected && "ring-2 ring-primary",
         disabled && "opacity-40 cursor-not-allowed"
       )}
@@ -43,7 +51,7 @@ export function ElementSelectionCard({
             alt={`Видео ${element.id}`}
             loading="lazy"
             decoding="async"
-            className="absolute inset-0 w-full h-full object-contain bg-muted"
+            className={cn("absolute inset-0 w-full h-full bg-muted", fitClass)}
           />
         ) : (
           <div className="absolute inset-0 bg-muted flex items-center justify-center">
@@ -56,7 +64,7 @@ export function ElementSelectionCard({
           alt={`Элемент ${element.id}`}
           loading="lazy"
           decoding="async"
-          className="absolute inset-0 w-full h-full object-contain bg-muted"
+          className={cn("absolute inset-0 w-full h-full bg-muted", fitClass)}
         />
       ) : (
         <div className="absolute inset-0 bg-muted flex items-center justify-center">

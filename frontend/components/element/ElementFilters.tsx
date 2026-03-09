@@ -1,13 +1,12 @@
-import { LayoutGrid, Grid3x3, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import type { ElementFilter, GridDensity } from "@/lib/types";
+import type { ElementFilter } from "@/lib/types";
 
 export interface ElementFiltersProps {
   filter: ElementFilter;
   onFilterChange: (filter: ElementFilter) => void;
-  density: GridDensity;
-  onDensityChange: (density: GridDensity) => void;
+  // Density controls moved to DisplaySettingsPopover
+  // density: GridDensity;
+  // onDensityChange: (density: GridDensity) => void;
   counts: {
     all: number;
     favorites: number;
@@ -23,17 +22,19 @@ const filterTabs: { value: ElementFilter; label: string }[] = [
   { value: "videos", label: "Видео" },
 ];
 
-const densityOptions: { value: GridDensity; icon: React.ReactNode; label: string }[] = [
-  { value: "sm", icon: <Grid3x3 className="h-4 w-4" />, label: "Мелкая сетка" },
-  { value: "md", icon: <LayoutGrid className="h-4 w-4" />, label: "Средняя сетка" },
-  { value: "lg", icon: <Square className="h-4 w-4" />, label: "Крупная сетка" },
-];
+// Density controls moved to DisplaySettingsPopover
+// const densityOptions: { value: GridDensity; icon: React.ReactNode; label: string }[] = [
+//   { value: "sm", icon: <Grid3x3 className="h-4 w-4" />, label: "Мелкая сетка" },
+//   { value: "md", icon: <LayoutGrid className="h-4 w-4" />, label: "Средняя сетка" },
+//   { value: "lg", icon: <Square className="h-4 w-4" />, label: "Крупная сетка" },
+// ];
 
 export function ElementFilters({
   filter,
   onFilterChange,
-  density,
-  onDensityChange,
+  // density controls moved to DisplaySettingsPopover
+  // density,
+  // onDensityChange,
   counts,
 }: ElementFiltersProps) {
   const getCount = (filterValue: ElementFilter) => {
@@ -63,7 +64,7 @@ export function ElementFilters({
         ))}
       </div>
 
-      {/* Density controls - left aligned after filters */}
+      {/* Density controls - MOVED to DisplaySettingsPopover 
       <div className="flex items-center gap-1">
         {densityOptions.map((option) => (
           <Tooltip key={option.value}>
@@ -83,6 +84,7 @@ export function ElementFilters({
           </Tooltip>
         ))}
       </div>
+      */}
     </div>
   );
 }

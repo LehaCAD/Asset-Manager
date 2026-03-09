@@ -15,6 +15,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,6 +42,8 @@ interface SceneCardProps {
   scene: Scene;
   projectId: number;
   index: number;
+  aspectClass?: string;
+  fitClass?: string;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -50,7 +53,7 @@ const STATUS_COLORS: Record<string, string> = {
   APPROVED: "bg-green-500/15 text-green-600 dark:text-green-400",
 };
 
-export function SceneCard({ scene, projectId, index }: SceneCardProps) {
+export function SceneCard({ scene, projectId, index, aspectClass = "aspect-video", fitClass = "object-cover" }: SceneCardProps) {
   const router = useRouter();
   const updateScene = useScenesStore((s) => s.updateScene);
   const deleteScene = useScenesStore((s) => s.deleteScene);
@@ -137,13 +140,13 @@ export function SceneCard({ scene, projectId, index }: SceneCardProps) {
         className="group relative bg-card border border-border rounded-xl overflow-hidden cursor-pointer hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 transition-all duration-200"
       >
         {/* Thumbnail */}
-        <div className="aspect-video bg-muted relative overflow-hidden">
+        <div className={cn("bg-muted relative overflow-hidden", aspectClass)}>
           {scene.headliner_url ? (
             isVideo ? (
               <video
                 ref={videoRef}
                 src={scene.headliner_url}
-                className="absolute inset-0 w-full h-full object-cover"
+                className={cn("absolute inset-0 w-full h-full", fitClass)}
                 muted
                 loop
                 playsInline
@@ -158,7 +161,7 @@ export function SceneCard({ scene, projectId, index }: SceneCardProps) {
                 src={scene.headliner_url}
                 alt={scene.name}
                 loading="lazy"
-                className="absolute inset-0 w-full h-full object-cover"
+                className={cn("absolute inset-0 w-full h-full", fitClass)}
               />
             )
           ) : (
@@ -205,68 +208,71 @@ export function SceneCard({ scene, projectId, index }: SceneCardProps) {
             >
               {statusConfig?.label ?? scene.status}
             </span>
+            
           </div>
         </div>
 
         {/* Info */}
-        <div className="p-3 flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <h3 className="font-medium text-sm leading-snug truncate group-hover:text-primary transition-colors">
+        <div className="p-3">
+          {/* Верхняя строка: название + меню */}
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="font-medium text-sm leading-snug truncate group-hover:text-primary transition-colors min-w-0 flex-1">
               {scene.name}
             </h3>
-            <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
-              <Layers className="h-3 w-3" />
-              {formatElementCount(scene.element_count ?? 0)}
-            </p>
-          </div>
-
-          <div data-no-navigate>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                  aria-label="Действия"
-                  onPointerDown={blockCardNavigation}
+            <div data-no-navigate>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 -mr-1"
+                    aria-label="Действия"
+                    onPointerDown={blockCardNavigation}
+                    onClick={blockCardNavigation}
+                  >
+                    <MoreHorizontal className="h-3.5 w-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  className="w-44"
                   onClick={blockCardNavigation}
                 >
-                  <MoreHorizontal className="h-3.5 w-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="w-44"
-                onClick={blockCardNavigation}
-              >
-                <DropdownMenuItem
-                  className="cursor-pointer"
-                  onSelect={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setEditName(scene.name);
-                    setEditOpen(true);
-                  }}
-                >
-                  <Pencil className="mr-2 h-3.5 w-3.5" />
-                  Переименовать
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
-                  onSelect={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setDeleteOpen(true);
-                  }}
-                >
-                  <Trash2 className="mr-2 h-3.5 w-3.5" />
-                  Удалить
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  <DropdownMenuItem
+                    className="cursor-pointer"
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setEditName(scene.name);
+                      setEditOpen(true);
+                    }}
+                  >
+                    <Pencil className="mr-2 h-3.5 w-3.5" />
+                    Переименовать
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setDeleteOpen(true);
+                    }}
+                  >
+                    <Trash2 className="mr-2 h-3.5 w-3.5" />
+                    Удалить
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
+          {/* Нижняя строка: количество элементов */}
+          <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+            <Layers className="h-3 w-3" />
+            {formatElementCount(scene.element_count ?? 0)}
+          </p>
         </div>
+        
       </div>
 
       {/* Edit dialog */}
