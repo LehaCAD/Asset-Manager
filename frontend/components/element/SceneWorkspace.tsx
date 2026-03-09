@@ -13,6 +13,9 @@ import { ConfigPanel } from "@/components/generation/ConfigPanel";
 import { PromptBar } from "@/components/generation/PromptBar";
 import { EmptyState } from "@/components/element/EmptyState";
 import { DisplaySettingsPopover } from "@/components/display/DisplaySettingsPopover";
+import { LightboxModal } from "@/components/lightbox/LightboxModal";
+import { DetailPanel } from "@/components/lightbox/DetailPanel";
+import { useKeyboard } from "@/lib/hooks/use-keyboard";
 import { Upload } from "lucide-react";
 import {
   Dialog,
@@ -46,17 +49,26 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
     updateElement,
     enqueueUploads,
     scene,
+    lightboxOpen,
+    lightboxElementId,
   } = useSceneWorkspaceStore();
 
   const { loadModels } = useGenerationStore();
 
   const [confirmDeleteIds, setConfirmDeleteIds] = useState<number[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [nextElementIdAfterDelete, setNextElementIdAfterDelete] = useState<number | null>(null);
   const fallbackRefetchIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const disconnectDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const resetWorkspace = useSceneWorkspaceStore((s) => s.resetWorkspace);
   const deleteElements = useSceneWorkspaceStore((s) => s.deleteElements);
+  const openLightbox = useSceneWorkspaceStore((s) => s.openLightbox);
+  const closeLightbox = useSceneWorkspaceStore((s) => s.closeLightbox);
+  const navigateLightbox = useSceneWorkspaceStore((s) => s.navigateLightbox);
+  const toggleFavorite = useSceneWorkspaceStore((s) => s.toggleFavorite);
+  const setHeadliner = useSceneWorkspaceStore((s) => s.setHeadliner);
+  const deleteElement = useSceneWorkspaceStore((s) => s.deleteElement);
 
   // Load scene data
   useEffect(() => {
@@ -235,6 +247,30 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
     setDeleteDialogOpen(true);
   };
 
+  // Handle delete from lightbox - prepare next element to show after delete
+  const handleLightboxDelete = (id: number) => {
+    const filteredElements = getFilteredElements();
+    const currentIndex = filteredElements.findIndex((e) => e.id === id);
+    
+    // Determine next element to show after delete
+    let nextId: number | null = null;
+    if (filteredElements.length > 1) {
+      if (currentIndex < filteredElements.length - 1) {
+        // Show next element
+        nextId = filteredElements[currentIndex + 1].id;
+      } else if (currentIndex > 0) {
+        // Show previous element (if deleting last)
+        nextId = filteredElements[currentIndex - 1].id;
+      }
+    }
+    
+    // Save next element id for after delete confirmation
+    setNextElementIdAfterDelete(nextId);
+    
+    // Open delete dialog
+    openDeleteDialog([id]);
+  };
+
   const handleConfirmDelete = async () => {
     if (confirmDeleteIds.length === 0) return;
     const idsToDelete = confirmDeleteIds;
@@ -246,6 +282,16 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
 
     setDeleteDialogOpen(false);
     setConfirmDeleteIds([]);
+    
+    // Navigate to next element after delete (for lightbox)
+    if (nextElementIdAfterDelete !== null) {
+      openLightbox(nextElementIdAfterDelete);
+      setNextElementIdAfterDelete(null);
+    } else if (nextElementIdAfterDelete === null && lightboxOpen) {
+      // No elements left - close lightbox
+      closeLightbox();
+    }
+    
     try {
       await deleteElements(idsToDelete);
       clearSelection();
@@ -255,6 +301,26 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
   };
 
   const hasElements = elements.length > 0;
+
+  // Current element for lightbox detail panel
+  const currentElementForLightbox = useMemo(() => {
+    if (!lightboxElementId) return null;
+    return elements.find((e) => e.id === lightboxElementId) ?? null;
+  }, [elements, lightboxElementId]);
+
+  // Keyboard shortcuts for lightbox
+  useKeyboard({
+    onArrowLeft: () => lightboxOpen && navigateLightbox("prev"),
+    onArrowRight: () => lightboxOpen && navigateLightbox("next"),
+    onEscape: () => lightboxOpen && closeLightbox(),
+    onF: () => lightboxOpen && lightboxElementId && toggleFavorite(lightboxElementId),
+    onDelete: () => {
+      if (lightboxOpen && lightboxElementId) {
+        openDeleteDialog([lightboxElementId]);
+      }
+    },
+    enabled: lightboxOpen,
+  });
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -346,6 +412,30 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Lightbox Modal */}
+        <LightboxModal
+          elements={getFilteredElements()}
+          currentElementId={lightboxElementId}
+          isOpen={lightboxOpen}
+          onClose={closeLightbox}
+          onNavigate={navigateLightbox}
+          onSelectElement={openLightbox}
+          onToggleFavorite={toggleFavorite}
+          onSetHeadliner={setHeadliner}
+          onDelete={handleLightboxDelete}
+          headlinerId={scene?.headliner ?? null}
+          filter={filter}
+          onFilterChange={setFilter}
+          filterCounts={filterCounts}
+        >
+          {currentElementForLightbox && (
+            <DetailPanel
+              element={currentElementForLightbox}
+              onUpdateElement={updateElement}
+            />
+          )}
+        </LightboxModal>
       </div>
     </div>
   );

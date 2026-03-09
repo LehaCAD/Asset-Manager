@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useMemo, useEffect } from "react";
 import { Breadcrumbs } from "./Breadcrumbs";
 import { SceneNavigation } from "@/components/element/SceneNavigation";
 import { useSceneNeighbors } from "@/lib/hooks/use-scene-neighbors";
-import { useSceneWorkspaceStore } from "@/lib/store/scene-workspace";
+import { useProjectsStore } from "@/lib/store/projects";
 
 interface WorkspaceHeaderProps {
   projectId: number;
@@ -22,7 +23,15 @@ function pluralizeScenes(count: number): string {
 
 export function WorkspaceHeader({ projectId, sceneId }: WorkspaceHeaderProps) {
   const router = useRouter();
-  const { scene } = useSceneWorkspaceStore();
+  const projects = useProjectsStore((s) => s.projects);
+  const loadProjects = useProjectsStore((s) => s.loadProjects);
+
+  // Загружаем проекты при монтировании, если их ещё нет
+  useEffect(() => {
+    if (projects.length === 0) {
+      void loadProjects();
+    }
+  }, [projects.length, loadProjects]);
   
   const {
     previousScene,
@@ -37,8 +46,11 @@ export function WorkspaceHeader({ projectId, sceneId }: WorkspaceHeaderProps) {
     router.push(`/projects/${projectId}/scenes/${targetSceneId}`);
   };
 
-  // Используем имя проекта из текущей сцены
-  const projectName = scene?.project_name;
+  // Используем имя проекта из projects store — стабильно при смене сцен
+  const projectName = useMemo(() => {
+    const project = projects.find((p) => p.id === projectId);
+    return project?.name;
+  }, [projects, projectId]);
 
   return (
     <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">

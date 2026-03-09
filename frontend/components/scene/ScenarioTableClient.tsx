@@ -71,13 +71,20 @@ export function ScenarioTableClient({ projectId }: ScenarioTableClientProps) {
       const oldIndex = scenes.findIndex((s) => s.id === active.id);
       const newIndex = scenes.findIndex((s) => s.id === over.id);
       if (oldIndex === -1 || newIndex === -1) return;
-      const reordered = arrayMove(scenes, oldIndex, newIndex);
+      
+      // Optimistic update: reorder and update order_index
+      const reordered = arrayMove(scenes, oldIndex, newIndex).map((s, index) => ({
+        ...s,
+        order_index: index,
+      }));
       setScenes(reordered);
+      
       try {
         await reorderScenes(projectId, reordered.map((s) => s.id));
       } catch {
         toast.error("Не удалось сохранить порядок");
-        setScenes(scenes);
+        // Rollback to original order
+        setScenes(scenes.map((s, index) => ({ ...s, order_index: index })));
       }
     },
     [scenes, projectId, reorderScenes, setScenes]

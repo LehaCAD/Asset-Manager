@@ -323,7 +323,7 @@ export function ElementSelectionModal({
         {/* Grid with elements - dropzone area */}
         <div 
           className={cn(
-            "flex-1 overflow-auto p-6 relative min-h-0",
+            "flex-1 overflow-auto p-6 relative min-h-[400px]",
             isDragActive && "bg-primary/5"
           )}
           {...getRootProps()}
