@@ -6,11 +6,14 @@ import { useSceneWorkspaceStore } from "@/lib/store/scene-workspace";
 import type {
   AIModel,
   GeneratePayload,
+  GenerationSubmitResult,
+  GenerationSubmitState,
 } from "@/lib/types";
 
 export interface ImageFileEntry {
   displayUrl: string; // Для PromptThumbnail: thumbnail_url || file_url
   apiUrl: string; // Для API-запроса: file_url
+  elementId?: number; // ID элемента для pre-select в модалке
 }
 
 export interface ImageInput {
@@ -30,6 +33,8 @@ interface GenerationState {
   prompt: string;
   imageInputs: ImageInput[];
   isGenerating: boolean;
+  submitState: GenerationSubmitState;
+  lastSubmitResult: GenerationSubmitResult | null;
 
   // UI
   configPanelOpen: boolean;
@@ -42,8 +47,9 @@ interface GenerationState {
   setPrompt: (text: string) => void;
   setImageInput: (key: string, files: ImageFileEntry[]) => void;
   clearImageInput: (key: string) => void;
-  generate: (sceneId: number) => Promise<void>;
+  generate: (sceneId: number) => Promise<GenerationSubmitResult>;
   canGenerate: () => boolean;
+  clearSubmitResult: () => void;
 
   // UI actions
   toggleConfigPanel: () => void;
@@ -59,6 +65,8 @@ export const useGenerationStore = create<GenerationState>()((set, get) => ({
   prompt: "",
   imageInputs: [],
   isGenerating: false,
+  submitState: "idle",
+  lastSubmitResult: null,
   configPanelOpen: true,
   modelSelectorOpen: false,
 
@@ -170,37 +178,92 @@ export const useGenerationStore = create<GenerationState>()((set, get) => ({
 
   generate: async (sceneId) => {
     if (!get().canGenerate()) {
-      toast.error("Заполните обязательные поля");
-      return;
+      const result: GenerationSubmitResult = {
+        ok: false,
+        state: "rejected",
+        errorMessage: "Заполните обязательные поля",
+        optimisticId: null,
+      };
+      set({
+        submitState: "rejected",
+        lastSubmitResult: result,
+      });
+      toast.error(result.errorMessage);
+      return result;
     }
 
-    set({ isGenerating: true });
+    // Build generation config
+    const imageInputsMap: Record<string, string[]> = {};
+    for (const input of get().imageInputs) {
+      if (input.files.length > 0) {
+        imageInputsMap[input.key] = input.files.map((f) => f.apiUrl);
+      }
+    }
+
+    const generationConfig = {
+      ...get().parameters,
+      ...imageInputsMap,
+    };
+
+    // Create optimistic generation item FIRST (before API call)
+    const optimisticId = useSceneWorkspaceStore
+      .getState()
+      .createOptimisticGeneration({
+        sceneId,
+        promptText: get().prompt,
+        aiModelId: get().selectedModel!.id,
+        generationConfig,
+        elementType: "IMAGE",
+      });
+
+    set({
+      isGenerating: true,
+      submitState: "submitting",
+      lastSubmitResult: null,
+    });
 
     try {
-      const imageInputsMap: Record<string, string[]> = {};
-      for (const input of get().imageInputs) {
-        if (input.files.length > 0) {
-          imageInputsMap[input.key] = input.files.map((f) => f.apiUrl);
-        }
-      }
-
       const payload: GeneratePayload = {
         prompt: get().prompt,
         ai_model_id: get().selectedModel!.id,
-        generation_config: {
-          ...get().parameters,
-          ...imageInputsMap,
-        },
+        generation_config: generationConfig,
       };
 
       const element = await scenesApi.generate(sceneId, payload);
 
-      // Add the returned element to scene workspace
-      useSceneWorkspaceStore.getState().addElement(element);
+      // Success: resolve optimistic generation to real element
+      useSceneWorkspaceStore.getState().resolveOptimisticGeneration(optimisticId, element);
 
+      const result: GenerationSubmitResult = {
+        ok: true,
+        state: "accepted",
+        element,
+        optimisticId,
+      };
+
+      set({
+        submitState: "accepted",
+        lastSubmitResult: result,
+      });
       toast.success("Генерация запущена");
-    } catch {
-      toast.error("Не удалось запустить генерацию");
+      return result;
+    } catch (error) {
+      // Request-level fail: discard optimistic item and show error
+      useSceneWorkspaceStore.getState().discardOptimisticGeneration(optimisticId);
+
+      const result: GenerationSubmitResult = {
+        ok: false,
+        state: "rejected",
+        errorMessage:
+          error instanceof Error ? error.message : "Не удалось запустить генерацию",
+        optimisticId,
+      };
+      set({
+        submitState: "rejected",
+        lastSubmitResult: result,
+      });
+      toast.error(result.errorMessage);
+      return result;
     } finally {
       set({ isGenerating: false });
     }
@@ -225,6 +288,13 @@ export const useGenerationStore = create<GenerationState>()((set, get) => ({
     if (isGenerating) return false;
 
     return true;
+  },
+
+  clearSubmitResult: () => {
+    set({
+      submitState: "idle",
+      lastSubmitResult: null,
+    });
   },
 
   toggleConfigPanel: () =>

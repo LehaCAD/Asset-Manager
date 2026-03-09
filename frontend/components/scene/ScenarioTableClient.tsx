@@ -23,41 +23,44 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { SceneCard } from "./SceneCard";
 import { CreateSceneDialog } from "./CreateSceneDialog";
 import { useScenesStore } from "@/lib/store/scenes";
+import { projectsApi } from "@/lib/api/projects";
+import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
+import type { Project } from "@/lib/types";
 
-interface SceneGridProps {
+interface ScenarioTableClientProps {
   projectId: number;
-  projectName?: string;
 }
 
-export function SceneGrid({ projectId, projectName }: SceneGridProps) {
-  const { scenes, isLoading, loadScenes, reorderScenes, setScenes } =
-    useScenesStore();
+function pluralizeScenes(count: number): string {
+  if (count === 1) return "сцена";
+  if (count >= 2 && count <= 4) return "сцены";
+  return "сцен";
+}
+
+export function ScenarioTableClient({ projectId }: ScenarioTableClientProps) {
+  const { scenes, isLoading, loadScenes, reorderScenes, setScenes } = useScenesStore();
   const [createOpen, setCreateOpen] = useState(false);
+  const [project, setProject] = useState<Project | null>(null);
 
   useEffect(() => {
     loadScenes(projectId);
+    projectsApi.getById(projectId).then(setProject).catch(() => null);
   }, [projectId, loadScenes]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
   const handleDragEnd = useCallback(
     async (event: DragEndEvent) => {
       const { active, over } = event;
       if (!over || active.id === over.id) return;
-
       const oldIndex = scenes.findIndex((s) => s.id === active.id);
       const newIndex = scenes.findIndex((s) => s.id === over.id);
-
       if (oldIndex === -1 || newIndex === -1) return;
-
       const reordered = arrayMove(scenes, oldIndex, newIndex);
       setScenes(reordered);
-
       try {
         await reorderScenes(projectId, reordered.map((s) => s.id));
       } catch {
@@ -69,66 +72,46 @@ export function SceneGrid({ projectId, projectName }: SceneGridProps) {
   );
 
   return (
-    <div className="px-4 py-8 max-w-[1800px] mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {projectName ?? "Сценарный стол"}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {isLoading
-              ? "Загрузка..."
-              : scenes.length === 0
-              ? "Добавьте первую сцену"
-              : `${scenes.length} ${scenesLabel(scenes.length)} · перетащите для изменения порядка`}
-          </p>
+    <>
+      {/* Header: breadcrumbs + count + button (all left-aligned) */}
+      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex items-center gap-4 px-4 py-3">
+          <Breadcrumbs 
+            projectName={project?.name} 
+            suffix={!isLoading ? `· ${scenes.length} ${pluralizeScenes(scenes.length)}` : undefined}
+          />
+          <Button onClick={() => setCreateOpen(true)} size="sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Добавить сцену
+          </Button>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Добавить сцену
-        </Button>
       </div>
 
-      {/* Grid */}
-      {isLoading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <SceneCardSkeleton key={i} />
-          ))}
-        </div>
-      ) : scenes.length === 0 ? (
-        <EmptyState onCreateClick={() => setCreateOpen(true)} />
-      ) : (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext
-            items={scenes.map((s) => s.id)}
-            strategy={rectSortingStrategy}
-          >
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {scenes.map((scene, index) => (
-                <SceneCard
-                  key={scene.id}
-                  scene={scene}
-                  projectId={projectId}
-                  index={index}
-                />
-              ))}
-            </div>
-          </SortableContext>
-        </DndContext>
-      )}
+      {/* Grid - full width, no max-width limit */}
+      <div className="flex-1 overflow-auto px-4 py-6">
+        {isLoading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <SceneCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : scenes.length === 0 ? (
+          <EmptyState onCreateClick={() => setCreateOpen(true)} />
+        ) : (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={scenes.map((s) => s.id)} strategy={rectSortingStrategy}>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+                {scenes.map((scene, index) => (
+                  <SceneCard key={scene.id} scene={scene} projectId={projectId} index={index} />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+        )}
+      </div>
 
-      <CreateSceneDialog
-        projectId={projectId}
-        open={createOpen}
-        onOpenChange={setCreateOpen}
-      />
-    </div>
+      <CreateSceneDialog projectId={projectId} open={createOpen} onOpenChange={setCreateOpen} />
+    </>
   );
 }
 
@@ -163,10 +146,4 @@ function EmptyState({ onCreateClick }: { onCreateClick: () => void }) {
       </Button>
     </div>
   );
-}
-
-function scenesLabel(count: number): string {
-  if (count === 1) return "сцена";
-  if (count >= 2 && count <= 4) return "сцены";
-  return "сцен";
 }

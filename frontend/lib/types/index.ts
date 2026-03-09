@@ -101,6 +101,8 @@ export interface ReorderScenesPayload {
 export type ElementType = "IMAGE" | "VIDEO";
 export type ElementStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
 export type ElementSource = "GENERATED" | "UPLOADED" | "IMG2VID";
+export type OptimisticElementKind = "upload" | "generation";
+export type GenerationSubmitState = "idle" | "submitting" | "accepted" | "rejected";
 
 export interface Element {
   id: number;
@@ -122,11 +124,42 @@ export interface Element {
   updated_at: string;
 }
 
+export interface WorkspaceElement extends Element {
+  client_optimistic_kind?: OptimisticElementKind;
+  client_generation_submit_state?: GenerationSubmitState;
+}
+
 export interface GeneratePayload {
   prompt: string;
   ai_model_id: number;
   generation_config?: Record<string, unknown>;
 }
+
+export interface CreateOptimisticGenerationInput {
+  sceneId: number;
+  promptText: string;
+  aiModelId: number | null;
+  generationConfig?: Record<string, unknown>;
+  elementType?: ElementType;
+}
+
+export interface GenerationSubmitAcceptedResult {
+  ok: true;
+  state: "accepted";
+  element: Element;
+  optimisticId: number | null;
+}
+
+export interface GenerationSubmitRejectedResult {
+  ok: false;
+  state: "rejected";
+  errorMessage: string;
+  optimisticId: number | null;
+}
+
+export type GenerationSubmitResult =
+  | GenerationSubmitAcceptedResult
+  | GenerationSubmitRejectedResult;
 
 export interface UploadElementPayload {
   scene: number;
@@ -276,6 +309,25 @@ export type WSEvent = WSElementStatusChangedEvent;
 
 export type GridDensity = "sm" | "md" | "lg";
 export type ElementFilter = "all" | "favorites" | "images" | "videos";
+export type DisplayCardSize = "compact" | "medium" | "large";
+export type DisplayAspectRatio = "landscape" | "square" | "portrait";
+export type DisplayFitMode = "fill" | "fit";
+
+export interface ProjectDisplayPreferences {
+  size: DisplayCardSize;
+  aspectRatio: DisplayAspectRatio;
+  fitMode: DisplayFitMode;
+}
+
+export interface SceneNeighbors {
+  currentScene: Scene | null;
+  previousScene: Scene | null;
+  nextScene: Scene | null;
+  currentIndex: number;
+  total: number;
+}
+
+export type ModalSelectionByScene = Record<number, number[]>;
 
 /* ── API responses ────────────────────────────────────────── */
 

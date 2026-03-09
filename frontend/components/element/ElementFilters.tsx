@@ -1,4 +1,3 @@
-import { cn } from "@/lib/utils";
 import { LayoutGrid, Grid3x3, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -39,22 +38,17 @@ export function ElementFilters({
 }: ElementFiltersProps) {
   const getCount = (filterValue: ElementFilter) => {
     switch (filterValue) {
-      case "all":
-        return counts.all;
-      case "favorites":
-        return counts.favorites;
-      case "images":
-        return counts.images;
-      case "videos":
-        return counts.videos;
-      default:
-        return 0;
+      case "all": return counts.all;
+      case "favorites": return counts.favorites;
+      case "images": return counts.images;
+      case "videos": return counts.videos;
+      default: return 0;
     }
   };
 
   return (
-    <div className="flex items-center justify-between gap-4">
-      {/* Filter tabs */}
+    <div className="flex items-center gap-4">
+      {/* Filter tabs - left aligned */}
       <div className="flex items-center gap-1">
         {filterTabs.map((tab) => (
           <Button
@@ -69,7 +63,7 @@ export function ElementFilters({
         ))}
       </div>
 
-      {/* Density controls */}
+      {/* Density controls - left aligned after filters */}
       <div className="flex items-center gap-1">
         {densityOptions.map((option) => (
           <Tooltip key={option.value}>

@@ -1,14 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useDropzone } from "react-dropzone";
 import { useSceneWorkspaceStore } from "@/lib/store/scene-workspace";
 import { useGenerationStore } from "@/lib/store/generation";
+import { useUIStore } from "@/lib/store/ui";
 import { wsManager } from "@/lib/api/websocket";
 import { ElementGrid } from "@/components/element/ElementGrid";
 import { ElementFilters } from "@/components/element/ElementFilters";
 import { ElementBulkBar } from "@/components/element/ElementBulkBar";
 import { ConfigPanel } from "@/components/generation/ConfigPanel";
 import { PromptBar } from "@/components/generation/PromptBar";
+import { EmptyState } from "@/components/element/EmptyState";
+import { Upload } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +23,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { MAX_FILE_SIZE_MB } from "@/lib/utils/constants";
 import type { WSEvent } from "@/lib/types";
 
 interface SceneWorkspaceProps {
@@ -26,43 +32,21 @@ interface SceneWorkspaceProps {
   sceneId: number;
 }
 
-// Russian pluralization helper
-function pluralizeElements(count: number): string {
-  const lastDigit = count % 10;
-  const lastTwoDigits = count % 100;
-
-  if (lastTwoDigits >= 11 && lastTwoDigits <= 19) {
-    return "элементов";
-  }
-
-  if (lastDigit === 1) {
-    return "элемент";
-  }
-
-  if (lastDigit >= 2 && lastDigit <= 4) {
-    return "элемента";
-  }
-
-  return "элементов";
-}
-
 export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
   const {
-    scene,
     elements,
     filter,
     density,
     selectedIds,
-    isLoading,
     loadScene,
     setFilter,
     setDensity,
-    hydrateDensityPreference,
-    deleteElements,
     clearSelection,
     toggleSelectAll,
     getFilteredElements,
     updateElement,
+    enqueueUploads,
+    scene,
   } = useSceneWorkspaceStore();
 
   const { loadModels } = useGenerationStore();
@@ -73,6 +57,7 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
   const disconnectDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const resetWorkspace = useSceneWorkspaceStore((s) => s.resetWorkspace);
+  const deleteElements = useSceneWorkspaceStore((s) => s.deleteElements);
 
   // Load scene data
   useEffect(() => {
@@ -87,11 +72,6 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
     loadModels();
   }, [loadModels]);
 
-  // Hydrate density preference
-  useEffect(() => {
-    hydrateDensityPreference();
-  }, [hydrateDensityPreference]);
-
   // WebSocket connection for real-time updates
   useEffect(() => {
     wsManager.connect(projectId);
@@ -100,6 +80,16 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
       useSceneWorkspaceStore
         .getState()
         .elements.some((element) => element.status === "PENDING" || element.status === "PROCESSING");
+
+    // Для optimistic generation: проверяем есть ли элементы в submitting состоянии
+    const hasSubmittingGenerationElements = () =>
+      useSceneWorkspaceStore
+        .getState()
+        .elements.some(
+          (element) =>
+            element.client_optimistic_kind === "generation" &&
+            element.client_generation_submit_state === "submitting"
+        );
 
     const stopFallbackRefetch = () => {
       if (disconnectDebounceTimerRef.current) {
@@ -113,9 +103,10 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
     };
 
     const tryFallbackRefetch = () => {
-      if (!wsManager.isConnected && hasPendingOrProcessingElements()) {
+      const hasPendingElements = hasPendingOrProcessingElements() || hasSubmittingGenerationElements();
+      if (!wsManager.isConnected && hasPendingElements) {
         useSceneWorkspaceStore.getState().loadScene(sceneId);
-      } else if (!hasPendingOrProcessingElements()) {
+      } else if (!hasPendingElements) {
         stopFallbackRefetch();
       }
     };
@@ -169,6 +160,14 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
       }
     });
 
+    // Initial fallback check для optimistic generation
+    // (если WS не подключился сразу, но есть submitting элементы)
+    if (!wsManager.isConnected && hasSubmittingGenerationElements()) {
+      if (!fallbackRefetchIntervalRef.current) {
+        fallbackRefetchIntervalRef.current = setInterval(tryFallbackRefetch, 8000);
+      }
+    }
+
     return () => {
       stopFallbackRefetch();
       unsubscribe();
@@ -189,8 +188,46 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
     };
   }, [elements]);
 
-  // Element count label with Russian pluralization
-  const elementsCountLabel = pluralizeElements(elements.length);
+  // File drop handler — moved to SceneWorkspace level
+  const handleFileDrop = useCallback(
+    async (acceptedFiles: File[]) => {
+      if (!scene) return;
+
+      const validFiles: File[] = [];
+      for (const file of acceptedFiles) {
+        const fileSizeMB = file.size / (1024 * 1024);
+        if (fileSizeMB > MAX_FILE_SIZE_MB) {
+          toast.error(
+            `Файл "${file.name}" слишком большой (макс. ${MAX_FILE_SIZE_MB} МБ)`
+          );
+          continue;
+        }
+        validFiles.push(file);
+      }
+
+      if (validFiles.length === 0) return;
+
+      enqueueUploads(scene.id, validFiles);
+    },
+    [scene, enqueueUploads]
+  );
+
+  // Check if modal is open to disable scene dropzone
+  const isModalOpen = useUIStore((s) => s.isElementSelectionModalOpen);
+  
+  // Dropzone setup — noClick: true means drag works, click doesn't
+  // disabled when modal is open
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
+    onDrop: handleFileDrop,
+    accept: {
+      "image/*": [".jpg", ".jpeg", ".png", ".webp", ".gif"],
+      "video/*": [".mp4", ".webm", ".mov"],
+    },
+    noClick: true,
+    noKeyboard: true,
+    disabled: isModalOpen,
+  });
+
   const isGroupDelete = confirmDeleteIds.length > 1;
 
   const openDeleteDialog = (ids: number[]) => {
@@ -218,6 +255,8 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
     }
   };
 
+  const hasElements = elements.length > 0;
+
   return (
     <div className="flex h-full overflow-hidden">
       {/* Zone 1: Config Panel (left sidebar) */}
@@ -225,22 +264,18 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
         <ConfigPanel />
       </div>
 
-      {/* Main content area */}
-      <div className="flex flex-1 flex-col min-w-0">
-        {/* Header: scene name + element count */}
-        <div className="flex items-center justify-between border-b px-4 py-3 shrink-0">
-          <div>
-            <h2 className="text-lg font-semibold">
-              {isLoading ? "Загрузка..." : scene?.name ?? "Сцена"}
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {elements.length} {elementsCountLabel}
-            </p>
-          </div>
-        </div>
+      {/* Main content area — whole-scene dropzone (drag only, no click) */}
+      <div
+        className={cn(
+          "flex flex-1 flex-col min-w-0 relative",
+          isDragActive && "bg-primary/5"
+        )}
+        {...getRootProps()}
+      >
+        <input {...getInputProps()} />
 
-        {/* Filters toolbar */}
-        <div className="border-b px-4 py-2 shrink-0">
+        {/* Filters toolbar - inside scene workspace */}
+        <div className="border-b px-4 py-2 shrink-0 bg-background">
           <ElementFilters
             filter={filter}
             onFilterChange={setFilter}
@@ -252,11 +287,15 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
 
         {/* Zone 3: Grid area - scrollable */}
         <div className="flex-1 overflow-auto p-4 relative min-h-0">
-          <ElementGrid onRequestDelete={openDeleteDialog} />
+          {hasElements ? (
+            <ElementGrid onRequestDelete={openDeleteDialog} />
+          ) : (
+            <EmptyState onUploadClick={open} isDragActive={isDragActive} />
+          )}
         </div>
 
         {/* Zone 2: Prompt Bar (bottom) */}
-        <PromptBar sceneId={sceneId} />
+        <PromptBar projectId={projectId} sceneId={sceneId} />
 
         {/* Bulk actions bar - shown when items selected */}
         <ElementBulkBar
@@ -266,6 +305,17 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
           onClearSelection={clearSelection}
           onToggleSelectAll={toggleSelectAll}
         />
+
+        {/* Whole-scene drag overlay - only during drag */}
+        {isDragActive && hasElements && (
+          <div className="absolute inset-0 z-50 border-2 border-dashed border-primary bg-primary/5 rounded-xl flex items-center justify-center pointer-events-none">
+            <div className="flex flex-col items-center gap-3">
+              <Upload className="h-10 w-10 text-primary animate-pulse" />
+              <p className="text-lg font-medium text-primary">Отпустите файлы для загрузки</p>
+              <p className="text-sm text-muted-foreground">JPG, PNG, MP4, MOV</p>
+            </div>
+          </div>
+        )}
 
         {/* Delete confirmation dialog */}
         <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

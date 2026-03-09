@@ -17,41 +17,41 @@ export function ProjectGrid() {
   }, [loadProjects]);
 
   return (
-    <div className="px-4 py-8 max-w-[1800px] mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Мои проекты</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {isLoading
-              ? "Загрузка..."
-              : projects.length === 0
-              ? "Создайте первый проект"
-              : `${projects.length} ${projectsLabel(projects.length)}`}
-          </p>
+    <div className="flex flex-col h-[calc(100vh-3.5rem)]">
+      {/* Header - breadcrumbs + count + button (left-aligned) */}
+      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex items-center gap-4 px-4 py-3">
+          <span className="text-foreground font-medium">Проекты</span>
+          {!isLoading && (
+            <span className="text-muted-foreground">
+              · {projects.length} {projectsLabel(projects.length)}
+            </span>
+          )}
+          <Button onClick={() => setCreateOpen(true)} size="sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Создать проект
+          </Button>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Создать проект
-        </Button>
       </div>
 
-      {/* Grid */}
-      {isLoading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <ProjectCardSkeleton key={i} />
-          ))}
-        </div>
-      ) : projects.length === 0 ? (
-        <EmptyState onCreateClick={() => setCreateOpen(true)} />
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {projects.map((project) => (
-            <ProjectCard key={project.id} project={project} />
-          ))}
-        </div>
-      )}
+      {/* Grid - full width, no max-width */}
+      <div className="flex-1 overflow-auto px-4 py-6">
+        {isLoading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <ProjectCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : projects.length === 0 ? (
+          <EmptyState onCreateClick={() => setCreateOpen(true)} />
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+            {projects.map((project) => (
+              <ProjectCard key={project.id} project={project} />
+            ))}
+          </div>
+        )}
+      </div>
 
       <CreateProjectDialog open={createOpen} onOpenChange={setCreateOpen} />
     </div>

@@ -8,8 +8,9 @@ import { cn } from "@/lib/utils";
 export interface PromptThumbnailPopupProps {
   url: string;
   label?: string;
-  onReplace: () => void;
+  onReplace: (fileIndex: number) => void;
   onRemove: () => void;
+  fileIndex: number;
   previewMaxSize?: number;
   className?: string;
 }
@@ -19,6 +20,7 @@ export function PromptThumbnailPopup({
   label,
   onReplace,
   onRemove,
+  fileIndex,
   previewMaxSize = 240,
   className,
 }: PromptThumbnailPopupProps) {
@@ -47,7 +49,7 @@ export function PromptThumbnailPopup({
           <div className="flex items-center justify-end gap-1 p-2 border-b bg-muted/50">
             <button
               type="button"
-              onClick={onReplace}
+              onClick={() => onReplace(fileIndex)}
               className={cn(
                 "flex h-8 w-8 items-center justify-center rounded-md",
                 "text-muted-foreground hover:text-foreground hover:bg-accent",
@@ -76,7 +78,7 @@ export function PromptThumbnailPopup({
           {/* Тело с изображением */}
           <button
             type="button"
-            onClick={onReplace}
+            onClick={() => onReplace(fileIndex)}
             className="p-3 hover:bg-accent/50 transition-colors cursor-pointer"
           >
             <div

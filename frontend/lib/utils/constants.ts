@@ -40,3 +40,26 @@ export const GRID_DENSITY_CONFIG = {
   md: { minSize: "200px", gap: "12px" },
   lg: { minSize: "280px", gap: "16px" },
 } as const;
+
+export const DISPLAY_CARD_SIZES = [
+  { value: "compact", label: "Компактный" },
+  { value: "medium", label: "Средний" },
+  { value: "large", label: "Крупный" },
+] as const;
+
+export const DISPLAY_ASPECT_RATIO_OPTIONS = [
+  { value: "landscape", label: "Горизонтальный" },
+  { value: "square", label: "Квадрат" },
+  { value: "portrait", label: "Вертикальный" },
+] as const;
+
+export const DISPLAY_FIT_MODE_OPTIONS = [
+  { value: "fill", label: "Заполнить" },
+  { value: "fit", label: "Целиком" },
+] as const;
+
+export const DEFAULT_PROJECT_DISPLAY_PREFERENCES = {
+  size: "medium",
+  aspectRatio: "landscape",
+  fitMode: "fill",
+} as const;

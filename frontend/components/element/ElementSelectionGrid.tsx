@@ -1,7 +1,6 @@
 "use client";
 
 import { ElementSelectionCard } from "./ElementSelectionCard";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { GRID_DENSITY_CONFIG } from "@/lib/utils/constants";
 import { ImageOff } from "lucide-react";
 import type { Element } from "@/lib/types";
@@ -35,30 +34,28 @@ export function ElementSelectionGrid({
   }
 
   return (
-    <ScrollArea className="h-[60vh]">
-      <div
-        className="p-1"
-        style={{
-          display: "grid",
-          gridTemplateColumns: `repeat(auto-fill, minmax(${config.minSize}, 1fr))`,
-          gap: config.gap,
-        }}
-      >
-        {elements.map((element) => {
-          const isSelected = selectedIds.has(element.id);
-          const disabled = maxReached && !isSelected;
+    <div
+      className="p-1"
+      style={{
+        display: "grid",
+        gridTemplateColumns: `repeat(auto-fill, minmax(${config.minSize}, 1fr))`,
+        gap: config.gap,
+      }}
+    >
+      {elements.map((element) => {
+        const isSelected = selectedIds.has(element.id);
+        const disabled = maxReached && !isSelected;
 
-          return (
-            <ElementSelectionCard
-              key={element.id}
-              element={element}
-              isSelected={isSelected}
-              disabled={disabled}
-              onClick={() => onToggle(element.id)}
-            />
-          );
-        })}
-      </div>
-    </ScrollArea>
+        return (
+          <ElementSelectionCard
+            key={element.id}
+            element={element}
+            isSelected={isSelected}
+            disabled={disabled}
+            onClick={() => onToggle(element.id)}
+          />
+        );
+      })}
+    </div>
   );
 }

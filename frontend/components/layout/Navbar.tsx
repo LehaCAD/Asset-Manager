@@ -13,15 +13,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "./ThemeToggle";
-import { Breadcrumbs } from "./Breadcrumbs";
 import { useAuthStore } from "@/lib/store/auth";
 
-interface NavbarProps {
-  projectName?: string;
-  sceneName?: string;
-}
-
-export function Navbar({ projectName, sceneName }: NavbarProps) {
+export function Navbar() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const router = useRouter();
@@ -37,7 +31,7 @@ export function Navbar({ projectName, sceneName }: NavbarProps) {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="flex h-14 items-center gap-3 px-4 max-w-[1800px] mx-auto">
+      <div className="flex h-14 items-center justify-between px-4">
         {/* Logo */}
         <Link
           href="/projects"
@@ -48,14 +42,6 @@ export function Navbar({ projectName, sceneName }: NavbarProps) {
             Раскадровка
           </span>
         </Link>
-
-        {/* Divider */}
-        <div className="h-4 w-px bg-border shrink-0 hidden sm:block" />
-
-        {/* Breadcrumbs */}
-        <div className="flex-1 min-w-0">
-          <Breadcrumbs projectName={projectName} sceneName={sceneName} />
-        </div>
 
         {/* Right side */}
         <div className="flex items-center gap-1 shrink-0">

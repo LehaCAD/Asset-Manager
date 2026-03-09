@@ -7,6 +7,8 @@ import type {
   Element,
   ElementFilter,
   GridDensity,
+  WorkspaceElement,
+  CreateOptimisticGenerationInput,
 } from "@/lib/types";
 
 const DENSITY_STORAGE_KEY = "scene-workspace-density";
@@ -18,7 +20,7 @@ function parsePersistedDensity(rawDensity: string | null): GridDensity | null {
   return null;
 }
 
-function getFirstFavoriteImageId(elements: Element[]): number | null {
+function getFirstFavoriteImageId(elements: WorkspaceElement[]): number | null {
   const firstFavoriteImage = [...elements]
     .sort((a, b) => a.order_index - b.order_index)
     .find((element) => element.element_type === "IMAGE" && element.is_favorite);
@@ -169,7 +171,7 @@ function cancelUploadQueue() {
 interface SceneWorkspaceState {
   // Data
   scene: Scene | null;
-  elements: Element[];
+  elements: WorkspaceElement[];
 
   // UI state
   selectedIds: Set<number>;
@@ -185,9 +187,12 @@ interface SceneWorkspaceState {
 
   // Data actions
   loadScene: (sceneId: number) => Promise<void>;
-  addElement: (element: Element) => void;
-  updateElement: (id: number, updates: Partial<Element>) => void;
+  addElement: (element: WorkspaceElement) => void;
+  updateElement: (id: number, updates: Partial<WorkspaceElement>) => void;
   removeElement: (id: number) => void;
+  createOptimisticGeneration: (input: CreateOptimisticGenerationInput) => number;
+  resolveOptimisticGeneration: (tempId: number, real: Element) => void;
+  discardOptimisticGeneration: (tempId: number) => void;
 
   // Element actions (API)
   setHeadliner: (elementId: number) => Promise<void>;
@@ -218,7 +223,7 @@ interface SceneWorkspaceState {
   navigateLightbox: (direction: "prev" | "next") => void;
 
   // Computed
-  getFilteredElements: () => Element[];
+  getFilteredElements: () => WorkspaceElement[];
 }
 
 export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) => ({
@@ -281,15 +286,19 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
     }
   },
 
-  addElement: (element: Element) => {
+  addElement: (element: WorkspaceElement) => {
     set((state) => {
-      const newElements = [...state.elements, element];
+      const existingIndex = state.elements.findIndex((current) => current.id === element.id);
+      const newElements =
+        existingIndex === -1
+          ? [...state.elements, element]
+          : state.elements.map((current) => (current.id === element.id ? element : current));
       newElements.sort((a, b) => a.order_index - b.order_index);
       return { elements: newElements };
     });
   },
 
-  updateElement: (id: number, updates: Partial<Element>) => {
+  updateElement: (id: number, updates: Partial<WorkspaceElement>) => {
     set((state) => ({
       elements: state.elements.map((e) => {
         if (e.id !== id) return e;
@@ -302,6 +311,51 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
         return { ...e, ...updates };
       }),
     }));
+  },
+
+  createOptimisticGeneration: ({
+    sceneId,
+    promptText,
+    aiModelId,
+    generationConfig = {},
+    elementType = "IMAGE",
+  }) => {
+    const currentOrderMax = get().elements.reduce(
+      (max, element) => Math.max(max, element.order_index),
+      -1
+    );
+    const tempId = -Date.now() - Math.floor(Math.random() * 10000);
+    const optimistic: WorkspaceElement = {
+      id: tempId,
+      scene: sceneId,
+      element_type: elementType,
+      order_index: currentOrderMax + 1,
+      file_url: "",
+      thumbnail_url: "",
+      is_favorite: false,
+      prompt_text: promptText,
+      ai_model: aiModelId,
+      generation_config: generationConfig,
+      seed: null,
+      status: "PENDING",
+      error_message: "",
+      source_type: "GENERATED",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      client_optimistic_kind: "generation",
+      client_generation_submit_state: "submitting",
+    };
+
+    get().addElement(optimistic);
+    return tempId;
+  },
+
+  resolveOptimisticGeneration: (tempId, real) => {
+    get()._replaceOptimistic(tempId, real);
+  },
+
+  discardOptimisticGeneration: (tempId) => {
+    get().removeElement(tempId);
   },
 
   removeElement: (id: number) => {
@@ -482,7 +536,7 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
       const objectUrl = URL.createObjectURL(file);
       currentOrderMax += 1;
 
-      const optimistic: Element = {
+      const optimistic: WorkspaceElement = {
         id: tempId,
         scene: sceneId,
         element_type: isVideo ? "VIDEO" : "IMAGE",
@@ -499,6 +553,7 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
         source_type: "UPLOADED",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
+        client_optimistic_kind: "upload",
       };
 
       get().addElement(optimistic);
@@ -665,7 +720,7 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
 
   getFilteredElements: () => {
     const { elements, filter } = get();
-    let filtered: Element[];
+    let filtered: WorkspaceElement[];
 
     switch (filter) {
       case "favorites":

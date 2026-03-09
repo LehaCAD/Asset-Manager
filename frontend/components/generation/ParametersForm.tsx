@@ -1,9 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { ParameterSchemaItem } from "@/lib/types";
 import { OptionSelectorPanel } from "./OptionSelectorPanel";
@@ -81,7 +87,7 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
     return (
       <div className="space-y-2">
         <label className="text-sm font-medium">{label}</label>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5">
           {options?.map((opt) => (
             <Button
               key={String(opt.value)}
@@ -89,6 +95,7 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
               variant={currentValue === opt.value ? "default" : "outline"}
               size="sm"
               onClick={() => onChange(request_key, opt.value)}
+              className="h-8 px-2.5 text-xs transition-colors active:bg-accent"
             >
               {opt.label}
             </Button>
@@ -99,9 +106,10 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
               variant={isCustomSelected ? "default" : "outline"}
               size="sm"
               onClick={() => onOpenCustom(param)}
+              className="h-8 px-2.5 text-xs transition-colors active:bg-accent"
             >
               {isCustomSelected && currentValue ?
-                (options?.find(o => o.value === currentValue)?.label || String(currentValue)) :
+                (options?.find(o => o.value === currentValue)?.label || String(currentValue).slice(0, 8)) :
                 "Custom"
               }
             </Button>
@@ -111,32 +119,35 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
     );
   }
 
-  // quality, output_format, duration, select - dropdown
+  // quality, output_format, duration, select - dropdown with shadcn Select
   if (ui_semantic === "quality" || ui_semantic === "output_format" || 
       ui_semantic === "duration" || ui_semantic === "select") {
     const currentValue = value as string | number | undefined;
+    const currentOption = options?.find(opt => opt.value === currentValue);
     
     return (
       <div className="space-y-2">
         <label className="text-sm font-medium">{label}</label>
-        <select
-          value={currentValue ?? ""}
-          onChange={(e) => {
-            const selected = options?.find(opt => String(opt.value) === e.target.value);
-            onChange(request_key, selected?.value ?? e.target.value);
+        <Select
+          value={currentValue !== undefined ? String(currentValue) : undefined}
+          onValueChange={(val: string) => {
+            const selected = options?.find(opt => String(opt.value) === val);
+            onChange(request_key, selected?.value ?? val);
           }}
-          className={cn(
-            "w-full rounded-md border border-input bg-background px-3 py-2 text-sm",
-            "ring-offset-background focus-visible:outline-none focus-visible:ring-2",
-            "focus-visible:ring-ring focus-visible:ring-offset-2"
-          )}
         >
-          {options?.map((opt) => (
-            <option key={String(opt.value)} value={String(opt.value)}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger className="w-full bg-background h-8 text-xs">
+            <SelectValue placeholder="Выберите...">
+              {currentOption?.label ?? currentValue}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {options?.map((opt) => (
+              <SelectItem key={String(opt.value)} value={String(opt.value)} className="text-xs">
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
     );
   }
@@ -146,7 +157,7 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
     const boolValue = value as boolean | undefined;
     
     return (
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between py-1">
         <label className="text-sm font-medium">{label}</label>
         <Switch
           checked={boolValue ?? false}
@@ -167,7 +178,7 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <label className="text-sm font-medium">{label}</label>
-          <span className="text-sm text-muted-foreground">{numValue}</span>
+          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">{numValue}</span>
         </div>
         <input
           type="range"
@@ -176,7 +187,7 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
           step={sliderStep}
           value={numValue}
           onChange={(e) => onChange(request_key, parseFloat(e.target.value))}
-          className="w-full accent-primary"
+          className="w-full accent-primary cursor-pointer"
         />
       </div>
     );
@@ -200,7 +211,7 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
             onChange(request_key, val);
           }}
           className={cn(
-            "w-full rounded-md border border-input bg-background px-3 py-2 text-sm",
+            "w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm h-8",
             "ring-offset-background focus-visible:outline-none focus-visible:ring-2",
             "focus-visible:ring-ring focus-visible:ring-offset-2"
           )}
@@ -216,19 +227,20 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
     return (
       <div className="space-y-2">
         <label className="text-sm font-medium">{label}</label>
-        <ToggleGroup
-          type="single"
-          value={currentValue}
-          onValueChange={(val) => val && onChange(request_key, val)}
-          variant="outline"
-          className="flex-wrap justify-start"
-        >
+        <div className="flex flex-wrap gap-1">
           {options?.map((opt) => (
-            <ToggleGroupItem key={String(opt.value)} value={String(opt.value)}>
+            <Button
+              key={String(opt.value)}
+              type="button"
+              variant={currentValue === opt.value ? "default" : "outline"}
+              size="sm"
+              onClick={() => onChange(request_key, opt.value)}
+              className="h-8 px-2.5 text-xs transition-colors active:bg-accent"
+            >
               {opt.label}
-            </ToggleGroupItem>
+            </Button>
           ))}
-        </ToggleGroup>
+        </div>
       </div>
     );
   }
@@ -236,28 +248,31 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
   // Fallback: render as select if options exist
   if (options && options.length > 0) {
     const currentValue = value as string | number | undefined;
+    const currentOption = options.find(opt => opt.value === currentValue);
     
     return (
       <div className="space-y-2">
         <label className="text-sm font-medium">{label}</label>
-        <select
-          value={currentValue ?? ""}
-          onChange={(e) => {
-            const selected = options.find(opt => String(opt.value) === e.target.value);
-            onChange(request_key, selected?.value ?? e.target.value);
+        <Select
+          value={currentValue !== undefined ? String(currentValue) : undefined}
+          onValueChange={(val: string) => {
+            const selected = options.find(opt => String(opt.value) === val);
+            onChange(request_key, selected?.value ?? val);
           }}
-          className={cn(
-            "w-full rounded-md border border-input bg-background px-3 py-2 text-sm",
-            "ring-offset-background focus-visible:outline-none focus-visible:ring-2",
-            "focus-visible:ring-ring focus-visible:ring-offset-2"
-          )}
         >
-          {options.map((opt) => (
-            <option key={String(opt.value)} value={String(opt.value)}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger className="w-full bg-background h-8 text-xs">
+            <SelectValue placeholder="Выберите...">
+              {currentOption?.label ?? currentValue}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {options.map((opt) => (
+              <SelectItem key={String(opt.value)} value={String(opt.value)} className="text-xs">
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
     );
   }

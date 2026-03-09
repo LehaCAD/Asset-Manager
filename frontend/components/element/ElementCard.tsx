@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import type { Element, GridDensity } from "@/lib/types";
+import type { WorkspaceElement, GridDensity } from "@/lib/types";
 import {
   Star,
   Trash2,
@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 
 export interface ElementCardProps {
-  element: Element;
+  element: WorkspaceElement;
   index: number;
   density: GridDensity;
   isSelected: boolean;
@@ -41,6 +41,9 @@ export function ElementCard({
 }: ElementCardProps) {
   const isProcessing = element.status === "PENDING" || element.status === "PROCESSING";
   const isFailed = element.status === "FAILED";
+  const isSubmitting = 
+    element.client_optimistic_kind === "generation" && 
+    element.client_generation_submit_state === "submitting";
   const isVideo = element.element_type === "VIDEO";
   const isSmallDensity = density === "sm";
   const videoThumbnailSrc = element.thumbnail_url?.trim() || null;
@@ -100,8 +103,9 @@ export function ElementCard({
     <div
       className={cn(
         "group relative aspect-square rounded-xl overflow-hidden cursor-pointer",
-        "bg-muted",
-        isSelected && "ring-2 ring-primary",
+        "bg-muted transition-transform duration-150 ease-out",
+        "hover:scale-[1.02] hover:shadow-lg",
+        isSelected && "ring-2 ring-primary scale-[1.01]",
         className
       )}
       style={style}
@@ -155,8 +159,8 @@ export function ElementCard({
           isSmallDensity ? "w-6 h-6" : "w-9 h-9",
           isSelected
             ? "bg-primary text-primary-foreground"
-            : "bg-black/35 text-white hover:bg-black/55",
-          isMultiSelectMode && !isSelected && "bg-white/30 hover:bg-white/50"
+            : "bg-black/50 text-white hover:bg-black/70",
+          isMultiSelectMode && !isSelected && "bg-white/40 hover:bg-white/60"
         )}
       >
         {isSelected && <Check className={cn(isSmallDensity ? "w-4 h-4" : "w-6 h-6")} />}
@@ -171,7 +175,7 @@ export function ElementCard({
         {/* Element type icon */}
         <div
           className={cn(
-            "rounded-full bg-black/45 text-white",
+            "rounded-full bg-black/50 text-white",
             isSmallDensity ? "p-1.5" : "p-2.5"
           )}
           title={isVideo ? "Видео" : "Изображение"}
@@ -192,8 +196,8 @@ export function ElementCard({
             "rounded-full transition-colors",
             isSmallDensity ? "p-1.5" : "p-2.5",
             element.is_favorite
-              ? "bg-black/45 text-yellow-400 hover:bg-black/60"
-              : "bg-black/45 text-white hover:bg-black/60"
+              ? "bg-black/50 text-yellow-400 hover:bg-black/70"
+              : "bg-black/50 text-white hover:bg-black/70"
           )}
           aria-label={element.is_favorite ? "Убрать из избранного" : "Добавить в избранное"}
           title={element.is_favorite ? "Убрать из избранного" : "Добавить в избранное"}
@@ -207,10 +211,10 @@ export function ElementCard({
         </button>
       </div>
 
-      {/* Hover overlay */}
+      {/* Hover overlay — image-safe: no blur, just dark scrim */}
       <div
         className={cn(
-          "absolute inset-0 z-20 bg-black/40 backdrop-blur-[2px]",
+          "absolute inset-0 z-20 bg-black/50",
           "opacity-0 group-hover:opacity-100 transition-opacity duration-150",
           "flex flex-col justify-between p-2"
         )}
@@ -243,7 +247,7 @@ export function ElementCard({
               onPointerDown={handleControlPointerDown}
               onClick={handleDownloadClick}
               className={cn(
-                "rounded-full bg-white/15 hover:bg-white/30 transition-colors text-white",
+                "rounded-full bg-white/20 hover:bg-white/35 transition-colors text-white",
                 isSmallDensity ? "p-2" : "p-3"
               )}
             >
@@ -270,7 +274,7 @@ export function ElementCard({
             onPointerDown={handleControlPointerDown}
             onClick={handleDeleteClick}
             className={cn(
-              "rounded-full bg-white/15 hover:bg-red-500/40 transition-colors text-white",
+              "rounded-full bg-white/20 hover:bg-red-500/50 transition-colors text-white",
               isSmallDensity ? "p-2" : "p-3"
             )}
           >
@@ -280,7 +284,13 @@ export function ElementCard({
       </div>
 
       {/* Status overlay */}
-      {isProcessing && (
+      {isSubmitting && (
+        <div className="absolute inset-0 z-30 bg-black/60 flex flex-col items-center justify-center pointer-events-none">
+          <Loader2 className="w-8 h-8 text-white animate-spin mb-2" />
+          <span className="text-xs text-white font-medium">Отправка...</span>
+        </div>
+      )}
+      {!isSubmitting && isProcessing && (
         <div className="absolute inset-0 z-30 bg-black/50 flex items-center justify-center pointer-events-none">
           <Loader2 className="w-8 h-8 text-white animate-spin" />
         </div>
@@ -290,15 +300,6 @@ export function ElementCard({
           <AlertCircle className="w-8 h-8 text-red-500" />
         </div>
       )}
-
-      {/* Badges - always visible */}
-      {/* Order badge intentionally hidden for now (can be restored later)
-      <div className="absolute bottom-2 left-2 z-20 px-1.5 py-0.5 rounded text-xs font-medium bg-black/50 text-white">
-        #{index + 1}
-      </div>
-      */}
-
-      {/* type marker moved to top-right icon group with star */}
     </div>
   );
 }

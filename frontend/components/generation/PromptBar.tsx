@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useRef, useEffect, useMemo } from "react";
+import { useCallback, useState, useRef, useLayoutEffect, useMemo } from "react";
 import { useGenerationStore, ImageFileEntry } from "@/lib/store/generation";
 import { ElementSelectionModal } from "@/components/element/ElementSelectionModal";
 import { PromptThumbnailPopup } from "./PromptThumbnailPopup";
@@ -13,17 +13,17 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { Sparkles, Loader2, Plus } from "lucide-react";
-import type { Element } from "@/lib/types";
+import type { Element, ModalSelectionByScene } from "@/lib/types";
 
 interface PromptBarProps {
+  projectId: number;
   sceneId: number;
   className?: string;
 }
 
-const MAX_TEXTAREA_ROWS = 6;
-const TEXTAREA_LINE_HEIGHT = 24; // примерная высота строки в px
+const MAX_TEXTAREA_HEIGHT = 144; // 6 строк * 24px
 
-export function PromptBar({ sceneId, className }: PromptBarProps) {
+export function PromptBar({ projectId, sceneId, className }: PromptBarProps) {
   const {
     selectedModel,
     prompt,
@@ -36,31 +36,54 @@ export function PromptBar({ sceneId, className }: PromptBarProps) {
   } = useGenerationStore();
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [textareaRows, setTextareaRows] = useState(1);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [textareaHeight, setTextareaHeight] = useState(24); // начальная высота 1 строка
 
   // Modal state
   const [selectionModalOpen, setSelectionModalOpen] = useState(false);
   const [activeInputKey, setActiveInputKey] = useState<string | null>(null);
+  const [activeFileIndex, setActiveFileIndex] = useState<number | null>(null); // Для replace конкретного файла
 
-  // Auto-resize textarea и подсчёт строк
-  useEffect(() => {
+  // Auto-resize textarea — корректное измерение через cloneNode
+  const resizeTextarea = useCallback(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
 
-    // Сбрасываем высоту для корректного измерения
-    textarea.style.height = "auto";
+    // Клонируем textarea для корректного измерения без влияния на DOM
+    const clone = textarea.cloneNode(true) as HTMLTextAreaElement;
+    clone.style.height = "auto";
+    clone.style.position = "absolute";
+    clone.style.top = "-9999px";
+    clone.style.left = "-9999px";
+    clone.style.visibility = "hidden";
+    clone.value = textarea.value;
+    clone.style.width = `${textarea.offsetWidth}px`;
+    
+    document.body.appendChild(clone);
+    const scrollHeight = clone.scrollHeight;
+    document.body.removeChild(clone);
 
-    // Вычисляем количество строк
-    const scrollHeight = textarea.scrollHeight;
-    const newRows = Math.min(
-      Math.max(1, Math.ceil(scrollHeight / TEXTAREA_LINE_HEIGHT)),
-      MAX_TEXTAREA_ROWS
-    );
-    setTextareaRows(newRows);
+    const newHeight = Math.min(scrollHeight, MAX_TEXTAREA_HEIGHT);
+    setTextareaHeight(newHeight);
+  }, []);
 
-    // Устанавливаем высоту
-    textarea.style.height = `${Math.min(scrollHeight, TEXTAREA_LINE_HEIGHT * MAX_TEXTAREA_ROWS)}px`;
-  }, [prompt]);
+  // Resize при изменении prompt
+  useLayoutEffect(() => {
+    resizeTextarea();
+  }, [prompt, resizeTextarea]);
+
+  // ResizeObserver для отслеживания изменения ширины контейнера
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const observer = new ResizeObserver(() => {
+      resizeTextarea();
+    });
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [resizeTextarea]);
 
   // Есть ли выбранные изображения для отображения в thumbnails-zone
   const hasSelectedImages = useMemo(() => {
@@ -75,14 +98,16 @@ export function PromptBar({ sceneId, className }: PromptBarProps) {
   // Проверка: можно ли выбирать изображения (есть ли модель со схемой)
   const canSelectImages = selectedModel && imageInputs.length > 0;
 
-  const handleOpenSelector = useCallback((key: string) => {
+  const handleOpenSelector = useCallback((key: string, fileIndex?: number) => {
     setActiveInputKey(key);
+    setActiveFileIndex(fileIndex ?? null);
     setSelectionModalOpen(true);
   }, []);
 
   const handleCloseModal = useCallback(() => {
     setSelectionModalOpen(false);
     setActiveInputKey(null);
+    setActiveFileIndex(null);
   }, []);
 
   // Конвертация Element[] -> ImageFileEntry[] и установка в store
@@ -90,27 +115,37 @@ export function PromptBar({ sceneId, className }: PromptBarProps) {
     (elements: Element[]) => {
       if (!activeInputKey) return;
 
-      const files: ImageFileEntry[] = elements
+      const newFiles: ImageFileEntry[] = elements
         .filter((e) => e.element_type === "IMAGE")
         .map((e) => ({
           displayUrl: e.thumbnail_url || e.file_url,
           apiUrl: e.file_url || e.thumbnail_url,
+          elementId: e.id,
         }))
         .filter((f) => f.apiUrl);
 
-      setImageInput(activeInputKey, files);
+      if (activeFileIndex !== null) {
+        // Replace mode: заменяем конкретный файл
+        const input = imageInputs.find((i) => i.key === activeInputKey);
+        if (input) {
+          const updatedFiles = [...input.files];
+          // Удаляем старый файл по индексу и вставляем новый на его место
+          updatedFiles.splice(activeFileIndex, 1, ...newFiles);
+          setImageInput(activeInputKey, updatedFiles);
+        }
+      } else {
+        // Add mode: заменяем все файлы (старая логика для dropdown)
+        setImageInput(activeInputKey, newFiles);
+      }
     },
-    [activeInputKey, setImageInput]
+    [activeInputKey, activeFileIndex, imageInputs, setImageInput]
   );
 
   const handleGenerate = useCallback(async () => {
     if (!canGenerate()) return;
     await generate(sceneId);
     // Reset textarea height after generation
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-      setTextareaRows(1);
-    }
+    setTextareaHeight(24);
   }, [canGenerate, generate, sceneId]);
 
   const handleKeyDown = useCallback(
@@ -144,10 +179,10 @@ export function PromptBar({ sceneId, className }: PromptBarProps) {
     [imageInputs, setImageInput]
   )
 
-  // Замена файла (открытие модалки для конкретного input)
+  // Замена файла (открытие модалки для конкретного файла)
   const handleReplaceFile = useCallback(
-    (inputKey: string) => {
-      handleOpenSelector(inputKey);
+    (inputKey: string, fileIndex: number) => {
+      handleOpenSelector(inputKey, fileIndex);
     },
     [handleOpenSelector]
   );
@@ -157,16 +192,20 @@ export function PromptBar({ sceneId, className }: PromptBarProps) {
     ? imageInputs.find((i) => i.key === activeInputKey)
     : null;
 
-  // Подготавливаем initialSelection для модалки (ID элементов на основе URL)
-  const initialSelection = useMemo(() => {
-    if (!activeInput) return [];
-    // TODO: В идеале нужно маппить URL обратно в ID элементов
-    // Пока возвращаем пустой массив (без предвыбора)
-    return [];
-  }, [activeInput]);
-
-  // Кнопка "Создать" справа внизу только если 2+ строк
-  const showGenerateAtBottom = textareaRows >= 2;
+  // Подготавливаем initialSelection для модалки (ModalSelectionByScene format)
+  // Группируем выбранные elementIds по sceneId (в данном случае все из текущей сцены)
+  const initialSelection: ModalSelectionByScene = useMemo(() => {
+    if (!activeInput) return {};
+    
+    const elementIds = activeInput.files
+      .map((f) => f.elementId)
+      .filter((id): id is number => id !== undefined);
+    
+    if (elementIds.length === 0) return {};
+    
+    // All selected elements are from current workspace scene
+    return { [sceneId]: elementIds };
+  }, [activeInput, sceneId]);
 
   return (
     <div className={cn("border-t bg-background p-4", className)}>
@@ -177,7 +216,7 @@ export function PromptBar({ sceneId, className }: PromptBarProps) {
           "transition-shadow focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
         )}
       >
-        {/* Верхний ряд: Add-кнопка | textarea | [Создать] (если 1 строка) */}
+        {/* Верхний ряд: Add-кнопка | textarea | Создать */}
         <div className="flex items-start gap-3">
           {/* Add-кнопка */}
           {canSelectImages ? (
@@ -232,7 +271,7 @@ export function PromptBar({ sceneId, className }: PromptBarProps) {
           )}
 
           {/* Prompt zone (textarea) */}
-          <div className="relative flex-1 min-w-0">
+          <div ref={containerRef} className="relative flex-1 min-w-0">
             <textarea
               ref={textareaRef}
               value={prompt}
@@ -248,27 +287,28 @@ export function PromptBar({ sceneId, className }: PromptBarProps) {
                 "overflow-y-auto"
               )}
               rows={1}
-              
+              style={{ height: `${textareaHeight}px` }}
             />
-                    {/* Thumbnails-zone (только выбранные изображения) */}
-        {hasSelectedImages && (
-          <div className="flex flex-wrap gap-2">
-            {imageInputs.map((input) =>
-              input.files.map((file, fileIndex) => (
-                <PromptThumbnailPopup
-                  key={`${input.key}-${fileIndex}`}
-                  url={file.displayUrl}
-                  label={input.label}
-                  onReplace={() => handleReplaceFile(input.key)}
-                  onRemove={() => handleRemoveFile(input.key, fileIndex)}
-                />
-              ))
+            {/* Thumbnails-zone (только выбранные изображения) */}
+            {hasSelectedImages && (
+              <div className="flex flex-wrap gap-2">
+                {imageInputs.map((input) =>
+                  input.files.map((file, fileIndex) => (
+                    <PromptThumbnailPopup
+                      key={`${input.key}-${fileIndex}`}
+                      url={file.displayUrl}
+                      label={input.label}
+                      fileIndex={fileIndex}
+                      onReplace={(idx) => handleReplaceFile(input.key, idx)}
+                      onRemove={() => handleRemoveFile(input.key, fileIndex)}
+                    />
+                  ))
+                )}
+              </div>
             )}
           </div>
-        )}
-          </div>
- {/* Кнопка Создать (справа внизу, при 2+ строках) */}
- {showGenerateAtBottom && (
+
+          {/* Кнопка Создать — всегда видна справа */}
           <div className="flex justify-end">
             <Button
               onClick={handleGenerate}
@@ -283,7 +323,6 @@ export function PromptBar({ sceneId, className }: PromptBarProps) {
               Создать
             </Button>
           </div>
-        )}
         </div>
 
 
@@ -297,8 +336,10 @@ export function PromptBar({ sceneId, className }: PromptBarProps) {
           isOpen={selectionModalOpen}
           onClose={handleCloseModal}
           onConfirm={handleSelectionConfirm}
-          max={activeInput.max}
-          min={activeInput.min}
+          projectId={projectId}
+          currentSceneId={sceneId}
+          max={activeFileIndex !== null ? 1 : activeInput.max}
+          min={activeFileIndex !== null ? 1 : activeInput.min}
           initialSelection={initialSelection}
           elementTypeFilter="IMAGE"
           title={`Выбор: ${activeInput.label}`}

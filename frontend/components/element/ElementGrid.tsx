@@ -15,16 +15,11 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useDropzone } from "react-dropzone";
 import { useSceneWorkspaceStore } from "@/lib/store/scene-workspace";
-import { useAuthStore } from "@/lib/store/auth";
 import { ElementCard } from "@/components/element/ElementCard";
 import { ElementCardSkeleton } from "@/components/element/ElementCardSkeleton";
-import { EmptyState } from "@/components/element/EmptyState";
 import { cn } from "@/lib/utils";
-import { GRID_DENSITY_CONFIG, MAX_FILE_SIZE_MB } from "@/lib/utils/constants";
-import { Upload } from "lucide-react";
-import { toast } from "sonner";
+import { GRID_DENSITY_CONFIG } from "@/lib/utils/constants";
 import type { Element, GridDensity } from "@/lib/types";
 
 interface ElementGridProps {
@@ -75,8 +70,6 @@ function SortableElementCard({
 
 export function ElementGrid({ className, onRequestDelete }: ElementGridProps) {
   const {
-    scene,
-    elements,
     getFilteredElements,
     selectedIds,
     isMultiSelectMode,
@@ -87,9 +80,7 @@ export function ElementGrid({ className, onRequestDelete }: ElementGridProps) {
     openLightbox,
     toggleFavorite,
     reorderElements,
-    enqueueUploads,
   } = useSceneWorkspaceStore();
-  const user = useAuthStore((state) => state.user);
 
   const filteredElements = getFilteredElements();
 
@@ -121,65 +112,6 @@ export function ElementGrid({ className, onRequestDelete }: ElementGridProps) {
     [filteredElements, reorderElements]
   );
 
-  // File drop handler
-  const handleFileDrop = useCallback(
-    async (acceptedFiles: File[]) => {
-      if (!scene) return;
-
-      const validFiles: File[] = [];
-      for (const file of acceptedFiles) {
-        const fileSizeMB = file.size / (1024 * 1024);
-        if (fileSizeMB > MAX_FILE_SIZE_MB) {
-          toast.error(
-            `Файл "${file.name}" слишком большой (макс. ${MAX_FILE_SIZE_MB} МБ)`
-          );
-          continue;
-        }
-        validFiles.push(file);
-      }
-
-      if (validFiles.length === 0) return;
-
-      // const maxElementsPerScene = user?.quota?.max_elements_per_scene;
-      // if (typeof maxElementsPerScene !== "number") {
-      //   toast.info("Проверяю лимиты аккаунта, повторите загрузку через секунду");
-      //   return;
-      // }
-      // const remainingSlots =
-      //   Math.max(0, maxElementsPerScene - elements.length);
-      // if (remainingSlots === 0) {
-      //   toast.error(`Достигнут лимит элементов в сцене (${maxElementsPerScene})`);
-      //   return;
-      // }
-      // const filesToUpload = validFiles.slice(0, remainingSlots);
-      // if (filesToUpload.length < validFiles.length) {
-      //   toast.info(
-      //     `Лимит сцены: загружаю ${filesToUpload.length} из ${validFiles.length}`
-      //   );
-      // }
-      const filesToUpload = validFiles;
-
-      enqueueUploads(scene.id, filesToUpload);
-    },
-    [scene, enqueueUploads]
-  );
-
-  // Dropzone setup
-  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
-    onDrop: handleFileDrop,
-    accept: {
-      "image/*": [".jpg", ".jpeg", ".png", ".webp", ".gif"],
-      "video/*": [".mp4", ".webm", ".mov"],
-    },
-    noClick: true,
-    noKeyboard: true,
-  });
-
-  // Empty state upload handler
-  const handleUploadClick = useCallback(() => {
-    open();
-  }, [open]);
-
   // Card callbacks
   const cardCallbacks = useMemo(
     () => ({
@@ -195,10 +127,7 @@ export function ElementGrid({ className, onRequestDelete }: ElementGridProps) {
   if (isLoading) {
     return (
       <div
-        className={cn(
-          "element-grid",
-          className
-        )}
+        className={cn("element-grid", className)}
         style={{
           "--card-min-size": GRID_DENSITY_CONFIG[density].minSize,
           "--grid-gap": GRID_DENSITY_CONFIG[density].gap,
@@ -220,36 +149,25 @@ export function ElementGrid({ className, onRequestDelete }: ElementGridProps) {
     );
   }
 
-  // Empty state
-  if (filteredElements.length === 0 && !isLoading) {
+  // Empty state is now handled by SceneWorkspace
+  if (filteredElements.length === 0) {
     return (
-      <div className={cn("relative", className)} {...getRootProps()}>
-        <input {...getInputProps()} />
-        <EmptyState onUploadClick={handleUploadClick} />
-        {isDragActive && (
-          <div className="absolute inset-0 z-50 border-2 border-dashed border-primary bg-primary/5 rounded-xl flex items-center justify-center">
-            <div className="flex flex-col items-center gap-3">
-              <Upload className="h-10 w-10 text-primary" />
-              <p className="text-lg font-medium">Перетащите файлы сюда</p>
-              <p className="text-sm text-muted-foreground">JPG, PNG, MP4, MOV</p>
-            </div>
-          </div>
-        )}
+      <div className={cn("element-grid", className)}>
+        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+          <p>Нет элементов, соответствующих фильтру</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div
-      className={cn("element-grid relative", className)}
-      {...getRootProps()}
+      className={cn("element-grid", className)}
       style={{
         "--card-min-size": GRID_DENSITY_CONFIG[density].minSize,
         "--grid-gap": GRID_DENSITY_CONFIG[density].gap,
       } as React.CSSProperties}
     >
-      <input {...getInputProps()} />
-
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -282,17 +200,6 @@ export function ElementGrid({ className, onRequestDelete }: ElementGridProps) {
           </div>
         </SortableContext>
       </DndContext>
-
-      {/* Drag overlay */}
-      {isDragActive && (
-        <div className="absolute inset-0 z-50 border-2 border-dashed border-primary bg-primary/5 rounded-xl flex items-center justify-center">
-          <div className="flex flex-col items-center gap-3">
-            <Upload className="h-10 w-10 text-primary" />
-            <p className="text-lg font-medium">Перетащите файлы сюда</p>
-            <p className="text-sm text-muted-foreground">JPG, PNG, MP4, MOV</p>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

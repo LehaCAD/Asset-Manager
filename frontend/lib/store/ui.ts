@@ -1,9 +1,12 @@
-/**
- * @deprecated — UI state has been distributed to domain stores:
- *   - configPanelOpen, modelSelectorOpen → useGenerationStore (lib/store/generation.ts)
- *   - lightboxElementId, selectedElementId, elementFilter → useSceneWorkspaceStore (lib/store/scene-workspace.ts)
- *
- * This file is kept temporarily. Remove once all old references are cleaned up.
- */
+import { create } from "zustand";
 
-export {};
+interface UIState {
+  // Modal open state for blocking scene dropzone
+  isElementSelectionModalOpen: boolean;
+  setElementSelectionModalOpen: (isOpen: boolean) => void;
+}
+
+export const useUIStore = create<UIState>()((set) => ({
+  isElementSelectionModalOpen: false,
+  setElementSelectionModalOpen: (isOpen) => set({ isElementSelectionModalOpen: isOpen }),
+}));

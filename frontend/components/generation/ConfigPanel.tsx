@@ -5,7 +5,6 @@ import { useGenerationStore } from "@/lib/store/generation";
 import { ModelSelector } from "@/components/generation/ModelSelector";
 import { ParametersForm } from "@/components/generation/ParametersForm";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { PanelLeftClose, PanelLeft, ChevronRight } from "lucide-react";
 
@@ -41,41 +40,48 @@ export function ConfigPanel({ className }: ConfigPanelProps) {
     }
   };
 
+  // Toggle model selector on click
+  const handleModelClick = () => {
+    if (modelSelectorOpen) {
+      closeModelSelector();
+    } else {
+      openModelSelector();
+    }
+  };
+
   const hasParameters = selectedModel && selectedModel.parameters_schema.length > 0;
 
   return (
     <div
       className={cn(
-        "relative flex flex-col border-r bg-background transition-all duration-200",
+        "relative flex flex-col border-r bg-background transition-all duration-200 h-full",
         configPanelOpen ? "w-72" : "w-12",
         className
       )}
     >
-      {/* Collapse toggle */}
-      <div className="flex items-center justify-end p-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={toggleConfigPanel}
-          className="h-8 w-8"
-          title={configPanelOpen ? "Свернуть" : "Развернуть"}
-        >
-          {configPanelOpen ? (
-            <PanelLeftClose className="h-4 w-4" />
-          ) : (
-            <PanelLeft className="h-4 w-4" />
-          )}
-        </Button>
-      </div>
-
       {configPanelOpen && (
-        <div className="flex flex-1 flex-col gap-4 p-4">
-          {/* Model selector trigger */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Модель</label>
+        <div className="flex flex-1 flex-col gap-4 p-4 overflow-y-auto">
+          {/* Model selector trigger - header with collapse button */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium px-1">Модель</label>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleConfigPanel}
+                className="h-7 w-7"
+                title="Свернуть"
+              >
+                <PanelLeftClose className="h-4 w-4" />
+              </Button>
+            </div>
             <button
-              onClick={openModelSelector}
-              className="w-full flex items-center gap-3 p-3 rounded-lg border hover:bg-accent transition-colors text-left"
+              onClick={handleModelClick}
+              className={cn(
+                "w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors",
+                "bg-muted/50 hover:bg-muted border-0",
+                modelSelectorOpen && "ring-2 ring-primary bg-primary/5"
+              )}
             >
               {selectedModel?.preview_url && (
                 <img
@@ -92,24 +98,41 @@ export function ConfigPanel({ className }: ConfigPanelProps) {
                   {selectedModel?.description}
                 </p>
               </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+              <ChevronRight 
+                className={cn(
+                  "h-4 w-4 text-muted-foreground shrink-0 transition-transform",
+                  modelSelectorOpen && "rotate-90"
+                )} 
+              />
             </button>
           </div>
 
-          {/* Parameters form */}
+          {/* Parameters form - card style */}
           {hasParameters && (
-            <>
-              <Separator />
-              <div className="space-y-4">
-                <h3 className="text-sm font-medium">Параметры</h3>
-                <ParametersForm
-                  schema={selectedModel.parameters_schema}
-                  values={parameters}
-                  onChange={setParameter}
-                />
-              </div>
-            </>
+            <div className="bg-muted/30 rounded-lg p-3 space-y-4">
+              <h3 className="text-sm font-medium px-1">Параметры</h3>
+              <ParametersForm
+                schema={selectedModel.parameters_schema}
+                values={parameters}
+                onChange={setParameter}
+              />
+            </div>
           )}
+        </div>
+      )}
+
+      {/* Collapsed state - expand button */}
+      {!configPanelOpen && (
+        <div className="flex flex-col items-center p-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleConfigPanel}
+            className="h-8 w-8"
+            title="Развернуть"
+          >
+            <PanelLeft className="h-4 w-4" />
+          </Button>
         </div>
       )}
 
