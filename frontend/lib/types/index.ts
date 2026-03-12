@@ -346,3 +346,23 @@ export interface ApiError {
   detail?: string;
   code?: string;
 }
+
+/* ── Credits ─────────────────────────────────────────────── */
+
+export interface CreditsBalanceResponse {
+  balance: string;
+  pricing_percent: number;
+  label: string;
+}
+
+export interface CreditsEstimateRequest {
+  ai_model_id: number;
+  generation_config: Record<string, unknown>;
+}
+
+export interface CreditsEstimateResponse {
+  cost: string | null;
+  balance: string;
+  can_afford: boolean;
+  error: string | null;
+}

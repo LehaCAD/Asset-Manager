@@ -2,11 +2,12 @@
 
 import { useEffect } from "react";
 import { useGenerationStore } from "@/lib/store/generation";
+import { useCreditsStore } from "@/lib/store/credits";
 import { ModelSelector } from "@/components/generation/ModelSelector";
 import { ParametersForm } from "@/components/generation/ParametersForm";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { PanelLeftClose, PanelLeft, ChevronRight } from "lucide-react";
+import { PanelLeftClose, PanelLeft, ChevronRight, AlertCircle } from "lucide-react";
 
 interface ConfigPanelProps {
   className?: string;
@@ -26,6 +27,11 @@ export function ConfigPanel({ className }: ConfigPanelProps) {
     openModelSelector,
     closeModelSelector,
   } = useGenerationStore();
+  
+  const estimateCost = useCreditsStore((s) => s.estimateCost);
+  const estimateError = useCreditsStore((s) => s.estimateError);
+  const canAfford = useCreditsStore((s) => s.canAfford);
+  const isEstimateLoading = useCreditsStore((s) => s.isEstimateLoading);
 
   // Load models on mount if not loaded
   useEffect(() => {
@@ -116,6 +122,32 @@ export function ConfigPanel({ className }: ConfigPanelProps) {
                 values={parameters}
                 onChange={setParameter}
               />
+            </div>
+          )}
+          
+          {/* Стоимость генерации */}
+          {selectedModel && (
+            <div className="rounded-lg p-3 space-y-2">
+              {isEstimateLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>Расчет стоимости...</span>
+                </div>
+              ) : estimateError ? (
+                <div className="flex items-start gap-2 text-sm text-amber-600">
+                  <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                  <span>{estimateError}</span>
+                </div>
+              ) : estimateCost ? (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Стоимость</span>
+                  <span className={cn(
+                    "font-medium",
+                    canAfford ? "text-green-600" : "text-destructive"
+                  )}>
+                    {parseFloat(estimateCost).toFixed(0)} ₽
+                  </span>
+                </div>
+              ) : null}
             </div>
           )}
         </div>

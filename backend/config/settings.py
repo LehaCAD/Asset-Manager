@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'apps.elements',
     'apps.ai_providers',
     'apps.sharing',
+    'apps.credits',
 ]
 
 MIDDLEWARE = [

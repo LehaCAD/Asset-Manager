@@ -2,6 +2,7 @@
 
 import { useCallback, useState, useRef, useLayoutEffect, useMemo } from "react";
 import { useGenerationStore, ImageFileEntry } from "@/lib/store/generation";
+import { useCreditsStore } from "@/lib/store/credits";
 import { ElementSelectionModal } from "@/components/element/ElementSelectionModal";
 import { PromptThumbnailPopup } from "./PromptThumbnailPopup";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,10 @@ export function PromptBar({ projectId, sceneId, className }: PromptBarProps) {
     generate,
     canGenerate,
   } = useGenerationStore();
+  
+  const canAfford = useCreditsStore((s) => s.canAfford);
+  const estimateError = useCreditsStore((s) => s.estimateError);
+  const isEstimateLoading = useCreditsStore((s) => s.isEstimateLoading);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -312,7 +317,7 @@ export function PromptBar({ projectId, sceneId, className }: PromptBarProps) {
           <div className="flex justify-end">
             <Button
               onClick={handleGenerate}
-              disabled={!canGenerate() || isGenerating}
+              disabled={!canGenerate() || isGenerating || isEstimateLoading || !!estimateError || !canAfford}
               className="h-10"
             >
               {isGenerating ? (

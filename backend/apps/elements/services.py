@@ -3,6 +3,7 @@
 """
 from typing import Optional, List, Dict, Any
 import re
+from apps.ai_providers.models import AIModel
 from apps.scenes.models import Scene
 from .models import Element
 
@@ -74,6 +75,32 @@ def collect_unresolved_placeholders(value: Any) -> List[str]:
 
     walk(value)
     return placeholders
+
+
+def build_generation_context(
+    ai_model: AIModel,
+    *,
+    prompt: str,
+    generation_config: Dict[str, Any] | None = None,
+    callback_url: str | None = None
+) -> Dict[str, Any]:
+    context: Dict[str, Any] = {
+        'prompt': prompt or '',
+        'model': ai_model.name,
+    }
+
+    if generation_config:
+        context.update(generation_config)
+
+    if callback_url:
+        context['callback_url'] = callback_url
+
+    for binding in ai_model.parameter_bindings.select_related('canonical_parameter').all():
+        canonical_code = binding.canonical_parameter.code
+        if canonical_code in context and binding.placeholder not in context:
+            context[binding.placeholder] = context[canonical_code]
+
+    return context
 
 
 def create_element(

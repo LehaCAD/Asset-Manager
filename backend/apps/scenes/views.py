@@ -1,8 +1,15 @@
+from decimal import Decimal
+from uuid import uuid4
+
 from django.db import transaction
 from rest_framework import viewsets, permissions, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.decorators import action
+
+from apps.credits.models import CreditsTransaction
+from apps.credits.services import CreditsService
+
 from .models import Scene
 from .serializers import SceneSerializer, ReorderSerializer
 from .services import reorder_scenes
@@ -239,6 +246,23 @@ class SceneViewSet(viewsets.ModelViewSet):
             source_type = Element.SOURCE_GENERATED
         
         try:
+            # Проверяем и списываем средства ДО создания элемента
+            operation_key = uuid4().hex
+            element = None
+            credits_service = CreditsService()
+            debit_result = credits_service.debit_for_generation(
+                user=request.user,
+                ai_model=ai_model,
+                generation_config=generation_config,
+                metadata={"operation_key": operation_key},
+            )
+            
+            if not debit_result.ok:
+                return Response(
+                    {'error': debit_result.error or 'Не удалось списать средства для генерации'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
             # Создание Element с атомарной проверкой лимита
             from apps.elements.serializers import ElementSerializer
             
@@ -265,6 +289,16 @@ class SceneViewSet(viewsets.ModelViewSet):
                 serializer = ElementSerializer(data=element_data)
                 serializer.is_valid(raise_exception=True)
                 element = serializer.save()
+                
+                # Обновляем элемент ссылкой на транзакцию списания для возможного возврата
+                # (сохраняем сумму в метаданных элемента для refund)
+                if debit_result.cost:
+                    element.generation_config = {
+                        **element.generation_config,
+                        '_debit_amount': str(debit_result.cost),
+                        '_debit_transaction': True,
+                    }
+                    element.save(update_fields=['generation_config'])
             
             # Запускаем асинхронную генерацию
             from apps.elements.tasks import start_generation
@@ -276,6 +310,17 @@ class SceneViewSet(viewsets.ModelViewSet):
             )
         
         except Exception as e:
+            if 'debit_result' in locals() and debit_result.ok and debit_result.cost is not None:
+                credits_service.refund_for_generation(
+                    user=request.user,
+                    amount=debit_result.cost,
+                    element=element,
+                    reason=CreditsTransaction.REASON_GENERATION_REFUND,
+                    metadata={
+                        "source": "generation_setup_failure",
+                        "operation_key": operation_key,
+                    },
+                )
             return Response(
                 {'error': f'Failed to start generation: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR

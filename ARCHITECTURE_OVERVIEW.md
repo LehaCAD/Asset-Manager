@@ -97,3 +97,13 @@ User 1──1 UserQuota
 | `apps/users/`           | **User**, **UserQuota**  |
 | `apps/sharing/`         | **SharedLink**, **Comment** |
 | `apps/ai_providers/`    | **AIProvider**, **AIModel** |
+## AI Model Admin Redesign
+
+`AIModel` remains the central entity for administration and runtime delivery, but authoring is now normalized:
+
+- `CanonicalParameter` stores reusable semantic parameter definitions.
+- `ModelParameterBinding` links model placeholders to canonical parameters and carries per-model overrides.
+- `ModelPricingConfig` stores normalized pricing configuration.
+- Runtime consumers still receive compiled `parameters_schema` and `pricing_schema` from `AIModel` for backward compatibility.
+
+This keeps frontend/runtime compatibility while removing manual synchronization between request template, UI parameters, and pricing.

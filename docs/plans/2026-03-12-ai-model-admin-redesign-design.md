@@ -1,5 +1,12 @@
 # AI Model Admin Redesign Design
 
+## Implementation Status
+
+- Contract boundary between legacy and compiled runtime artifacts is implemented.
+- Normalized parameter, binding, pricing, compiler, validator, admin workflow, and backfill layers are implemented.
+- Runtime compatibility for compiled `parameters_schema` and compiled pricing is implemented.
+- Remaining blocker is full-suite verification of `apps.scenes.test_api`, which is currently impeded by test database runner state outside the AI admin redesign logic.
+
 **Дата:** 2026-03-12
 
 **Проблема**

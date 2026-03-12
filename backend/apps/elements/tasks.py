@@ -8,8 +8,10 @@ import requests
 import logging
 from django.conf import settings
 from .models import Element
-from .services import substitute_variables, collect_unresolved_placeholders
+from .services import substitute_variables, collect_unresolved_placeholders, build_generation_context
 import os
+from decimal import Decimal
+
 from apps.scenes.s3_utils import (
     generate_video_thumbnail_from_path,
     upload_staging_to_s3,
@@ -20,6 +22,9 @@ from apps.common.generation import (
     finalize_generation_success,
     is_public_callback_url,
 )
+from apps.credits.models import CreditsTransaction
+from apps.credits.services import CreditsService
+from apps.ai_providers.validators import validate_model_admin_config
 
 logger = logging.getLogger(__name__)
 
@@ -126,21 +131,21 @@ def start_generation(self, element_id: int) -> dict:
         provider = ai_model.provider
         
         # Формируем context для подстановки переменных
-        context = {
-            'prompt': element.prompt_text or '',
-            'model': ai_model.name,
-        }
-
         callback_base = settings.BACKEND_BASE_URL
+        callback_url = None
         if is_public_callback_url(callback_base):
             callback_url = f"{callback_base}/api/ai/callback/"
             if settings.KIE_CALLBACK_TOKEN:
                 callback_url = f"{callback_url}?token={settings.KIE_CALLBACK_TOKEN}"
-            context['callback_url'] = callback_url
         
         # Добавляем параметры из generation_config (единственный источник input_urls и др.)
-        if element.generation_config:
-            context.update(element.generation_config)
+        validate_model_admin_config(ai_model)
+        context = build_generation_context(
+            ai_model,
+            prompt=element.prompt_text or '',
+            generation_config=element.generation_config,
+            callback_url=callback_url,
+        )
         # input_urls опционален для image-моделей (text-to-image): если не передан — пустой список
         if 'input_urls' not in context:
             context['input_urls'] = []
@@ -230,11 +235,13 @@ def start_generation(self, element_id: int) -> dict:
         if isinstance(e, (requests.RequestException, requests.Timeout)):
             raise self.retry(exc=e, countdown=60)
 
-        # Критическая ошибка — переводим в FAILED и уведомляем фронтенд
+        # Критическая ошибка — переводим в FAILED, делаем refund и уведомляем фронтенд
         try:
+            element = Element.objects.get(id=element_id)
+            # Возврат средств при ошибке провайдера
+            _refund_for_failure(element)
             applied = finalize_generation_failure(element_id=element_id, error_message=str(e))
             if applied:
-                element = Element.objects.get(id=element_id)
                 notify_element_status(element, 'FAILED', error_message=str(e))
         except Element.DoesNotExist:
             pass
@@ -307,6 +314,14 @@ def check_generation_status(self, element_id: int) -> dict:
         elif state == 'failed':
             # Генерация failed
             fail_msg = data.get('failMsg', 'Unknown error')
+            
+            try:
+                element = Element.objects.get(id=element_id)
+                # Возврат средств при ошибке провайдера
+                _refund_for_failure(element, reason=fail_msg)
+            except Element.DoesNotExist:
+                pass
+            
             applied = finalize_generation_failure(element_id=element_id, error_message=fail_msg)
             if applied:
                 updated_element = Element.objects.get(id=element_id)
@@ -473,3 +488,47 @@ def generate_upload_thumbnail(self, element_id: int) -> dict:
                 _os.unlink(tmp_path)
         except Exception:
             pass
+
+
+def _refund_for_failure(element: Element, reason: str = "provider_error") -> None:
+    """
+    Выполнить возврат средств за генерацию при ошибке провайдера.
+    
+    Идемпотентна: повторный вызов не создаст двойной refund.
+    """
+    # Проверяем, что была операция списания
+    generation_config = element.generation_config or {}
+    debit_amount_str = generation_config.get('_debit_amount')
+    
+    if not debit_amount_str:
+        # Не удалось определить сумму списания — не делаем refund
+        logger.warning("Не удалось определить сумму списания для Element #%s", element.id)
+        return
+    
+    try:
+        amount = Decimal(debit_amount_str)
+    except Exception:
+        logger.error("Некорректная сумма списания '%s' для Element #%s", debit_amount_str, element.id)
+        return
+    
+    # Получаем пользователя через сцену и проект
+    user = element.scene.project.user
+    
+    # Выполняем refund
+    credits_service = CreditsService()
+    refund_result = credits_service.refund_for_generation(
+        user=user,
+        amount=amount,
+        element=element,
+        reason=CreditsTransaction.REASON_REFUND_PROVIDER_ERROR,
+        metadata={
+            "source": "provider_failure",
+            "reason": reason,
+            "original_debit": debit_amount_str,
+        }
+    )
+    
+    if refund_result.refunded:
+        logger.info("Возврат средств выполнен для Element #%s: %s", element.id, amount)
+    else:
+        logger.info("Возврат средств пропущен (уже выполнен) для Element #%s", element.id)

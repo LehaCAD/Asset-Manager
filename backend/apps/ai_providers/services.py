@@ -2,7 +2,10 @@
 Бизнес-логика для работы с AI провайдерами и моделями.
 """
 from typing import List, Optional, Dict, Any
+
+from .compiler import compile_parameters_schema, compile_pricing_payload, extract_placeholders, match_placeholder_to_canonical
 from .models import AIProvider, AIModel
+from .validators import validate_model_admin_config
 
 
 def create_provider(
@@ -38,7 +41,7 @@ def create_model(
     model_type: str,
     api_endpoint: str,
     request_schema: Optional[Dict[str, Any]] = None,
-    parameters_schema: Optional[Dict[str, Any]] = None,
+    parameters_schema: Optional[Any] = None,
     is_active: bool = True
 ) -> AIModel:
     """
@@ -62,7 +65,7 @@ def create_model(
         model_type=model_type,
         api_endpoint=api_endpoint,
         request_schema=request_schema or {},
-        parameters_schema=parameters_schema or {},
+        parameters_schema=parameters_schema if parameters_schema is not None else {},
         is_active=is_active
     )
     return model
@@ -149,3 +152,18 @@ def build_request_from_schema(
             return obj
     
     return replace_placeholders(model.request_schema, parameters)
+
+
+__all__ = [
+    'build_request_from_schema',
+    'compile_parameters_schema',
+    'compile_pricing_payload',
+    'create_model',
+    'create_provider',
+    'extract_placeholders',
+    'get_active_models',
+    'get_active_providers',
+    'get_provider_models',
+    'match_placeholder_to_canonical',
+    'validate_model_admin_config',
+]

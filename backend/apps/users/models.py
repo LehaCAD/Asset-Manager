@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.db.models.signals import post_save
@@ -9,6 +11,18 @@ class User(AbstractUser):
     # Можешь добавить свои поля позже
     # phone = models.CharField(max_length=20, blank=True)
     # avatar = models.ImageField(upload_to='avatars/', blank=True)
+    
+    balance = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        verbose_name="Баланс"
+    )
+    pricing_percent = models.PositiveIntegerField(
+        default=100,
+        verbose_name="Процент цены",
+        help_text="100 = по себестоимости, 80 = скидка 20%, 130 = наценка 30%"
+    )
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

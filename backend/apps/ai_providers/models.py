@@ -55,6 +55,10 @@ class AIModel(models.Model):
         (MODEL_TYPE_VIDEO, 'Видео'),
     ]
     
+    PARAMETERS_SCHEMA_SOURCE_EMPTY = 'empty'
+    PARAMETERS_SCHEMA_SOURCE_LEGACY = 'legacy'
+    PARAMETERS_SCHEMA_SOURCE_COMPILED = 'compiled'
+
     provider = models.ForeignKey(
         AIProvider,
         on_delete=models.CASCADE,
@@ -112,6 +116,12 @@ class AIModel(models.Model):
         help_text='Описание слотов изображений для промпт-бара. '
                   'Пример: [{"key": "style_ref", "label": "Style Ref", "min": 0, "max": 4, "required": false}]'
     )
+    pricing_schema = models.JSONField(
+        default=dict,
+        blank=False,
+        verbose_name="Схема ценообразования",
+        help_text='Либо {"fixed_cost": "5.00"}, либо {"cost_params": ["resolution", "duration"], "costs": {"720p|5": "3.00"}}'
+    )
     is_active = models.BooleanField(
         default=True,
         verbose_name='Активна',
@@ -140,3 +150,125 @@ class AIModel(models.Model):
         base = self.provider.base_url.rstrip('/')
         endpoint = self.api_endpoint.lstrip('/')
         return f'{base}/{endpoint}'
+
+    def get_parameters_schema_source(self) -> str:
+        """
+        Dict payloads remain the legacy authoring format.
+        List payloads are treated as compiled runtime artifacts for compatibility.
+        """
+        if isinstance(self.parameters_schema, list):
+            return self.PARAMETERS_SCHEMA_SOURCE_COMPILED
+        if isinstance(self.parameters_schema, dict) and self.parameters_schema:
+            return self.PARAMETERS_SCHEMA_SOURCE_LEGACY
+        return self.PARAMETERS_SCHEMA_SOURCE_EMPTY
+
+    def has_legacy_parameters_schema(self) -> bool:
+        return self.get_parameters_schema_source() == self.PARAMETERS_SCHEMA_SOURCE_LEGACY
+
+    def has_compiled_parameters_schema(self) -> bool:
+        return self.get_parameters_schema_source() == self.PARAMETERS_SCHEMA_SOURCE_COMPILED
+
+    def get_runtime_parameters_schema(self):
+        if self.parameter_bindings.exists():
+            from .compiler import compile_parameters_schema
+
+            return compile_parameters_schema(self)
+        return self.parameters_schema
+
+    def get_runtime_pricing_schema(self):
+        if hasattr(self, 'pricing_config'):
+            from .compiler import compile_pricing_payload
+
+            return compile_pricing_payload(self)
+        return self.pricing_schema
+
+
+class CanonicalParameter(models.Model):
+    VALUE_TYPE_STRING = 'string'
+    VALUE_TYPE_ENUM = 'enum'
+    VALUE_TYPE_INTEGER = 'integer'
+    VALUE_TYPE_DECIMAL = 'decimal'
+    VALUE_TYPE_BOOLEAN = 'boolean'
+
+    VALUE_TYPE_CHOICES = [
+        (VALUE_TYPE_STRING, 'String'),
+        (VALUE_TYPE_ENUM, 'Enum'),
+        (VALUE_TYPE_INTEGER, 'Integer'),
+        (VALUE_TYPE_DECIMAL, 'Decimal'),
+        (VALUE_TYPE_BOOLEAN, 'Boolean'),
+    ]
+
+    code = models.CharField(max_length=100, unique=True)
+    ui_semantic = models.CharField(max_length=100)
+    value_type = models.CharField(max_length=20, choices=VALUE_TYPE_CHOICES)
+    default_ui_control = models.CharField(max_length=100, blank=True, default='')
+    aliases = models.JSONField(default=list, blank=True)
+    base_options = models.JSONField(default=list, blank=True)
+    config = models.JSONField(default=dict, blank=True)
+    can_participate_in_pricing = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['code']
+
+    def __str__(self) -> str:
+        return self.code
+
+
+class ModelParameterBinding(models.Model):
+    ai_model = models.ForeignKey(
+        AIModel,
+        on_delete=models.CASCADE,
+        related_name='parameter_bindings',
+    )
+    canonical_parameter = models.ForeignKey(
+        CanonicalParameter,
+        on_delete=models.CASCADE,
+        related_name='model_bindings',
+    )
+    placeholder = models.CharField(max_length=100)
+    request_path = models.CharField(max_length=255, blank=True, default='')
+    label_override = models.CharField(max_length=255, blank=True, default='')
+    default_override = models.JSONField(default=dict, blank=True)
+    options_override = models.JSONField(default=list, blank=True)
+    is_visible = models.BooleanField(default=True)
+    is_advanced = models.BooleanField(default=False)
+    sort_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['sort_order', 'id']
+        unique_together = [
+            ('ai_model', 'placeholder'),
+            ('ai_model', 'canonical_parameter'),
+        ]
+
+    def __str__(self) -> str:
+        return f'{self.ai_model_id}:{self.placeholder}'
+
+
+class ModelPricingConfig(models.Model):
+    MODE_FIXED = 'fixed'
+    MODE_LOOKUP = 'lookup'
+
+    MODE_CHOICES = [
+        (MODE_FIXED, 'Fixed'),
+        (MODE_LOOKUP, 'Lookup'),
+    ]
+
+    ai_model = models.OneToOneField(
+        AIModel,
+        on_delete=models.CASCADE,
+        related_name='pricing_config',
+    )
+    mode = models.CharField(max_length=20, choices=MODE_CHOICES, default=MODE_FIXED)
+    dimensions = models.JSONField(default=list, blank=True)
+    raw_lookup = models.JSONField(default=dict, blank=True)
+    compiled_payload = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return f'{self.ai_model_id}:{self.mode}'

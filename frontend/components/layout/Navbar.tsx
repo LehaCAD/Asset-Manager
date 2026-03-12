@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LogOut, User, Clapperboard } from "lucide-react";
@@ -14,11 +15,22 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "./ThemeToggle";
 import { useAuthStore } from "@/lib/store/auth";
+import { useCreditsStore } from "@/lib/store/credits";
 
 export function Navbar() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const router = useRouter();
+  
+  const balance = useCreditsStore((s) => s.balance);
+  const loadBalance = useCreditsStore((s) => s.loadBalance);
+  
+  // Загружаем баланс при монтировании
+  useEffect(() => {
+    if (user) {
+      loadBalance();
+    }
+  }, [user, loadBalance]);
 
   function handleLogout() {
     logout();
@@ -45,6 +57,15 @@ export function Navbar() {
 
         {/* Right side */}
         <div className="flex items-center gap-1 shrink-0">
+          {/* Баланс */}
+          {user && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/50 text-sm font-medium">
+              <span className="text-muted-foreground">
+                {parseFloat(balance).toFixed(0)} ₽
+              </span>
+            </div>
+          )}
+          
           <ThemeToggle />
 
           <DropdownMenu>

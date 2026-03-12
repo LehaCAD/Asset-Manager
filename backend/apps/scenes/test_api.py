@@ -1,3 +1,6 @@
+from decimal import Decimal
+
+from django.test import override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -6,6 +9,8 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from apps.projects.models import Project
 from apps.scenes.models import Scene
 from apps.elements.models import Element
+from apps.ai_providers.models import AIModel, AIProvider, CanonicalParameter, ModelParameterBinding
+from apps.credits.models import CreditsTransaction
 from unittest.mock import patch
 
 User = get_user_model()
@@ -66,7 +71,7 @@ class SceneAPITest(APITestCase):
     
     def test_list_scenes_unauthorized(self):
         response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
     
     def test_list_scenes_authenticated(self):
         self.client.force_authenticate(user=self.user1)
@@ -190,9 +195,10 @@ class SceneAPITest(APITestCase):
         
         self.assertEqual(response.data['project_name'], 'Проект пользователя 1')
     
-    @patch('apps.scenes.views.upload_file_to_s3')
-    def test_upload_file(self, mock_upload):
-        mock_upload.return_value = ('https://s3.example.com/uploads/test.jpg', 'test.jpg')
+    @patch('apps.elements.tasks.process_uploaded_file.delay')
+    @patch('apps.scenes.views.save_to_staging')
+    def test_upload_file(self, mock_save_to_staging, mock_process_delay):
+        mock_save_to_staging.return_value = '/tmp/test-upload.jpg'
         
         self.client.force_authenticate(user=self.user1)
         url = reverse('scene-upload', kwargs={'pk': self.scene1.pk})
@@ -211,15 +217,22 @@ class SceneAPITest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['scene'], self.scene1.id)
         self.assertEqual(response.data['element_type'], Element.ELEMENT_TYPE_IMAGE)
-        self.assertEqual(response.data['file_url'], 'https://s3.example.com/uploads/test.jpg')
+        self.assertEqual(response.data['file_url'], '')
         self.assertEqual(response.data['prompt_text'], 'Test prompt')
         self.assertTrue(response.data['is_favorite'])
+        self.assertEqual(response.data['status'], Element.STATUS_PROCESSING)
+        self.assertEqual(response.data['source_type'], Element.SOURCE_UPLOADED)
         
-        self.assertTrue(Element.objects.filter(scene=self.scene1, file_url='https://s3.example.com/uploads/test.jpg').exists())
+        element = Element.objects.get(scene=self.scene1, prompt_text='Test prompt')
+        self.assertEqual(element.file_url, '')
+        self.assertEqual(element.status, Element.STATUS_PROCESSING)
+        mock_save_to_staging.assert_called_once()
+        mock_process_delay.assert_called_once_with(element.id, '/tmp/test-upload.jpg')
     
-    @patch('apps.scenes.views.upload_file_to_s3')
-    def test_upload_video_file(self, mock_upload):
-        mock_upload.return_value = ('https://s3.example.com/uploads/test.mp4', 'test.mp4')
+    @patch('apps.elements.tasks.process_uploaded_file.delay')
+    @patch('apps.scenes.views.save_to_staging')
+    def test_upload_video_file(self, mock_save_to_staging, mock_process_delay):
+        mock_save_to_staging.return_value = '/tmp/test-upload.mp4'
         
         self.client.force_authenticate(user=self.user1)
         url = reverse('scene-upload', kwargs={'pk': self.scene1.pk})
@@ -230,6 +243,12 @@ class SceneAPITest(APITestCase):
         
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['element_type'], Element.ELEMENT_TYPE_VIDEO)
+        self.assertEqual(response.data['status'], Element.STATUS_PROCESSING)
+        self.assertEqual(response.data['source_type'], Element.SOURCE_UPLOADED)
+
+        element = Element.objects.get(scene=self.scene1, element_type=Element.ELEMENT_TYPE_VIDEO)
+        mock_save_to_staging.assert_called_once()
+        mock_process_delay.assert_called_once_with(element.id, '/tmp/test-upload.mp4')
     
     def test_upload_without_file(self):
         self.client.force_authenticate(user=self.user1)
@@ -249,3 +268,87 @@ class SceneAPITest(APITestCase):
         response = self.client.post(url, {'file': file}, format='multipart')
         
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class SceneGenerateDebitRollbackTests(APITestCase):
+    @override_settings(DEBUG=True)
+    @patch("apps.elements.serializers.ElementSerializer.save", side_effect=RuntimeError("boom"))
+    def test_refunds_if_element_creation_fails_after_debit(self, _save):
+        user = User.objects.create_user(
+            username="billing-user",
+            password="x",
+            balance=Decimal("100.00"),
+        )
+        project = Project.objects.create(user=user, name="Project")
+        scene = Scene.objects.create(project=project, name="Scene", order_index=0)
+        provider = AIProvider.objects.create(
+            name="Provider",
+            base_url="https://example.com",
+            is_active=True,
+        )
+        model = AIModel.objects.create(
+            provider=provider,
+            name="Model",
+            model_type=AIModel.MODEL_TYPE_IMAGE,
+            api_endpoint="/generate",
+            pricing_schema={"fixed_cost": "10.00"},
+            is_active=True,
+        )
+
+        self.client.force_authenticate(user=user)
+        response = self.client.post(
+            reverse("scene-generate", args=[scene.id]),
+            {
+                "prompt": "test",
+                "ai_model_id": model.id,
+                "generation_config": {"width": 512, "height": 512},
+            },
+            format="json",
+        )
+
+        user.refresh_from_db()
+        assert response.status_code == 500
+        assert user.balance == Decimal("100.00")
+        assert CreditsTransaction.objects.filter(user=user).count() == 2
+
+
+class AIModelRuntimeConfigApiTests(APITestCase):
+    def test_ai_model_list_returns_compiled_parameters_schema(self):
+        user = User.objects.create_user(username="runtime-user", password="x")
+        provider = AIProvider.objects.create(
+            name="Provider",
+            base_url="https://example.com",
+            is_active=True,
+        )
+        model = AIModel.objects.create(
+            provider=provider,
+            name="Compiled Model",
+            model_type=AIModel.MODEL_TYPE_VIDEO,
+            api_endpoint="/generate",
+            request_schema={"duration": "{{videoDuration}}"},
+            parameters_schema={"legacy": {"type": "ignore-me"}},
+            is_active=True,
+        )
+        duration = CanonicalParameter.objects.create(
+            code="duration",
+            ui_semantic="duration",
+            value_type="enum",
+            aliases=["videoDuration"],
+            default_ui_control="select",
+            base_options=[{"value": 5, "label": "5 sec"}],
+        )
+        ModelParameterBinding.objects.create(
+            ai_model=model,
+            canonical_parameter=duration,
+            placeholder="videoDuration",
+            request_path="duration",
+            default_override=5,
+            sort_order=10,
+        )
+
+        self.client.force_authenticate(user=user)
+        response = self.client.get(reverse("ai-model-list"))
+
+        assert response.status_code == 200
+        assert response.data[0]["parameters_schema"][0]["request_key"] == "videoDuration"
+        assert response.data[0]["parameters_schema"][0]["ui_semantic"] == "duration"

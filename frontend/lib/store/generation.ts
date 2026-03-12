@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { aiModelsApi } from "@/lib/api/ai-models";
 import { scenesApi } from "@/lib/api/scenes";
 import { useSceneWorkspaceStore } from "@/lib/store/scene-workspace";
+import { useCreditsStore } from "@/lib/store/credits";
 import type {
   AIModel,
   GeneratePayload,
@@ -50,6 +51,9 @@ interface GenerationState {
   generate: (sceneId: number) => Promise<GenerationSubmitResult>;
   canGenerate: () => boolean;
   clearSubmitResult: () => void;
+  
+  // Internal
+  _requestEstimate: () => void;
 
   // UI actions
   toggleConfigPanel: () => void;
@@ -121,12 +125,17 @@ export const useGenerationStore = create<GenerationState>()((set, get) => ({
       imageInputs: inputs,
       modelSelectorOpen: false,
     });
+    
+    // Запрашиваем оценку стоимости для новой модели
+    get()._requestEstimate();
   },
 
   setParameter: (key, value) => {
     set((state) => ({
       parameters: { ...state.parameters, [key]: value },
     }));
+    // Перезапрашиваем оценку при изменении параметров
+    get()._requestEstimate();
   },
 
   setPrompt: (text) => {
@@ -246,6 +255,8 @@ export const useGenerationStore = create<GenerationState>()((set, get) => ({
         lastSubmitResult: result,
       });
       toast.success("Генерация запущена");
+      // Обновляем баланс после успешной генерации
+      useCreditsStore.getState().loadBalance();
       return result;
     } catch (error) {
       // Request-level fail: discard optimistic item and show error
@@ -287,7 +298,36 @@ export const useGenerationStore = create<GenerationState>()((set, get) => ({
     // Check not already generating
     if (isGenerating) return false;
 
+    // Check credits: can afford and no estimate error
+    const creditsState = useCreditsStore.getState();
+    if (creditsState.estimateError) return false;
+    if (creditsState.estimateCost !== null && !creditsState.canAfford) return false;
+
     return true;
+  },
+  
+  _requestEstimate: () => {
+    const { selectedModel, parameters, imageInputs } = get();
+    if (!selectedModel) return;
+    
+    // Формируем generation_config
+    const imageInputsMap: Record<string, string[]> = {};
+    for (const input of imageInputs) {
+      if (input.files.length > 0) {
+        imageInputsMap[input.key] = input.files.map((f) => f.apiUrl);
+      }
+    }
+    
+    const generationConfig = {
+      ...parameters,
+      ...imageInputsMap,
+    };
+    
+    // Запрашиваем оценку стоимости
+    useCreditsStore.getState().estimateGeneration({
+      ai_model_id: selectedModel.id,
+      generation_config: generationConfig,
+    });
   },
 
   clearSubmitResult: () => {

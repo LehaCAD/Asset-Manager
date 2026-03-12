@@ -19,6 +19,10 @@ class AIModelSerializer(serializers.ModelSerializer):
     но НЕ отдает request_schema и api_endpoint (внутренние детали).
     """
     provider_name = serializers.CharField(source='provider.name', read_only=True)
+    parameters_schema = serializers.SerializerMethodField()
+
+    def get_parameters_schema(self, obj):
+        return obj.get_runtime_parameters_schema()
 
     class Meta:
         model = AIModel

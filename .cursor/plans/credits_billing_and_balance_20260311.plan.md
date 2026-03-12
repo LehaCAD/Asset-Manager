@@ -4,19 +4,19 @@ overview: Исполняемый план по внедрению домена c
 todos:
   - id: credits-0-contracts
     content: Фаза 0. Зафиксировать контракты credits, pricing schema, API responses и архитектурные правила.
-    status: pending
+    status: done
   - id: credits-1-backend
     content: Фаза 1. Реализовать backend credits domain, persistence, estimate API и transaction journal.
-    status: pending
+    status: done
   - id: credits-2-admin
     content: Фаза 2. Добавить в админку управление балансом пользователя и pricing schema моделей.
-    status: pending
+    status: done
   - id: credits-3-frontend
     content: Фаза 3. Реализовать frontend credits store, Navbar balance и отображение стоимости в ConfigPanel.
-    status: pending
+    status: done
   - id: credits-4-integration
     content: Фаза 4. Встроить списание и возвраты в generate flow и заблокировать PromptBar при невозможности генерации.
-    status: pending
+    status: done
 isProject: false
 ---
 
@@ -128,6 +128,13 @@ Legend:
 - `refund` идемпотентен для одной генерации;
 - UI-ошибки выводятся только на русском языке.
 
+### Выполнено (2026-03-12)
+
+- [x] `backend/apps/users/models.py` — добавлены поля `balance` (DecimalField) и `pricing_percent` (PositiveIntegerField)
+- [x] `backend/apps/ai_providers/models.py` — добавлено поле `pricing_schema` (JSONField)
+- [x] `frontend/lib/types/index.ts` — добавлены интерфейсы `CreditsBalanceResponse`, `CreditsEstimateRequest`, `CreditsEstimateResponse`
+- [x] `.cursor/rules/credits-billing-architecture.mdc` — архитектурные правила уже зафиксированы
+
 ## Фаза 1. Backend Credits Domain & API
 
 Цель:
@@ -151,6 +158,24 @@ Legend:
 - не дублировать ценообразование в нескольких местах;
 - не использовать `float`.
 
+### Выполнено (2026-03-12)
+
+- [x] Создан `backend/apps/credits/` с полной структурой:
+  - `models.py` — `CreditsTransaction` с REASON_CHOICES и индексами
+  - `services.py` — `CreditsService` с `estimate_generation()`, `debit_for_generation()`, `refund_for_generation()`
+  - `serializers.py` — сериализаторы для balance и estimate
+  - `views.py` — `CreditsBalanceView` (GET) и `CreditsEstimateView` (POST)
+  - `urls.py` — роуты `/api/credits/balance/` и `/api/credits/estimate/`
+  - `migrations/0001_initial.py` — миграция для CreditsTransaction
+- [x] `backend/config/settings.py` — добавлен `'apps.credits'` в `INSTALLED_APPS`
+- [x] `backend/config/urls.py` — подключен `path('api/credits/', include('apps.credits.urls'))`
+- [x] `backend/apps/users/migrations/0004_user_balance_user_pricing_percent.py` — миграция для полей User
+- [x] `backend/apps/ai_providers/migrations/0003_aimodel_pricing_schema.py` — миграция для поля AIModel
+- [x] Реализованы pricing схемы: `fixed_cost` и lookup по `cost_params`
+- [x] Идемпотентность refund по `element + reason`
+- [x] Все ошибки на русском языке
+- [x] Используется `Decimal` для денежных операций
+
 ## Фаза 2. Admin Pricing & Balance Controls
 
 Цель:
@@ -169,6 +194,19 @@ Legend:
 - не придумывать отдельный UI-конструктор формул;
 - не прятать важные денежные поля глубоко в collapse-секции;
 - не менять доменную логику credits.
+
+### Выполнено (2026-03-12)
+
+- [x] `backend/apps/users/admin.py`:
+  - `balance` и `pricing_percent` добавлены в `list_display` и `fieldsets`
+  - `CreditsTransactionInline` — inline для просмотра истории транзакций
+  - Admin actions: `topup_balance_100`, `topup_balance_500`, `topup_balance_1000`
+  - Цветовая индикация баланса и сумм транзакций
+- [x] `backend/apps/ai_providers/admin.py`:
+  - `pricing_schema` в отдельной секции с примерами JSON
+  - Явное предупреждение о запрете формул
+  - Примеры fixed pricing и lookup pricing
+- [x] Все тексты на русском языке
 
 ## Фаза 3. Frontend Credits State & UI
 
@@ -191,6 +229,19 @@ Legend:
 - не показывать баланс в `ConfigPanel`;
 - не добавлять текст возле кнопки генерации.
 
+### Выполнено (2026-03-12)
+
+- [x] `frontend/lib/api/credits.ts` — API клиент с `getBalance()` и `estimate()`
+- [x] `frontend/lib/store/credits.ts` — Zustand store с `balance`, `estimateCost`, `canAfford`, `estimateError`
+- [x] `frontend/components/layout/Navbar.tsx`:
+  - Баланс в формате `125 ₽` между ThemeToggle и аватаром
+  - Загрузка баланса при монтировании
+- [x] `frontend/components/generation/ConfigPanel.tsx`:
+  - Блок стоимости: `Стоимость: 5 ₽`
+  - Отображение ошибок (красный текст с иконкой)
+  - Состояние загрузки
+  - Цветовая индикация: зелёный если хватает средств, красный если нет
+
 ## Фаза 4. Generation Debit / Refund Integration
 
 Цель:
@@ -210,6 +261,23 @@ Legend:
 - не запускать генерацию при ошибке estimate;
 - не делать двойной refund;
 - не блокировать кнопку по локально вычисленной цене.
+
+### Выполнено (2026-03-12)
+
+- [x] `backend/apps/scenes/views.py`:
+  - Вызов `CreditsService.debit_for_generation()` ДО создания Element
+  - Сохранение суммы списания в `generation_config._debit_amount` для refund
+  - Возврат ошибки 400 если debit неуспешен
+- [x] `backend/apps/elements/tasks.py`:
+  - `_refund_for_failure()` — идемпотентная функция refund
+  - Вызов refund в `start_generation()` при terminal failure
+  - Вызов refund в `check_generation_status()` при `state == 'failed'`
+- [x] `frontend/lib/store/generation.ts`:
+  - Вызов `_requestEstimate()` при смене модели и параметров
+  - `canGenerate()` учитывает `canAfford` и `estimateError`
+  - Обновление баланса после успешной генерации
+- [x] `frontend/components/generation/PromptBar.tsx`:
+  - Кнопка "Создать" блокируется если `!canAfford` или есть `estimateError`
 
 ## Acceptance Criteria для всего плана
 
