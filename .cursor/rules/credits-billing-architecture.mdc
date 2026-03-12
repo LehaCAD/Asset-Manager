@@ -1,0 +1,70 @@
+---
+description: Architecture decisions for credits, pricing, debit/refund flow and credits UI placement
+globs:
+  - backend/apps/credits/**
+  - backend/apps/scenes/views.py
+  - backend/apps/elements/tasks.py
+  - backend/apps/users/models.py
+  - backend/apps/users/admin.py
+  - backend/apps/ai_providers/models.py
+  - backend/apps/ai_providers/admin.py
+  - frontend/lib/api/credits.ts
+  - frontend/lib/store/credits.ts
+  - frontend/lib/store/generation.ts
+  - frontend/components/layout/Navbar.tsx
+  - frontend/components/generation/ConfigPanel.tsx
+  - frontend/components/generation/PromptBar.tsx
+alwaysApply: false
+---
+
+# Credits Billing Architecture
+
+## Pricing Rules
+
+- Use only fixed lookup pricing.
+- Allowed pricing schema shapes:
+  - `{"fixed_cost": "5.00"}`
+  - `{"cost_params": ["resolution", "duration"], "costs": {"720p|5": "3.00"}}`
+- DO NOT implement formulas, expression parsers, `eval`, multipliers per parameter or fallback heuristics.
+- If a parameter does not affect price, do not include it in `cost_params`.
+- If `pricing_schema` is missing, empty or invalid, return the Russian support error and block generation.
+- If a parameter combination is absent from `costs`, return the Russian support error and block generation.
+
+## Money Handling
+
+- Backend money values must use `Decimal` only.
+- API responses must return money values as strings.
+- `pricing_percent` is stored as integer percent where `100` means cost price.
+- `estimate` and `generate` must call the same backend pricing logic. Never calculate price separately in frontend.
+
+## Debit / Refund Rules
+
+- Perform debit before creating a generation `Element`.
+- If debit fails, do not create `Element` and do not start Celery generation.
+- Refund is mandatory on terminal provider failure or final generation failure.
+- Refund must be idempotent for the same generation failure.
+- Every debit and refund must create a `CreditsTransaction`.
+
+## UI Placement
+
+- Show user balance in `Navbar`, to the right of `ThemeToggle` and before the user avatar.
+- Show only generation cost and reason in `ConfigPanel`.
+- Do not show balance inside `ConfigPanel`.
+- Disable the `Сгенерировать` button when estimate says generation is unavailable.
+- Do not add explanatory text beside the generate button. The explanation belongs in `ConfigPanel`.
+
+## Language Rules
+
+- All user-facing texts for credits must be in Russian.
+- Required canonical errors:
+  - `Недостаточно средств для генерации.`
+  - `Не удалось определить стоимость генерации. Обратитесь в поддержку.`
+  - `Не удалось загрузить баланс.`
+  - `Не удалось рассчитать стоимость генерации.`
+
+## Anti-patterns
+
+- Do not treat missing pricing as free generation.
+- Do not implement frontend-only guards that can diverge from backend debit logic.
+- Do not keep balance history only in logs; use `CreditsTransaction`.
+- Do not use admin-only shadow fields for pricing that differ from `pricing_schema`.
