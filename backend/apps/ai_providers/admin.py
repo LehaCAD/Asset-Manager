@@ -2,8 +2,8 @@ from django.contrib import admin
 from django.utils.html import format_html
 
 from .admin_forms import AIModelAdminForm
-from .admin_inlines import ModelParameterBindingInline, ModelPricingConfigInline
-from .models import AIProvider, AIModel
+from .admin_workflow import FIELD_TYPE_PRESETS, ROLE_CHOICES, UI_SEMANTIC_PRESETS, build_admin_workflow_context
+from .models import AIProvider, AIModel, CanonicalParameter
 
 
 @admin.register(AIProvider)
@@ -38,7 +38,8 @@ class AIProviderAdmin(admin.ModelAdmin):
 @admin.register(AIModel)
 class AIModelAdmin(admin.ModelAdmin):
     form = AIModelAdminForm
-    inlines = [ModelParameterBindingInline, ModelPricingConfigInline]
+    inlines = []
+    change_form_template = 'admin/ai_providers/aimodel/change_form.html'
     list_display = ('name', 'provider', 'model_type', 'is_active', 'api_endpoint_display', 'created_at')
     list_filter = ('model_type', 'is_active', 'provider')
     search_fields = ('name', 'api_endpoint')
@@ -93,7 +94,7 @@ class AIModelAdmin(admin.ModelAdmin):
                 'description': 'Runtime payload compiled from normalized records.',
             },
         ),
-        ('Timestamps', {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)}),
+        ('Временные метки', {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)}),
     )
 
     def api_endpoint_display(self, obj):
@@ -117,3 +118,65 @@ class AIModelAdmin(admin.ModelAdmin):
         return obj.get_runtime_pricing_schema()
 
     compiled_pricing_preview.short_description = 'Compiled pricing'
+
+    class Media:
+        css = {
+            'all': ('admin/ai_providers/aimodel_workflow.css',),
+        }
+        js = ('admin/ai_providers/aimodel_workflow.js',)
+
+    def get_workflow_context(self, request, obj=None):
+        common = {
+            'canonical_parameter_choices': list(
+                CanonicalParameter.objects.order_by('ui_semantic', 'code').values('code', 'ui_semantic')
+            ),
+            'ui_semantic_choices': list(UI_SEMANTIC_PRESETS.keys()),
+            'field_type_choices': list(FIELD_TYPE_PRESETS.items()),
+            'role_choices': ROLE_CHOICES,
+        }
+        if obj is None:
+            return {
+                'mapping_rows': [],
+                'pricing': {},
+                'compiled_preview': {},
+                'summary': {},
+                'pricing_dimension_choices': [],
+                **common,
+            }
+
+        context = build_admin_workflow_context(obj)
+        context['mapping_rows'] = sorted(
+            context['mapping_rows'],
+            key=lambda row: (
+                0 if row['role'] == 'param' else 1,
+                row.get('sort_index', 999),
+            ),
+        )
+        context.update(common)
+        pricing_dimensions = []
+        seen_dimension_codes = set()
+        for row in context['mapping_rows']:
+            if row['role'] != 'param':
+                continue
+            code = row['canonical_code'] or row['suggested_canonical_code'] or row['parameter_code']
+            if not code or code in seen_dimension_codes:
+                continue
+            seen_dimension_codes.add(code)
+            pricing_dimensions.append({'code': code, 'label': row['label']})
+        context['pricing_dimension_choices'] = pricing_dimensions
+        return context
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        instance = form.instance
+        if hasattr(form, '_mapping_rows') and form._mapping_rows:
+            form._save_mapping_rows(instance, form._mapping_rows)
+        if hasattr(form, '_pricing_mode'):
+            form._save_pricing_config(instance)
+
+    def render_change_form(self, request, context, add=False, change=False, form_url='', obj=None):
+        context = {
+            **context,
+            'workflow': self.get_workflow_context(request, obj=obj),
+        }
+        return super().render_change_form(request, context, add=add, change=change, form_url=form_url, obj=obj)

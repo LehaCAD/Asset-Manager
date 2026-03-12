@@ -5,6 +5,8 @@ from typing import Any
 from .compiler import PLACEHOLDER_PATTERN, compile_parameters_schema, compile_pricing_payload
 from .models import AIModel
 
+SYSTEM_PLACEHOLDERS = {'prompt', 'callback_url'}
+
 
 def _iter_placeholders_in_order(value: Any):
     if isinstance(value, dict):
@@ -31,7 +33,7 @@ def validate_model_admin_config(ai_model: AIModel) -> None:
         if placeholder in seen_placeholders:
             continue
         seen_placeholders.add(placeholder)
-        if placeholder == 'prompt':
+        if placeholder in SYSTEM_PLACEHOLDERS:
             continue
         if placeholder not in bindings:
             raise ValueError(f'Плейсхолдер "{placeholder}" не связан с каноническим параметром.')

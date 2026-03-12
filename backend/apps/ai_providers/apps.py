@@ -4,4 +4,4 @@ from django.apps import AppConfig
 class AiProvidersConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'apps.ai_providers'
-    verbose_name = 'AI Провайдеры и Модели'
+    verbose_name = 'AI провайдеры и модели'

@@ -1,0 +1,18 @@
+<div class="workflow-summary">
+  <div class="workflow-summary__item">
+    <span class="workflow-summary__value">{{ workflow.summary.placeholder_count }}</span>
+    <span class="workflow-summary__label">Найдено</span>
+  </div>
+  <div class="workflow-summary__item workflow-summary__item--ok">
+    <span class="workflow-summary__value">{{ workflow.summary.mapped_count }}</span>
+    <span class="workflow-summary__label">Настроено</span>
+  </div>
+  <div class="workflow-summary__item {% if workflow.summary.needs_attention_count %}workflow-summary__item--warn{% endif %}">
+    <span class="workflow-summary__value">{{ workflow.summary.needs_attention_count }}</span>
+    <span class="workflow-summary__label">Требует внимания</span>
+  </div>
+  <div class="workflow-summary__item">
+    <span class="workflow-summary__value">{{ workflow.summary.system_count }}</span>
+    <span class="workflow-summary__label">Системных</span>
+  </div>
+</div>

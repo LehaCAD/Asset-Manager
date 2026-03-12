@@ -1,0 +1,144 @@
+{% load i18n %}
+{% if workflow.mapping_rows %}
+
+  <p class="wf-section-intro">
+    Укажи роль каждого параметра. Для пользовательских — настрой название, тип и варианты.
+  </p>
+
+  {{ adminform.form.errors.mapping_payload }}
+  <div class="wf-compact-rows">
+    {% for row in workflow.mapping_rows %}
+      <div
+        class="wf-card"
+        data-mapping-card
+        data-placeholder="{{ row.placeholder }}"
+        data-parameter-code="{{ row.parameter_code }}"
+        data-field-type="{{ row.field_type }}"
+        data-role="{{ row.role }}"
+      >
+        <div class="wf-card__head">
+          <select class="wf-card__role-select" data-mapping-role data-placeholder="{{ row.placeholder }}">
+            {% for role_value, role_label in workflow.role_choices %}
+              <option value="{{ role_value }}" {% if row.role == role_value %}selected{% endif %}>
+                {{ role_label }}
+              </option>
+            {% endfor %}
+          </select>
+
+          <code class="wf-card__code" title="Код из шаблона запроса">{{ row.placeholder }}</code>
+
+          <div class="wf-card__identity" data-card-param-section>
+            <span class="wf-card__arrow">→</span>
+            <input
+              type="text"
+              class="wf-card__label-input"
+              value="{{ row.label }}"
+              data-mapping-label
+              data-placeholder="{{ row.placeholder }}"
+              title="Название для пользователя"
+            >
+          </div>
+
+          <div class="wf-card__type-wrap" data-card-param-section>
+            <select class="wf-card__type-select" data-mapping-field-type data-placeholder="{{ row.placeholder }}">
+              {% for field_type, meta in workflow.field_type_choices %}
+                <option value="{{ field_type }}" {% if row.field_type == field_type %}selected{% endif %}>
+                  {{ meta.label }}
+                </option>
+              {% endfor %}
+            </select>
+            {% if row.status == 'mapped' %}
+              <span class="wf-card__status wf-card__status--ok" title="Сохранено">✓</span>
+            {% elif row.status == 'suggested' %}
+              <span class="wf-card__status wf-card__status--auto" title="Авто-предложение">⟳</span>
+            {% else %}
+              <span class="wf-card__status wf-card__status--new" title="Требует настройки">●</span>
+            {% endif %}
+          </div>
+
+          <span class="wf-card__role-note" data-card-system-note>{{ row.role_description }}</span>
+        </div>
+
+        <div class="wf-card__body" data-card-param-body>
+          <div class="wf-card__chips-preview" data-options-section>
+            <div class="wf-chips" data-chips-display>
+              {% for val in row.chips.featured %}
+                <span class="wf-chip-opt wf-chip-opt--on">{{ val }}</span>
+              {% endfor %}
+              {% if row.chips.overflow_count > 0 %}
+                <span class="wf-chip-opt wf-chip-opt--other">Другое +{{ row.chips.overflow_count }}</span>
+              {% endif %}
+              {% if not row.chips.featured and not row.chips.overflow %}
+                <span class="wf-chips-empty">Добавь варианты ↓</span>
+              {% endif %}
+            </div>
+
+            <details class="wf-opts-editor">
+              <summary class="wf-opts-editor__toggle">Редактировать варианты</summary>
+              <div class="wf-opts-editor__body">
+                <div class="wf-opts-editor__grid">
+                  <div class="wf-opts-editor__col">
+                    <label class="wf-opts-editor__label">Все варианты <span class="wf-label-hint">(по одному на строку)</span></label>
+                    <textarea
+                      class="wf-opts-editor__ta"
+                      rows="4"
+                      data-mapping-all-options
+                      data-placeholder="{{ row.placeholder }}"
+                      placeholder="1K&#10;2K&#10;4K"
+                    >{{ row.all_options_text }}</textarea>
+                  </div>
+                  <div class="wf-opts-editor__col wf-opts-editor__col--narrow">
+                    <label class="wf-opts-editor__label">Кнопками первые</label>
+                    <div class="wf-opts-editor__num-row">
+                      <input
+                        type="number"
+                        class="wf-opts-editor__num"
+                        min="1"
+                        max="99"
+                        value="{{ row.featured_count|default:3 }}"
+                        data-mapping-max-visible
+                        data-placeholder="{{ row.placeholder }}"
+                      >
+                      <span class="wf-opts-editor__num-unit">шт</span>
+                    </div>
+                    <label class="wf-opts-editor__check">
+                      <input
+                        type="checkbox"
+                        data-mapping-show-other
+                        data-placeholder="{{ row.placeholder }}"
+                        {% if row.show_other_modal %}checked{% endif %}
+                      >
+                      <span>Остальные → «Другое»</span>
+                    </label>
+                  </div>
+                </div>
+                <p class="wf-opts-editor__live-hint" data-show-other-hint></p>
+              </div>
+            </details>
+          </div>
+
+          {% if row.editor_hint %}
+            <p class="wf-card__hint">{{ row.editor_hint }}</p>
+          {% endif %}
+        </div>
+
+        <select style="display:none" data-mapping-parameter-code data-placeholder="{{ row.placeholder }}">
+          <option value="{{ row.parameter_code }}"
+            {% if not workflow.canonical_parameter_choices %}selected{% endif %}
+          >{{ row.parameter_code }}</option>
+          {% for cp in workflow.canonical_parameter_choices %}
+            {% if cp.code != row.parameter_code %}
+              <option value="{{ cp.code }}">{{ cp.code }}</option>
+            {% endif %}
+          {% endfor %}
+        </select>
+      </div>
+    {% endfor %}
+  </div>
+
+{% else %}
+  <div class="wf-empty-state">
+    <div class="wf-empty-state__icon">⬆</div>
+    <p>Сохрани модель с JSON-шаблоном запроса — параметры появятся здесь.</p>
+  </div>
+{% endif %}

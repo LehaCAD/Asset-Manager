@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import type { ParameterSchemaItem } from "@/lib/types";
+import type { ParameterOption, ParameterSchemaItem } from "@/lib/types";
 import { OptionSelectorPanel } from "./OptionSelectorPanel";
 
 interface ParametersFormProps {
@@ -23,6 +23,8 @@ interface ParametersFormProps {
 export function ParametersForm({ schema, values, onChange }: ParametersFormProps) {
   const [customPanelOpen, setCustomPanelOpen] = useState(false);
   const [activeCustomParam, setActiveCustomParam] = useState<ParameterSchemaItem | null>(null);
+
+  const visibleSchema = schema.filter((param) => param.visible !== false);
 
   const handleOpenCustom = (param: ParameterSchemaItem) => {
     setActiveCustomParam(param);
@@ -41,7 +43,7 @@ export function ParametersForm({ schema, values, onChange }: ParametersFormProps
 
   return (
     <div className="space-y-4">
-      {schema.map((param) => (
+      {visibleSchema.map((param) => (
         <ParameterField
           key={param.request_key}
           param={param}
@@ -51,13 +53,12 @@ export function ParametersForm({ schema, values, onChange }: ParametersFormProps
         />
       ))}
 
-      {/* Custom option selector panel */}
       {activeCustomParam && (
         <OptionSelectorPanel
           isOpen={customPanelOpen}
           onClose={handleCloseCustom}
           title={activeCustomParam.label}
-          options={activeCustomParam.custom_options || []}
+          options={getOverflowOptions(activeCustomParam)}
           selectedValue={values[activeCustomParam.request_key]}
           onSelect={handleCustomSelect}
           requestKey={activeCustomParam.request_key}
@@ -74,21 +75,66 @@ interface ParameterFieldProps {
   onOpenCustom: (param: ParameterSchemaItem) => void;
 }
 
-function ParameterField({ param, value, onChange, onOpenCustom }: ParameterFieldProps) {
-  const { request_key, label, ui_semantic, options, custom_options, min, max, step } = param;
+function getOverflowOptions(param: ParameterSchemaItem): ParameterOption[] {
+  return param.overflow_options ?? param.custom_options ?? [];
+}
 
-  // aspect_ratio, resolution - preset buttons + optional Custom
-  if (ui_semantic === "aspect_ratio" || ui_semantic === "resolution") {
-    const hasCustomOptions = custom_options && custom_options.length > 0;
+function getFeaturedOptions(param: ParameterSchemaItem): ParameterOption[] {
+  if (param.featured_options && param.featured_options.length > 0) {
+    return param.featured_options;
+  }
+  return param.options ?? [];
+}
+
+function getEffectiveControl(param: ParameterSchemaItem): string {
+  if (param.control) {
+    return param.control;
+  }
+
+  switch (param.ui_semantic) {
+    case "toggle_group":
+      return "toggle_group";
+    case "switch":
+      return "switch";
+    case "number":
+      return "number";
+    case "aspect_ratio":
+    case "resolution":
+      return "toggle_group";
+    case "quality":
+    case "output_format":
+    case "duration":
+    case "select":
+      return "select";
+    default:
+      return "text";
+  }
+}
+
+function ParameterField({ param, value, onChange, onOpenCustom }: ParameterFieldProps) {
+  const {
+    request_key,
+    label,
+    options,
+    min,
+    max,
+    step,
+    show_other_button,
+  } = param;
+  const effectiveControl = getEffectiveControl(param);
+
+  if (effectiveControl === "toggle_group") {
     const currentValue = value as string | number | undefined;
-    const isCustomSelected = hasCustomOptions && currentValue && 
-      !options?.some(opt => opt.value === currentValue);
+    const featuredOptions = getFeaturedOptions(param);
+    const overflowOptions = getOverflowOptions(param);
+    const hasOverflow = (show_other_button ?? false) && overflowOptions.length > 0;
+    const selectedOverflowOption = overflowOptions.find((opt) => opt.value === currentValue);
 
     return (
       <div className="space-y-2">
         <label className="text-sm font-medium">{label}</label>
         <div className="flex flex-wrap gap-1.5">
-          {options?.map((opt) => (
+          {featuredOptions.map((opt) => (
             <Button
               key={String(opt.value)}
               type="button"
@@ -100,18 +146,15 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
               {opt.label}
             </Button>
           ))}
-          {hasCustomOptions && (
+          {hasOverflow && (
             <Button
               type="button"
-              variant={isCustomSelected ? "default" : "outline"}
+              variant={selectedOverflowOption ? "default" : "outline"}
               size="sm"
               onClick={() => onOpenCustom(param)}
               className="h-8 px-2.5 text-xs transition-colors active:bg-accent"
             >
-              {isCustomSelected && currentValue ?
-                (options?.find(o => o.value === currentValue)?.label || String(currentValue).slice(0, 8)) :
-                "Custom"
-              }
+              {selectedOverflowOption?.label ?? "Другое"}
             </Button>
           )}
         </div>
@@ -119,19 +162,17 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
     );
   }
 
-  // quality, output_format, duration, select - dropdown with shadcn Select
-  if (ui_semantic === "quality" || ui_semantic === "output_format" || 
-      ui_semantic === "duration" || ui_semantic === "select") {
+  if (effectiveControl === "select") {
     const currentValue = value as string | number | undefined;
-    const currentOption = options?.find(opt => opt.value === currentValue);
-    
+    const currentOption = options?.find((opt) => opt.value === currentValue);
+
     return (
       <div className="space-y-2">
         <label className="text-sm font-medium">{label}</label>
         <Select
           value={currentValue !== undefined ? String(currentValue) : undefined}
           onValueChange={(val: string) => {
-            const selected = options?.find(opt => String(opt.value) === val);
+            const selected = options?.find((opt) => String(opt.value) === val);
             onChange(request_key, selected?.value ?? val);
           }}
         >
@@ -152,10 +193,9 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
     );
   }
 
-  // switch - boolean toggle
-  if (ui_semantic === "switch") {
+  if (effectiveControl === "switch" || effectiveControl === "checkbox") {
     const boolValue = value as boolean | undefined;
-    
+
     return (
       <div className="flex items-center justify-between py-1">
         <label className="text-sm font-medium">{label}</label>
@@ -167,34 +207,7 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
     );
   }
 
-  // slider - range input
-  if (ui_semantic === "slider") {
-    const numValue = (value as number) ?? min ?? 0;
-    const sliderMin = min ?? 0;
-    const sliderMax = max ?? 100;
-    const sliderStep = step ?? 1;
-
-    return (
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <label className="text-sm font-medium">{label}</label>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">{numValue}</span>
-        </div>
-        <input
-          type="range"
-          min={sliderMin}
-          max={sliderMax}
-          step={sliderStep}
-          value={numValue}
-          onChange={(e) => onChange(request_key, parseFloat(e.target.value))}
-          className="w-full accent-primary cursor-pointer"
-        />
-      </div>
-    );
-  }
-
-  // number - number input
-  if (ui_semantic === "number") {
+  if (effectiveControl === "number") {
     const numValue = value as number | undefined;
 
     return (
@@ -220,63 +233,21 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
     );
   }
 
-  // toggle_group - button group
-  if (ui_semantic === "toggle_group") {
-    const currentValue = value as string | undefined;
+  const textValue = typeof value === "string" ? value : "";
 
-    return (
-      <div className="space-y-2">
-        <label className="text-sm font-medium">{label}</label>
-        <div className="flex flex-wrap gap-1">
-          {options?.map((opt) => (
-            <Button
-              key={String(opt.value)}
-              type="button"
-              variant={currentValue === opt.value ? "default" : "outline"}
-              size="sm"
-              onClick={() => onChange(request_key, opt.value)}
-              className="h-8 px-2.5 text-xs transition-colors active:bg-accent"
-            >
-              {opt.label}
-            </Button>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // Fallback: render as select if options exist
-  if (options && options.length > 0) {
-    const currentValue = value as string | number | undefined;
-    const currentOption = options.find(opt => opt.value === currentValue);
-    
-    return (
-      <div className="space-y-2">
-        <label className="text-sm font-medium">{label}</label>
-        <Select
-          value={currentValue !== undefined ? String(currentValue) : undefined}
-          onValueChange={(val: string) => {
-            const selected = options.find(opt => String(opt.value) === val);
-            onChange(request_key, selected?.value ?? val);
-          }}
-        >
-          <SelectTrigger className="w-full bg-background h-8 text-xs">
-            <SelectValue placeholder="Выберите...">
-              {currentOption?.label ?? currentValue}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {options.map((opt) => (
-              <SelectItem key={String(opt.value)} value={String(opt.value)} className="text-xs">
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-    );
-  }
-
-  // Unknown semantic - skip rendering
-  return null;
+  return (
+    <div className="space-y-2">
+      <label className="text-sm font-medium">{label}</label>
+      <input
+        type="text"
+        value={textValue}
+        onChange={(e) => onChange(request_key, e.target.value)}
+        className={cn(
+          "w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm h-8",
+          "ring-offset-background focus-visible:outline-none focus-visible:ring-2",
+          "focus-visible:ring-ring focus-visible:ring-offset-2"
+        )}
+      />
+    </div>
+  );
 }

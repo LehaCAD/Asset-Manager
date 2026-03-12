@@ -55,7 +55,9 @@ export function ConfigPanel({ className }: ConfigPanelProps) {
     }
   };
 
-  const hasParameters = selectedModel && selectedModel.parameters_schema.length > 0;
+  const hasParameters = !!selectedModel?.parameters_schema.some(
+    (param) => param.visible !== false
+  );
 
   return (
     <div
@@ -118,7 +120,7 @@ export function ConfigPanel({ className }: ConfigPanelProps) {
             <div className="bg-muted/30 rounded-lg p-3 space-y-4">
               <h3 className="text-sm font-medium px-1">Параметры</h3>
               <ParametersForm
-                schema={selectedModel.parameters_schema}
+                schema={selectedModel?.parameters_schema ?? []}
                 values={parameters}
                 onChange={setParameter}
               />

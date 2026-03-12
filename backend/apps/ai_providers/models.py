@@ -34,8 +34,8 @@ class AIProvider(models.Model):
     )
 
     class Meta:
-        verbose_name = 'AI Провайдер'
-        verbose_name_plural = 'AI Провайдеры'
+        verbose_name = 'AI провайдер'
+        verbose_name_plural = 'AI провайдеры'
         ordering = ['name']
 
     def __str__(self) -> str:
@@ -137,8 +137,8 @@ class AIModel(models.Model):
     )
 
     class Meta:
-        verbose_name = 'AI Модель'
-        verbose_name_plural = 'AI Модели'
+        verbose_name = 'AI модель'
+        verbose_name_plural = 'AI модели'
         ordering = ['provider', 'name']
 
     def __str__(self) -> str:

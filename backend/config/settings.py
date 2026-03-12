@@ -44,7 +44,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'channels',
-    'storages',  # django-storages для S3
+    'storages',  # django-storages РґР»СЏ S3
     'apps.users',
     'apps.projects',
     'apps.scenes',
@@ -71,7 +71,7 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -140,6 +140,7 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [BASE_DIR / 'static']
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Default primary key field type
@@ -187,9 +188,9 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True
-CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 минут
+CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 РјРёРЅСѓС‚
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
-CELERY_TASK_SOFT_TIME_LIMIT = 5 * 60  # 5 мин soft limit для thumbnail-задач
+CELERY_TASK_SOFT_TIME_LIMIT = 5 * 60  # 5 РјРёРЅ soft limit РґР»СЏ thumbnail-Р·Р°РґР°С‡
 
 # AWS S3 Configuration
 AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
@@ -202,15 +203,15 @@ AWS_S3_OBJECT_PARAMETERS = {
     'CacheControl': 'max-age=86400',
 }
 AWS_DEFAULT_ACL = 'public-read'
-AWS_QUERYSTRING_AUTH = False  # Не добавлять подпись к URL
-AWS_S3_FILE_OVERWRITE = False  # Не перезаписывать файлы с одинаковым именем
+AWS_QUERYSTRING_AUTH = False  # РќРµ РґРѕР±Р°РІР»СЏС‚СЊ РїРѕРґРїРёСЃСЊ Рє URL
+AWS_S3_FILE_OVERWRITE = False  # РќРµ РїРµСЂРµР·Р°РїРёСЃС‹РІР°С‚СЊ С„Р°Р№Р»С‹ СЃ РѕРґРёРЅР°РєРѕРІС‹Рј РёРјРµРЅРµРј
 
 # Media files (Uploads)
 DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
 
 # CORS settings
-CORS_ALLOW_ALL_ORIGINS = True  # В продакшене указать конкретные домены
+CORS_ALLOW_ALL_ORIGINS = True  # Р’ РїСЂРѕРґР°РєС€РµРЅРµ СѓРєР°Р·Р°С‚СЊ РєРѕРЅРєСЂРµС‚РЅС‹Рµ РґРѕРјРµРЅС‹
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',

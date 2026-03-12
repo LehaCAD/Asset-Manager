@@ -1,0 +1,177 @@
+{% extends "admin/change_form.html" %}
+
+{% block field_sets %}
+<div class="ai-model-workflow">
+  <input type="hidden" name="mapping_payload" id="id_mapping_payload" value="{{ adminform.form.mapping_payload.value|default:'' }}">
+  <input type="hidden" name="pricing_dimensions" id="id_pricing_dimensions" value="{{ adminform.form.pricing_dimensions.value|default:'[]' }}">
+
+  <div class="workflow-shell">
+    <header class="workflow-hero">
+      <div class="workflow-hero__left">
+        <h1 class="workflow-title">
+          {% if original %}{{ original.name }}{% else %}Новая модель{% endif %}
+        </h1>
+        <p class="workflow-subtitle">
+          {% if original %}
+            <span class="wf-type-badge wf-type-badge--{{ original.model_type|lower }}">{{ original.get_model_type_display }}</span>
+            <span class="wf-provider-name">{{ original.provider.name }}</span>
+          {% else %}
+            Настрой провайдер, шаблон запроса и параметры нового инструмента.
+          {% endif %}
+        </p>
+      </div>
+      {% if original %}
+        {% include "admin/ai_providers/aimodel/includes/workflow_summary.html" %}
+      {% endif %}
+    </header>
+
+    <section class="workflow-panel">
+      <div class="workflow-panel__head">
+        <div class="wf-step-badge">1</div>
+        <div>
+          <h2>Модель</h2>
+          <p>Провайдер, название и тип инструмента.</p>
+        </div>
+      </div>
+
+      <div class="wf-grid wf-grid--2">
+        <div class="wf-field">
+          {{ adminform.form.provider.errors }}
+          <label for="{{ adminform.form.provider.id_for_label }}">Провайдер</label>
+          {{ adminform.form.provider }}
+        </div>
+        <div class="wf-field">
+          {{ adminform.form.name.errors }}
+          <label for="{{ adminform.form.name.id_for_label }}">Название</label>
+          {{ adminform.form.name }}
+        </div>
+        <div class="wf-field">
+          {{ adminform.form.model_type.errors }}
+          <label for="{{ adminform.form.model_type.id_for_label }}">Тип</label>
+          {{ adminform.form.model_type }}
+        </div>
+        <div class="wf-field wf-field--center">
+          <label class="wf-checkbox-label">
+            {{ adminform.form.is_active }}
+            <span>Модель активна</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="wf-grid wf-grid--2" style="margin-top:18px">
+        <div class="wf-field">
+          {{ adminform.form.preview_url.errors }}
+          <label for="{{ adminform.form.preview_url.id_for_label }}">URL превью</label>
+          {{ adminform.form.preview_url }}
+          <p class="wf-help">Картинка в карточке выбора модели.</p>
+        </div>
+        <div class="wf-field">
+          {{ adminform.form.description.errors }}
+          <label for="{{ adminform.form.description.id_for_label }}">Описание</label>
+          {{ adminform.form.description }}
+          <p class="wf-help">Короткая подпись под названием модели.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="workflow-panel">
+      <div class="workflow-panel__head">
+        <div class="wf-step-badge">2</div>
+        <div>
+          <h2>Запрос к API</h2>
+          <p>Вставь JSON-шаблон. После сохранения ниже появятся найденные параметры.</p>
+        </div>
+      </div>
+
+      <div class="wf-field" style="margin-bottom:16px">
+        {{ adminform.form.api_endpoint.errors }}
+        <label for="{{ adminform.form.api_endpoint.id_for_label }}">Эндпоинт</label>
+        {{ adminform.form.api_endpoint }}
+        {% if original %}
+          <p class="wf-help">→ <code>{{ original.get_full_url }}</code></p>
+        {% endif %}
+      </div>
+
+      <div class="wf-field">
+        {{ adminform.form.request_schema.errors }}
+        <label for="{{ adminform.form.request_schema.id_for_label }}">Шаблон запроса (JSON)</label>
+        {{ adminform.form.request_schema }}
+        <p class="wf-help">
+          Используй <code>&#123;&#123;variable&#125;&#125;</code> для параметров.
+          Системные (не надо настраивать): <code>&#123;&#123;prompt&#125;&#125;</code>,
+          <code>&#123;&#123;callback_url&#125;&#125;</code>, <code>&#123;&#123;input_urls&#125;&#125;</code>.
+        </p>
+      </div>
+    </section>
+
+    <section class="workflow-panel">
+      <div class="workflow-panel__head">
+        <div class="wf-step-badge">3</div>
+        <div>
+          <h2>Параметры интерфейса</h2>
+          <p>Настрой, как каждый найденный параметр отобразится пользователю.</p>
+        </div>
+      </div>
+      {% include "admin/ai_providers/aimodel/includes/mapping_table.html" %}
+    </section>
+
+    <section class="workflow-panel">
+      <div class="workflow-panel__head">
+        <div class="wf-step-badge">4</div>
+        <div>
+          <h2>Цена</h2>
+          <p>Фиксированная стоимость или таблица по параметрам.</p>
+        </div>
+      </div>
+      {% include "admin/ai_providers/aimodel/includes/pricing_panel.html" %}
+    </section>
+
+    <section class="workflow-panel workflow-panel--dark">
+      <div class="workflow-panel__head">
+        <div class="wf-step-badge wf-step-badge--dark">✓</div>
+        <div>
+          <h2>Предпросмотр runtime</h2>
+          <p>Что уйдёт в интерфейс после сохранения. Обновляется при каждом сохранении.</p>
+        </div>
+      </div>
+      {% include "admin/ai_providers/aimodel/includes/compiled_preview.html" %}
+    </section>
+
+    <section class="workflow-panel workflow-panel--muted">
+      <details>
+        <summary class="wf-details-summary">
+          <span class="wf-details-icon">⚙</span>
+          Расширенный режим — только для edge-cases
+          <span class="wf-details-arrow">▸</span>
+        </summary>
+        <div class="wf-advanced-body">
+          <div class="wf-field">
+            {{ adminform.form.parameters_schema.errors }}
+            <label for="{{ adminform.form.parameters_schema.id_for_label }}">Parameters schema (legacy cache)</label>
+            {{ adminform.form.parameters_schema }}
+            <p class="wf-help">Автоматически компилируется из настроек выше. Редактируй только если знаешь, что делаешь.</p>
+          </div>
+          <div class="wf-field">
+            {{ adminform.form.pricing_schema.errors }}
+            <label for="{{ adminform.form.pricing_schema.id_for_label }}">Pricing schema (fallback)</label>
+            {{ adminform.form.pricing_schema }}
+          </div>
+          <div class="wf-field">
+            {{ adminform.form.image_inputs_schema.errors }}
+            <label for="{{ adminform.form.image_inputs_schema.id_for_label }}">Image inputs schema</label>
+            {{ adminform.form.image_inputs_schema }}
+          </div>
+          <div class="wf-field">
+            {{ adminform.form.tags.errors }}
+            <label for="{{ adminform.form.tags.id_for_label }}">Теги (JSON-массив)</label>
+            {{ adminform.form.tags }}
+            <p class="wf-help">Пример: <code>["Style Ref", "Image Ref"]</code></p>
+          </div>
+        </div>
+      </details>
+    </section>
+  </div>
+</div>
+{% endblock %}
+
+{% block inline_field_sets %}{% endblock %}

@@ -208,12 +208,18 @@ export interface ParameterSchemaItem {
   request_key: string;        // field name in API request body (placeholder in request_schema)
   label: string;
   ui_semantic: UISemantic;
+  control?: string;
   options?: ParameterOption[];
+  featured_options?: ParameterOption[];
+  overflow_options?: ParameterOption[];
+  show_other_button?: boolean;
   custom_options?: ParameterOption[];  // optional: options for Custom panel
   default?: unknown;
   min?: number;
   max?: number;
   step?: number;
+  visible?: boolean;
+  advanced?: boolean;
 }
 
 export interface ImageInputSchemaItem {

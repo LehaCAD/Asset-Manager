@@ -49,7 +49,30 @@ def compile_parameters_schema(ai_model: AIModel) -> list[dict[str, Any]]:
 
     for binding in bindings:
         parameter = binding.canonical_parameter
-        options = binding.options_override or parameter.base_options or []
+        raw_options = binding.options_override or parameter.base_options or []
+        options = [
+            {
+                'value': option.get('value'),
+                'label': option.get('label', option.get('value')),
+            }
+            for option in raw_options
+            if isinstance(option, dict) and option.get('value') is not None
+        ]
+        featured_options = [
+            {
+                'value': option.get('value'),
+                'label': option.get('label', option.get('value')),
+            }
+            for option in raw_options
+            if isinstance(option, dict) and option.get('value') is not None and option.get('featured')
+        ]
+        if options and not featured_options:
+            featured_options = options[:3]
+        overflow_options = [
+            option
+            for option in options
+            if option not in featured_options
+        ]
         item = {
             'request_key': binding.placeholder,
             'label': binding.label_override or parameter.code.replace('_', ' ').title(),
@@ -57,6 +80,9 @@ def compile_parameters_schema(ai_model: AIModel) -> list[dict[str, Any]]:
             'value_type': parameter.value_type,
             'control': parameter.default_ui_control,
             'options': options,
+            'featured_options': featured_options,
+            'overflow_options': overflow_options,
+            'show_other_button': bool(overflow_options),
             'advanced': binding.is_advanced,
             'visible': binding.is_visible,
         }

@@ -17,6 +17,25 @@ def generate_pricing_template(dimensions: list[str], value_map: dict[str, list[A
     }
 
 
+def build_pricing_template_for_model(ai_model, dimensions: list[str]) -> dict[str, Any]:
+    value_map: dict[str, list[Any]] = {}
+    bindings = ai_model.parameter_bindings.select_related('canonical_parameter').all()
+    bindings_by_code = {binding.canonical_parameter.code: binding for binding in bindings}
+
+    for dimension in dimensions:
+        binding = bindings_by_code.get(dimension)
+        if binding is None:
+            raise ValueError(f'Pricing dimension "{dimension}" is not bound to this model.')
+        options = binding.options_override or binding.canonical_parameter.base_options or []
+        value_map[dimension] = [
+            option.get('value')
+            for option in options
+            if isinstance(option, dict) and 'value' in option
+        ]
+
+    return generate_pricing_template(dimensions, value_map)
+
+
 def parse_bulk_pricing_json(
     raw_json: str,
     *,

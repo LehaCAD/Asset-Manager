@@ -1,0 +1,70 @@
+<div class="wf-grid wf-grid--2" style="margin-bottom:20px">
+  <div class="wf-field">
+    {{ adminform.form.errors.pricing_mode }}
+    <label for="id_pricing_mode">Режим цены</label>
+    <select name="pricing_mode" id="id_pricing_mode" class="wf-select">
+      <option value="fixed" {% if workflow.pricing.mode == "fixed" %}selected{% endif %}>Фиксированная цена</option>
+      <option value="bulk_json" {% if workflow.pricing.mode == "lookup" %}selected{% endif %}>Таблица цен по параметрам</option>
+    </select>
+    <p class="wf-help">Фиксированная — любой запрос стоит одинаково. Таблица — цена зависит от параметров.</p>
+  </div>
+</div>
+
+<div data-pricing-fixed-panel>
+  <div class="wf-field wf-field--narrow">
+    {{ adminform.form.errors.pricing_fixed_cost }}
+    <label for="id_pricing_fixed_cost">Цена за генерацию</label>
+    <div class="wf-price-input-row">
+      <input
+        type="text"
+        name="pricing_fixed_cost"
+        id="id_pricing_fixed_cost"
+        class="wf-input wf-input--price"
+        value="{{ workflow.pricing.raw.fixed_cost|default:'' }}"
+        placeholder="0.00"
+      >
+      <span class="wf-price-unit">кредитов</span>
+    </div>
+    <p class="wf-help">Пример: <code>5.00</code> — каждая генерация стоит 5 кредитов.</p>
+  </div>
+</div>
+
+<div data-pricing-dimensions-panel>
+  <div class="wf-field" style="margin-bottom:20px">
+    {{ adminform.form.errors.pricing_dimensions }}
+    <label>Параметры, влияющие на цену</label>
+    <div class="wf-dimension-chips">
+      {% for item in workflow.pricing_dimension_choices %}
+        <label class="wf-dimension-chip">
+          <input
+            type="checkbox"
+            data-pricing-dimension
+            value="{{ item.code }}"
+            {% if item.code in workflow.pricing.raw.cost_params %}checked{% endif %}
+          >
+          <span class="wf-dimension-chip__label">{{ item.label }}</span>
+          <span class="wf-dimension-chip__code">{{ item.code }}</span>
+        </label>
+      {% empty %}
+        <p class="wf-muted-note">Сначала настрой параметры на шаге 3 — они появятся здесь.</p>
+      {% endfor %}
+    </div>
+    <p class="wf-help">Отметь только те параметры, от которых реально зависит цена.</p>
+  </div>
+
+  <div id="pricing-table-container" class="wf-pricing-table-container"></div>
+
+  {{ adminform.form.errors.pricing_bulk_json }}
+  <textarea
+    name="pricing_bulk_json"
+    id="id_pricing_bulk_json"
+    class="wf-textarea wf-textarea--mono"
+    rows="10"
+  >{{ workflow.compiled_preview.pricing_json }}</textarea>
+
+  <div class="wf-inline-actions">
+    <button type="button" class="wf-btn wf-btn--secondary" data-generate-pricing-template>
+      ↺ Перестроить таблицу
+    </button>
+  </div>
+</div>
