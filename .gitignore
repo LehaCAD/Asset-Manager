@@ -39,3 +39,6 @@ Thumbs.db
 
 # Docker
 postgres_data/
+
+# Local worktrees
+.worktrees/
