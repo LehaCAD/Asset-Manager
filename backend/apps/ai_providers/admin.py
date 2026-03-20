@@ -1,3 +1,5 @@
+import json
+
 from django.contrib import admin
 from django.utils.html import format_html
 
@@ -123,7 +125,10 @@ class AIModelAdmin(admin.ModelAdmin):
         css = {
             'all': ('admin/ai_providers/aimodel_workflow.css',),
         }
-        js = ('admin/ai_providers/aimodel_workflow.js',)
+        js = (
+            'admin/ai_providers/aimodel_workflow.js',
+            'admin/ai_providers/aimodel_image_inputs.js',
+        )
 
     def get_workflow_context(
         self,
@@ -148,6 +153,7 @@ class AIModelAdmin(admin.ModelAdmin):
                 'compiled_preview': {},
                 'summary': {},
                 'pricing_dimension_choices': [],
+                'image_inputs_schema_json': '[]',
                 **common,
             }
 
@@ -175,6 +181,7 @@ class AIModelAdmin(admin.ModelAdmin):
             seen_dimension_codes.add(code)
             pricing_dimensions.append({'code': code, 'label': row['label']})
         context['pricing_dimension_choices'] = pricing_dimensions
+        context['image_inputs_schema_json'] = json.dumps(obj.image_inputs_schema or [])
         return context
 
     def save_related(self, request, form, formsets, change):
