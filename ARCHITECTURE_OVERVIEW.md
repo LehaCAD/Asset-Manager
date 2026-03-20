@@ -17,8 +17,9 @@
 ## Технологический стек
 
 - **Backend:** Django 5, DRF, Channels (WebSocket), Celery, Redis, PostgreSQL, S3 (django-storages).
-- **Frontend:** Next.js 14 (App Router), Zustand, клиентский API-слой в `frontend/lib`.
-- **Инфраструктура:** Docker Compose, Nginx.
+- **Frontend:** Next.js 16 (App Router), React 19, Zustand 5, Tailwind 4, shadcn/ui, DnD-Kit, клиентский API-слой в `frontend/lib`.
+- **Инфраструктура:** Docker Compose, Nginx, Daphne (ASGI), Let's Encrypt.
+- **Прод:** VPS, `raskadrawka.ru`.
 
 ## Где что лежит
 
@@ -36,7 +37,8 @@ backend/
 │   ├── projects/           — Project, ProjectConsumer (WebSocket)
 │   ├── scenes/             — Scene (модель, вьюхи, сериализаторы, S3-утилиты)
 │   ├── elements/           — Element (модель, вьюхи, сериализаторы, Celery-задачи)
-│   ├── ai_providers/       — AIProvider, AIModel, management-команды
+│   ├── ai_providers/       — AIProvider, AIModel, CanonicalParameter, ModelParameterBinding, ModelPricingConfig
+│   ├── credits/            — CreditsTransaction, CreditsService
 │   └── sharing/            — SharedLink, Comment
 ```
 
@@ -44,11 +46,22 @@ backend/
 
 ```
 frontend/
-├── app/                    — страницы Next.js (App Router)
-├── components/             — UI-компоненты
+├── app/
+│   ├── (auth)/             — login, register
+│   ├── (workspace)/        — projects, project detail, scene workspace
+│   └── share/              — public share view
+├── components/
+│   ├── element/            — SceneWorkspace, ElementGrid, ElementCard
+│   ├── generation/         — PromptBar, ConfigPanel, ModelSelector, ParametersForm
+│   ├── lightbox/           — LightboxModal, DetailPanel, Filmstrip
+│   ├── project/            — ProjectGrid, ProjectCard
+│   ├── scene/              — ScenarioTableClient, SceneCard
+│   └── ui/                 — shadcn components
 ├── lib/
-│   ├── api.ts              — типы и методы API-клиента
-│   └── store/              — Zustand сторы
+│   ├── api/                — client.ts, auth, scenes, elements, ai-models, credits, sharing, websocket
+│   ├── store/              — auth, generation, scene-workspace, credits, projects, scenes, project-display, ui
+│   ├── types/index.ts      — все TypeScript типы (source of truth)
+│   └── utils/              — constants, format, cn
 ```
 
 ## Модели и связи
@@ -64,8 +77,14 @@ User 1──N Project
               └── 1──N SharedLink
 
 AIProvider 1──N AIModel 1──N Element (nullable)
+                    │
+                    ├── 1──N CanonicalParameter (через ModelParameterBinding)
+                    ├── 1──N ModelParameterBinding
+                    └── 1──1 ModelPricingConfig
 
 User 1──1 UserQuota
+User 1──N CreditsTransaction
+Element 1──N CreditsTransaction (nullable)
 ```
 
 ## API эндпоинты
@@ -77,12 +96,15 @@ User 1──1 UserQuota
 | `api/scenes/`        | scenes           | CRUD сцен, upload, generate, reorder, set_headliner |
 | `api/elements/`      | elements         | CRUD элементов, reorder         |
 | `api/ai-models/`     | ai_providers     | Список AI-моделей               |
+| `api/credits/`       | credits          | Баланс, оценка стоимости        |
+| `api/sharing/`       | sharing          | Публичные ссылки, комментарии   |
+| `api/ai/callback/`   | elements         | Webhook для Kie.ai              |
 
 ## Ключевые механики
 
 - **Генерация:** `POST /api/scenes/{id}/generate/` создаёт Element со статусом `PENDING`, запускает Celery-задачу `start_generation` → polling `check_generation_status` → скачивание результата на S3 → статус `COMPLETED`. Входные изображения (image refs, img2vid source) передаются через `generation_config.input_urls` и др. ключи из `image_inputs_schema`.
 - **WebSocket:** Клиент подключается к `ws/projects/{id}/`, получает `element_status_changed` при завершении/ошибке генерации.
-- **Загрузка файлов:** `POST /api/scenes/{id}/upload/` загружает файл на S3, создаёт Element с `source_type=UPLOADED`.
+- **Загрузка файлов:** `POST /api/scenes/{id}/upload/` сохраняет файл в staging (`/app/tmp_uploads/`), создаёт Element с `status=PROCESSING`, запускает Celery-задачу `process_uploaded_file` → загрузка в S3 → thumbnail (для видео — первый кадр через ffmpeg) → `status=COMPLETED`.
 - **Публичный доступ:** `SharedLink` даёт readonly-доступ к проекту по токену. Через него клиент оставляет `Comment` к сцене.
 - **Квоты:** `UserQuota` ограничивает количество проектов, сцен в проекте и элементов в сцене.
 - **Headliner:** У каждой сцены может быть «лучший элемент» (`headliner`) — используется как обложка на сценарном столе.
@@ -96,7 +118,16 @@ User 1──1 UserQuota
 | `apps/projects/`        | **Project**              |
 | `apps/users/`           | **User**, **UserQuota**  |
 | `apps/sharing/`         | **SharedLink**, **Comment** |
-| `apps/ai_providers/`    | **AIProvider**, **AIModel** |
+| `apps/ai_providers/`    | **AIProvider**, **AIModel**, **CanonicalParameter**, **ModelParameterBinding**, **ModelPricingConfig** |
+| `apps/credits/`          | **CreditsTransaction**   |
+
+## Кредиты и биллинг
+
+- `CreditsTransaction` — неизменяемый журнал операций (topup, generation_debit, refund_provider_error и др.).
+- При генерации: дебит из `user.balance` → на ошибке: идемпотентный рефунд.
+- `GET /api/credits/balance/` — текущий баланс и pricing_percent.
+- `POST /api/credits/estimate/` — оценка стоимости перед генерацией.
+
 ## AI Model Admin Redesign
 
 `AIModel` remains the central entity for administration and runtime delivery, but authoring is now normalized:

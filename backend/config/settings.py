@@ -170,12 +170,13 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
-# Channel Layers (WebSocket)
+# Channel Layers (WebSocket) — тот же Redis, что и Celery
+_redis_url = os.getenv('CELERY_BROKER_URL', 'redis://redis:6379/0')
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
-            'hosts': [(os.getenv('REDIS_HOST', 'redis'), 6379)],
+            'hosts': [_redis_url],
         },
     },
 }

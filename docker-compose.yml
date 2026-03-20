@@ -53,6 +53,7 @@ services:
       - AWS_S3_ENDPOINT_URL=https://s3.timeweb.com
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - REDIS_HOST=redis
     depends_on:
       db:
         condition: service_healthy
@@ -83,6 +84,7 @@ services:
       - AWS_S3_ENDPOINT_URL=https://s3.timeweb.com
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - REDIS_HOST=redis
     depends_on:
       - backend
       - redis

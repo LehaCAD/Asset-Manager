@@ -232,6 +232,12 @@ class ModelParameterBinding(models.Model):
     label_override = models.CharField(max_length=255, blank=True, default='')
     default_override = models.JSONField(default=dict, blank=True)
     options_override = models.JSONField(default=list, blank=True)
+    ui_control_override = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        help_text='Override control for this model (select, toggle_group, etc). Empty = use canonical default.',
+    )
     is_visible = models.BooleanField(default=True)
     is_advanced = models.BooleanField(default=False)
     sort_order = models.PositiveIntegerField(default=0)

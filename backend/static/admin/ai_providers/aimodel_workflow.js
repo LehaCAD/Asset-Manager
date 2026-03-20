@@ -3,8 +3,8 @@
 
 document.addEventListener('DOMContentLoaded', () => {
 
-  const form = document.querySelector('form');
   const mappingPayloadInput    = document.getElementById('id_mapping_payload');
+  const form = mappingPayloadInput?.closest('form') || document.querySelector('form');
   const pricingDimensionsInput = document.getElementById('id_pricing_dimensions');
   const pricingModeSelect      = document.getElementById('id_pricing_mode');
   const pricingBulkJsonTA      = document.getElementById('id_pricing_bulk_json');
@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
     card.dataset.fieldType = typeSelect.value;
   }
 
-  // ─── Live chip preview ─────────────────────────────────────────────────────────
+  // ─── Live preview (select vs toggle_group) ───────────────────────────────────────
   function updateChipsPreview(card) {
     const chipsDisplay = card.querySelector('[data-chips-display]');
     const allTA        = card.querySelector('[data-mapping-all-options]');
@@ -54,10 +54,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const showOtherCb  = card.querySelector('[data-mapping-show-other]');
     if (!chipsDisplay || !allTA) return;
 
+    const fieldType = card.dataset.fieldType || 'select';
     const all = parseLines(allTA.value);
+
+    if (all.length === 0) {
+      chipsDisplay.innerHTML = '<span class="wf-chips-empty">Добавь варианты ↓</span>';
+      chipsDisplay.dataset.previewMode = fieldType;
+      return;
+    }
+
+    chipsDisplay.dataset.previewMode = fieldType;
+
+    if (fieldType === 'select') {
+      const optionsText = all.join(', ');
+      chipsDisplay.innerHTML = `<span class="wf-preview-select">▾ ${escapeHtml(all[0])}</span><span class="wf-preview-select-hint">${escapeHtml(optionsText)}</span>`;
+      return;
+    }
+
+    // toggle_group: chips/buttons
     const max = Math.max(1, parseInt(maxInput?.value, 10) || 3);
     const showOther = showOtherCb ? showOtherCb.checked : true;
-
     const featured = all.slice(0, max);
     const overflowCount = showOther ? Math.max(0, all.length - max) : 0;
 
@@ -73,10 +89,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (overflowCount > 0) {
       html += `<span class="wf-chip-opt wf-chip-opt--other">Другое +${overflowCount}</span>`;
     }
-    if (all.length === 0) {
-      html = '<span class="wf-chips-empty">Добавь варианты ↓</span>';
-    }
-
     chipsDisplay.innerHTML = html;
   }
 
@@ -92,13 +104,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const allTA       = card.querySelector('[data-mapping-all-options]');
     const maxInput    = card.querySelector('[data-mapping-max-visible]');
     const showOtherCb = card.querySelector('[data-mapping-show-other]');
-    if (!hint || !allTA || !maxInput || !showOtherCb) return;
+    if (!hint || !allTA) return;
 
+    const fieldType = card.dataset.fieldType || 'select';
+    const all = parseLines(allTA.value);
+
+    if (fieldType === 'select') {
+      hint.textContent = all.length > 0 ? `Выпадающий список: ${all.join(', ')}` : '';
+      return;
+    }
+
+    if (!maxInput || !showOtherCb) return;
     if (!showOtherCb.checked) {
       hint.textContent = 'Все варианты будут показаны как кнопки.';
       return;
     }
-    const all     = parseLines(allTA.value);
     const max     = Math.max(1, parseInt(maxInput.value, 10) || 3);
     const visible = all.slice(0, max);
     const hidden  = Math.max(0, all.length - max);
@@ -128,6 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (typeSelect) typeSelect.addEventListener('change', () => {
         syncRowFieldType(card);
         updateChipsPreview(card);
+        updateShowOtherHint(card);
       });
       if (allTA) allTA.addEventListener('input', () => {
         updateChipsPreview(card);
@@ -142,6 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateShowOtherHint(card);
       });
 
+      updateChipsPreview(card);
       updateShowOtherHint(card);
     });
   }
@@ -177,7 +199,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!pricingBulkJsonTA || !pricingBulkJsonTA.value.trim()) return {};
     try {
       return JSON.parse(pricingBulkJsonTA.value).costs || {};
-    } catch { return {}; }
+    } catch (_) {
+      return {};
+    }
   }
 
   function serializePricingTable() {
@@ -393,13 +417,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   if (form) {
-    form.addEventListener('submit', () => {
+    const onSubmit = () => {
       serializeMappingPayload();
       serializePricingDimensions();
       if (pricingModeSelect && pricingModeSelect.value === 'bulk_json') {
         serializePricingTable();
         if (pricingBulkJsonTA) pricingBulkJsonTA.style.display = '';
       }
-    });
+    };
+    form.addEventListener('submit', onSubmit, true);
   }
 });

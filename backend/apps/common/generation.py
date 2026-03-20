@@ -84,10 +84,10 @@ def finalize_generation_success(element_id: int, source_url: str) -> tuple[bool,
 
 
 def finalize_generation_failure(element_id: int, error_message: str) -> bool:
-    """Atomically persist FAILED status if item is still processing."""
+    """Atomically persist FAILED status if item is PENDING or PROCESSING."""
     updated = Element.objects.filter(
         id=element_id,
-        status=Element.STATUS_PROCESSING,
+        status__in=(Element.STATUS_PENDING, Element.STATUS_PROCESSING),
     ).update(
         status=Element.STATUS_FAILED,
         error_message=error_message[:4000],

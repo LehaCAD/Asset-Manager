@@ -87,7 +87,7 @@ function getFeaturedOptions(param: ParameterSchemaItem): ParameterOption[] {
 }
 
 function getEffectiveControl(param: ParameterSchemaItem): string {
-  if (param.control) {
+  if (param.control != null && param.control !== "") {
     return param.control;
   }
 
@@ -99,8 +99,8 @@ function getEffectiveControl(param: ParameterSchemaItem): string {
     case "number":
       return "number";
     case "aspect_ratio":
-    case "resolution":
       return "toggle_group";
+    case "resolution":
     case "quality":
     case "output_format":
     case "duration":
@@ -164,22 +164,23 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
 
   if (effectiveControl === "select") {
     const currentValue = value as string | number | undefined;
-    const currentOption = options?.find((opt) => opt.value === currentValue);
 
     return (
       <div className="space-y-2">
         <label className="text-sm font-medium">{label}</label>
         <Select
-          value={currentValue !== undefined ? String(currentValue) : undefined}
+          value={
+            currentValue === undefined || currentValue === null
+              ? ""
+              : String(currentValue)
+          }
           onValueChange={(val: string) => {
             const selected = options?.find((opt) => String(opt.value) === val);
             onChange(request_key, selected?.value ?? val);
           }}
         >
           <SelectTrigger className="w-full bg-background h-8 text-xs">
-            <SelectValue placeholder="Выберите...">
-              {currentOption?.label ?? currentValue}
-            </SelectValue>
+            <SelectValue placeholder="Выберите..." />
           </SelectTrigger>
           <SelectContent>
             {options?.map((opt) => (

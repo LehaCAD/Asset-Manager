@@ -123,9 +123,7 @@
         </div>
 
         <select style="display:none" data-mapping-parameter-code data-placeholder="{{ row.placeholder }}">
-          <option value="{{ row.parameter_code }}"
-            {% if not workflow.canonical_parameter_choices %}selected{% endif %}
-          >{{ row.parameter_code }}</option>
+          <option value="{{ row.parameter_code }}" selected>{{ row.parameter_code }}</option>
           {% for cp in workflow.canonical_parameter_choices %}
             {% if cp.code != row.parameter_code %}
               <option value="{{ cp.code }}">{{ cp.code }}</option>

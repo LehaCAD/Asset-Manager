@@ -275,12 +275,20 @@ def build_mapping_rows(ai_model: AIModel) -> list[dict[str, Any]]:
                 'ui_semantic': binding.canonical_parameter.ui_semantic if binding is not None else (suggested.ui_semantic if suggested is not None else suggest_ui_semantic(placeholder)),
                 'label': binding.label_override if binding is not None and binding.label_override else humanize_placeholder(placeholder),
                 'field_type': (
-                    CONTROL_TO_FIELD_TYPE.get(binding.canonical_parameter.default_ui_control, suggest_field_type(placeholder))
-                    if binding is not None else suggest_field_type(placeholder)
+                    CONTROL_TO_FIELD_TYPE.get(
+                        binding.ui_control_override or binding.canonical_parameter.default_ui_control,
+                        suggest_field_type(placeholder),
+                    )
+                    if binding is not None
+                    else suggest_field_type(placeholder)
                 ),
                 'field_type_label': FIELD_TYPE_PRESETS[
-                    CONTROL_TO_FIELD_TYPE.get(binding.canonical_parameter.default_ui_control, suggest_field_type(placeholder))
-                    if binding is not None else suggest_field_type(placeholder)
+                    CONTROL_TO_FIELD_TYPE.get(
+                        binding.ui_control_override or binding.canonical_parameter.default_ui_control,
+                        suggest_field_type(placeholder),
+                    )
+                    if binding is not None
+                    else suggest_field_type(placeholder)
                 ]['label'],
                 'all_options_text': split_options_for_display(binding.options_override or binding.canonical_parameter.base_options or [])[0] if binding is not None else '',
                 'featured_options_text': split_options_for_display(binding.options_override or binding.canonical_parameter.base_options or [])[1] if binding is not None else '',
@@ -330,12 +338,84 @@ def build_compiled_preview_context(ai_model: AIModel) -> dict[str, str]:
     }
 
 
-def build_admin_workflow_context(ai_model: AIModel) -> dict[str, Any]:
+def build_mapping_payload_for_form(mapping_rows: list[dict[str, Any]]) -> str:
+    """Serialize mapping_rows to JSON matching serializeMappingPayload format for hidden input init."""
+    payload = []
+    for row in mapping_rows:
+        chips = row.get('chips', {})
+        featured = chips.get('featured', [])
+        overflow = chips.get('overflow', [])
+        options_override = [
+            {'value': v, 'label': v, 'featured': True}
+            for v in featured
+        ] + [
+            {'value': v, 'label': v, 'featured': False}
+            for v in overflow
+        ]
+        payload.append({
+            'placeholder': row.get('placeholder', ''),
+            'parameter_code': row.get('parameter_code') or row.get('canonical_code') or row.get('placeholder', ''),
+            'role': row.get('role', 'param'),
+            'field_type': row.get('field_type', 'text'),
+            'display_label': row.get('label', ''),
+            'request_path': row.get('request_path', ''),
+            'options_override': options_override,
+        })
+    return json.dumps(payload, ensure_ascii=False)
+
+
+def _merge_post_payload_into_mapping_rows(
+    mapping_rows: list[dict[str, Any]], raw_payload: str
+) -> list[dict[str, Any]]:
+    """Override mapping_rows with user-submitted POST data so cards reflect user choices on validation errors."""
+    try:
+        payload = json.loads(raw_payload) if isinstance(raw_payload, str) else raw_payload
+    except (TypeError, json.JSONDecodeError):
+        return mapping_rows
+    if not isinstance(payload, list):
+        return mapping_rows
+
+    by_placeholder = {p.get('placeholder'): p for p in payload if p.get('placeholder')}
+    result = []
+    for row in mapping_rows:
+        row = dict(row)
+        pl = row.get('placeholder')
+        post_row = by_placeholder.get(pl) if pl else None
+        if post_row:
+            row['field_type'] = post_row.get('field_type') or row.get('field_type', 'text')
+            row['role'] = post_row.get('role') or row.get('role', 'param')
+            row['label'] = post_row.get('display_label') or post_row.get('label_override') or row.get('label', '')
+            row['parameter_code'] = post_row.get('parameter_code') or row.get('parameter_code', pl or '')
+            opts = post_row.get('options_override') or []
+            if opts:
+                all_txt, feat_txt, show_other = split_options_for_display(opts)
+                row['all_options_text'] = all_txt
+                row['chips'] = build_options_for_chips(opts, 3)
+                row['featured_count'] = max(
+                    1,
+                    len([v for v in feat_txt.split('\n') if v.strip()]) or 3,
+                )
+                row['show_other_modal'] = show_other
+            row['field_type_label'] = FIELD_TYPE_PRESETS.get(
+                row['field_type'], FIELD_TYPE_PRESETS['text']
+            )['label']
+        result.append(row)
+    return result
+
+
+def build_admin_workflow_context(
+    ai_model: AIModel,
+    form_post_payload: str | None = None,
+    form_has_errors: bool = False,
+) -> dict[str, Any]:
     mapping_rows = build_mapping_rows(ai_model)
+    if form_has_errors and form_post_payload:
+        mapping_rows = _merge_post_payload_into_mapping_rows(mapping_rows, form_post_payload)
     param_rows = [row for row in mapping_rows if row['role'] == 'param']
     system_rows = [row for row in mapping_rows if row['role'] in SYSTEM_ROLES]
     return {
         'mapping_rows': mapping_rows,
+        'mapping_payload_json': build_mapping_payload_for_form(mapping_rows),
         'pricing': build_pricing_context(ai_model),
         'compiled_preview': build_compiled_preview_context(ai_model),
         'summary': {

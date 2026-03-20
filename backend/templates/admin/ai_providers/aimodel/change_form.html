@@ -2,7 +2,7 @@
 
 {% block field_sets %}
 <div class="ai-model-workflow">
-  <input type="hidden" name="mapping_payload" id="id_mapping_payload" value="{{ adminform.form.mapping_payload.value|default:'' }}">
+  <input type="hidden" name="mapping_payload" id="id_mapping_payload" value="{% firstof adminform.form.mapping_payload.value workflow.mapping_payload_json '[]' %}">
   <input type="hidden" name="pricing_dimensions" id="id_pricing_dimensions" value="{{ adminform.form.pricing_dimensions.value|default:'[]' }}">
 
   <div class="workflow-shell">

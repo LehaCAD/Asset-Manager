@@ -57,7 +57,7 @@ def notify_element_status(element: Element, status: str, file_url: str = '', err
             }
         )
     except Exception as e:
-        logger.warning("Не удалось отправить WebSocket-уведомление: %s", e)
+        logger.exception("Не удалось отправить WebSocket-уведомление: %s", e)
 
 
 @shared_task
@@ -240,9 +240,8 @@ def start_generation(self, element_id: int) -> dict:
             element = Element.objects.get(id=element_id)
             # Возврат средств при ошибке провайдера
             _refund_for_failure(element)
-            applied = finalize_generation_failure(element_id=element_id, error_message=str(e))
-            if applied:
-                notify_element_status(element, 'FAILED', error_message=str(e))
+            finalize_generation_failure(element_id=element_id, error_message=str(e))
+            notify_element_status(element, 'FAILED', error_message=str(e))
         except Element.DoesNotExist:
             pass
 

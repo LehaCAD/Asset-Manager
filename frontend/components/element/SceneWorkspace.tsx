@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { useSceneWorkspaceStore } from "@/lib/store/scene-workspace";
+import { useCreditsStore } from "@/lib/store/credits";
 import { useGenerationStore } from "@/lib/store/generation";
 import { useUIStore } from "@/lib/store/ui";
 import { wsManager } from "@/lib/api/websocket";
@@ -143,10 +144,20 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
           }
           updateElement(event.element_id, completedUpdates);
         } else if (event.status === "FAILED") {
-          updateElement(event.element_id, {
-            status: "FAILED",
-            error_message: event.error_message ?? "",
-          });
+          const err = (event.error_message ?? "").toLowerCase();
+          const isCreditsError =
+            err.includes("credits") || err.includes("недостаточно средств");
+          if (isCreditsError) {
+            toast.error("Недостаточно средств для генерации. Карточка удалена.");
+            void deleteElement(event.element_id, { silent: true });
+            void useCreditsStore.getState().loadBalance();
+          } else {
+            updateElement(event.element_id, {
+              status: "FAILED",
+              error_message: event.error_message ?? "",
+            });
+            void useCreditsStore.getState().loadBalance();
+          }
         } else {
           updateElement(event.element_id, { status: event.status });
         }
@@ -172,7 +183,6 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
     });
 
     // Initial fallback check для optimistic generation
-    // (если WS не подключился сразу, но есть submitting элементы)
     if (!wsManager.isConnected && hasSubmittingGenerationElements()) {
       if (!fallbackRefetchIntervalRef.current) {
         fallbackRefetchIntervalRef.current = setInterval(tryFallbackRefetch, 8000);
@@ -187,7 +197,7 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
       unsubscribeReconnectExhausted();
       wsManager.disconnect();
     };
-  }, [projectId, sceneId, updateElement]);
+  }, [projectId, sceneId, updateElement, deleteElement]);
 
   // Calculate filter counts
   const filterCounts = useMemo(() => {

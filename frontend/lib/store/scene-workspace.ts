@@ -197,8 +197,8 @@ interface SceneWorkspaceState {
   // Element actions (API)
   setHeadliner: (elementId: number) => Promise<void>;
   toggleFavorite: (elementId: number) => Promise<void>;
-  deleteElements: (elementIds: number[]) => Promise<void>;
-  deleteElement: (elementId: number) => Promise<void>;
+  deleteElements: (elementIds: number[], options?: { silent?: boolean }) => Promise<void>;
+  deleteElement: (elementId: number, options?: { silent?: boolean }) => Promise<void>;
   deleteSelected: () => Promise<void>;
   reorderElements: (ids: number[]) => Promise<void>;
   enqueueUploads: (sceneId: number, files: File[]) => void;
@@ -423,7 +423,7 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
     }
   },
 
-  deleteElements: async (elementIds: number[]) => {
+  deleteElements: async (elementIds: number[], options?: { silent?: boolean }) => {
     if (elementIds.length === 0) return;
 
     const { scene, elements, selectedIds } = get();
@@ -456,9 +456,11 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
       .map(({ id }) => id);
 
     if (failedIds.length === 0) {
-      toast.success(
-        elementIds.length === 1 ? "Элемент удалён" : `Удалено: ${elementIds.length}`
-      );
+      if (!options?.silent) {
+        toast.success(
+          elementIds.length === 1 ? "Элемент удалён" : `Удалено: ${elementIds.length}`
+        );
+      }
       return;
     }
 
@@ -486,8 +488,8 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
     }
   },
 
-  deleteElement: async (elementId: number) => {
-    await get().deleteElements([elementId]);
+  deleteElement: async (elementId: number, options?: { silent?: boolean }) => {
+    await get().deleteElements([elementId], options);
   },
 
   deleteSelected: async () => {

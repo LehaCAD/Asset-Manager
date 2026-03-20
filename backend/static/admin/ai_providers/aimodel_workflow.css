@@ -555,6 +555,29 @@
   font-style: italic;
 }
 
+/* Select preview (dropdown-style) vs toggle_group (chips) */
+.ai-model-workflow [data-preview-mode="select"] .wf-preview-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  background: #fff;
+  border: 1px solid #c8d8e8;
+  color: #334155;
+  min-width: 80px;
+}
+.ai-model-workflow [data-preview-mode="select"] .wf-preview-select-hint {
+  margin-left: 8px;
+  font-size: 12px;
+  color: #64748b;
+}
+.ai-model-workflow [data-preview-mode="select"] .wf-chips {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
 /* ── Options editor (expandable) ───────────────────────────────────────────── */
 
 .ai-model-workflow .wf-opts-editor {

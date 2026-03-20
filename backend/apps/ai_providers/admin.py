@@ -125,7 +125,13 @@ class AIModelAdmin(admin.ModelAdmin):
         }
         js = ('admin/ai_providers/aimodel_workflow.js',)
 
-    def get_workflow_context(self, request, obj=None):
+    def get_workflow_context(
+        self,
+        request,
+        obj=None,
+        form_post_payload: str | None = None,
+        form_has_errors: bool = False,
+    ):
         common = {
             'canonical_parameter_choices': list(
                 CanonicalParameter.objects.order_by('ui_semantic', 'code').values('code', 'ui_semantic')
@@ -137,6 +143,7 @@ class AIModelAdmin(admin.ModelAdmin):
         if obj is None:
             return {
                 'mapping_rows': [],
+                'mapping_payload_json': '[]',
                 'pricing': {},
                 'compiled_preview': {},
                 'summary': {},
@@ -144,7 +151,11 @@ class AIModelAdmin(admin.ModelAdmin):
                 **common,
             }
 
-        context = build_admin_workflow_context(obj)
+        context = build_admin_workflow_context(
+            obj,
+            form_post_payload=form_post_payload,
+            form_has_errors=form_has_errors,
+        )
         context['mapping_rows'] = sorted(
             context['mapping_rows'],
             key=lambda row: (
@@ -175,8 +186,15 @@ class AIModelAdmin(admin.ModelAdmin):
             form._save_pricing_config(instance)
 
     def render_change_form(self, request, context, add=False, change=False, form_url='', obj=None):
+        form = context.get('form')
+        workflow = self.get_workflow_context(
+            request,
+            obj=obj,
+            form_post_payload=form.data.get('mapping_payload') if form and form.data else None,
+            form_has_errors=bool(form and form.errors),
+        )
         context = {
             **context,
-            'workflow': self.get_workflow_context(request, obj=obj),
+            'workflow': workflow,
         }
         return super().render_change_form(request, context, add=add, change=change, form_url=form_url, obj=obj)

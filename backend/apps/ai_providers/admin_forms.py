@@ -82,14 +82,10 @@ class AIModelAdminForm(forms.ModelForm):
                 parameter.save(update_fields=['aliases'])
         else:
             fields_to_update = []
-            if parameter.ui_semantic != ui_semantic:
-                parameter.ui_semantic = ui_semantic
-                fields_to_update.append('ui_semantic')
-            if parameter.value_type != preset['value_type']:
-                parameter.value_type = preset['value_type']
-                fields_to_update.append('value_type')
-            if parameter.default_ui_control != preset['default_ui_control']:
-                parameter.default_ui_control = preset['default_ui_control']
+            # Only update default_ui_control from field_type; preserve ui_semantic
+            desired_control = field_preset['default_ui_control']
+            if parameter.default_ui_control != desired_control:
+                parameter.default_ui_control = desired_control
                 fields_to_update.append('default_ui_control')
             aliases = parameter.aliases or []
             placeholder = row.get('placeholder')
@@ -180,8 +176,9 @@ class AIModelAdminForm(forms.ModelForm):
         for field_name, value in cleaned_data.items():
             setattr(instance, field_name, value)
 
+        raw_payload = cleaned_data.get('mapping_payload', '[]')
         try:
-            mapping_rows = self._parse_mapping_payload(cleaned_data.get('mapping_payload', '[]'))
+            mapping_rows = self._parse_mapping_payload(raw_payload)
         except (TypeError, ValueError, json.JSONDecodeError) as exc:
             self.add_error('mapping_payload', str(exc))
             return cleaned_data
@@ -289,10 +286,6 @@ class AIModelAdminForm(forms.ModelForm):
 
     def save(self, commit=True):
         instance = super().save(commit=commit)
-        if commit and hasattr(self, '_mapping_rows') and self._mapping_rows:
-            self._save_mapping_rows(instance, self._mapping_rows)
-        if commit and hasattr(self, '_pricing_mode'):
-            self._save_pricing_config(instance)
         return instance
 
     def _save_mapping_rows(self, instance, mapping_rows):
@@ -328,6 +321,10 @@ class AIModelAdminForm(forms.ModelForm):
                 binding.default_override = row['default_override']
             if 'options_override' in row:
                 binding.options_override = row['options_override']
+
+            field_type = row.get('field_type') or 'text'
+            field_preset = FIELD_TYPE_PRESETS.get(field_type, FIELD_TYPE_PRESETS['text'])
+            binding.ui_control_override = field_preset['default_ui_control'] if role == 'param' else ''
 
             binding.is_visible = role == 'param'
             binding.is_advanced = role == 'hidden'

@@ -8,6 +8,17 @@ from .models import AIModel, CanonicalParameter
 
 PLACEHOLDER_PATTERN = re.compile(r"\{\{\s*([a-zA-Z0-9_]+)\s*\}\}")
 
+# Fallback when CanonicalParameter.default_ui_control is empty (legacy/migration data)
+UI_SEMANTIC_TO_CONTROL = {
+    'resolution': 'select',
+    'aspect_ratio': 'toggle_group',
+    'output_format': 'select',
+    'boolean_toggle': 'switch',
+    'image_list': 'image_picker',
+    'integer': 'number',
+    'text': 'text',
+}
+
 
 def extract_placeholders(request_schema: Any) -> set[str]:
     placeholders: set[str] = set()
@@ -73,12 +84,17 @@ def compile_parameters_schema(ai_model: AIModel) -> list[dict[str, Any]]:
             for option in options
             if option not in featured_options
         ]
+        control = (
+            binding.ui_control_override
+            or parameter.default_ui_control
+            or UI_SEMANTIC_TO_CONTROL.get(parameter.ui_semantic, 'text')
+        )
         item = {
             'request_key': binding.placeholder,
             'label': binding.label_override or parameter.code.replace('_', ' ').title(),
             'ui_semantic': parameter.ui_semantic,
             'value_type': parameter.value_type,
-            'control': parameter.default_ui_control,
+            'control': control,
             'options': options,
             'featured_options': featured_options,
             'overflow_options': overflow_options,
