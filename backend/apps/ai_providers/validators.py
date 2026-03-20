@@ -42,8 +42,10 @@ def _validate_slot(slot: Any, path: str, seen_keys: set[str]) -> None:
 
     if 'max' not in slot:
         raise ValidationError(f'{path}: отсутствует обязательное поле "max".')
-    if not isinstance(slot['max'], int):
+    if not isinstance(slot['max'], int) or isinstance(slot['max'], bool):
         raise ValidationError(f'{path}: "max" должен быть целым числом.')
+    if slot['max'] < 1:
+        raise ValidationError(f'{path}: "max" должен быть не менее 1.')
 
     slot_key = slot['key']
     if slot_key in seen_keys:
@@ -51,7 +53,7 @@ def _validate_slot(slot: Any, path: str, seen_keys: set[str]) -> None:
     seen_keys.add(slot_key)
 
     min_val = slot.get('min', 0)
-    if not isinstance(min_val, int):
+    if not isinstance(min_val, int) or isinstance(min_val, bool):
         raise ValidationError(f'{path}: "min" должен быть целым числом.')
     if min_val > slot['max']:
         raise ValidationError(
