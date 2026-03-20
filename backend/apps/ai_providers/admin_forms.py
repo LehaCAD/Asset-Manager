@@ -5,6 +5,8 @@ from django import forms
 from .admin_workflow import FIELD_TYPE_PRESETS, SYSTEM_ROLES, UI_SEMANTIC_PRESETS, discover_placeholder_entries
 from .models import AIModel, CanonicalParameter, ModelParameterBinding, ModelPricingConfig
 from .pricing_tools import build_pricing_template_for_model, parse_bulk_pricing_json
+from django.core.exceptions import ValidationError as DjangoValidationError
+
 from .validators import validate_model_admin_config
 
 
@@ -14,6 +16,7 @@ class AIModelAdminForm(forms.ModelForm):
     pricing_fixed_cost = forms.CharField(required=False)
     pricing_dimensions = forms.CharField(required=False)
     pricing_bulk_json = forms.CharField(required=False, widget=forms.HiddenInput())
+    image_inputs_payload = forms.CharField(required=False, widget=forms.HiddenInput())
 
     class Meta:
         model = AIModel
@@ -175,6 +178,23 @@ class AIModelAdminForm(forms.ModelForm):
         instance = self.instance
         for field_name, value in cleaned_data.items():
             setattr(instance, field_name, value)
+
+        # ── Validate image_inputs_schema ──
+        from .validators import validate_image_inputs_schema
+        raw_ii_payload = cleaned_data.get('image_inputs_payload', '')
+        if raw_ii_payload and raw_ii_payload.strip():
+            try:
+                parsed = json.loads(raw_ii_payload)
+                cleaned_data['image_inputs_schema'] = parsed
+                instance.image_inputs_schema = parsed
+            except (json.JSONDecodeError, TypeError) as exc:
+                self.add_error('image_inputs_schema', f'Ошибка JSON: {exc}')
+                return cleaned_data
+
+        try:
+            validate_image_inputs_schema(cleaned_data.get('image_inputs_schema'))
+        except DjangoValidationError as exc:
+            self.add_error('image_inputs_schema', exc)
 
         raw_payload = cleaned_data.get('mapping_payload', '[]')
         try:

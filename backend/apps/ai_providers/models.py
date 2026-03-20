@@ -113,8 +113,11 @@ class AIModel(models.Model):
         default=list,
         blank=True,
         verbose_name='Схема входных изображений',
-        help_text='Описание слотов изображений для промпт-бара. '
-                  'Пример: [{"key": "style_ref", "label": "Style Ref", "min": 0, "max": 4, "required": false}]'
+        help_text=(
+            'Два формата:\n'
+            '1) Список слотов: [{"key": "input_urls", "label": "...", "min": 0, "max": 4}]\n'
+            '2) Группы: {"mode": "groups", "no_images_params": {...}, "groups": [{...}]}'
+        ),
     )
     pricing_schema = models.JSONField(
         default=dict,
