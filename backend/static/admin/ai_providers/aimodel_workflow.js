@@ -16,6 +16,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const parseLines = (str) =>
     (str || '').split('\n').map((s) => s.trim()).filter(Boolean);
 
+  function parseLabel(raw) {
+    const parts = raw.split('|');
+    return parts.length > 1 ? parts[1].trim() : parts[0].trim();
+  }
+
   const ENUM_TYPES = new Set(['select', 'toggle_group']);
   const SYSTEM_ROLES = new Set(['prompt', 'callback', 'auto_input', 'hidden']);
 
@@ -66,8 +71,8 @@ document.addEventListener('DOMContentLoaded', () => {
     chipsDisplay.dataset.previewMode = fieldType;
 
     if (fieldType === 'select') {
-      const optionsText = all.join(', ');
-      chipsDisplay.innerHTML = `<span class="wf-preview-select">▾ ${escapeHtml(all[0])}</span><span class="wf-preview-select-hint">${escapeHtml(optionsText)}</span>`;
+      const optionsText = all.map(parseLabel).join(', ');
+      chipsDisplay.innerHTML = `<span class="wf-preview-select">▾ ${escapeHtml(parseLabel(all[0]))}</span><span class="wf-preview-select-hint">${escapeHtml(optionsText)}</span>`;
       return;
     }
 
@@ -79,11 +84,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let html = '';
     featured.forEach((val) => {
-      html += `<span class="wf-chip-opt wf-chip-opt--on">${escapeHtml(val)}</span>`;
+      html += `<span class="wf-chip-opt wf-chip-opt--on">${escapeHtml(parseLabel(val))}</span>`;
     });
     if (!showOther && all.length > max) {
       all.slice(max).forEach((val) => {
-        html += `<span class="wf-chip-opt wf-chip-opt--on">${escapeHtml(val)}</span>`;
+        html += `<span class="wf-chip-opt wf-chip-opt--on">${escapeHtml(parseLabel(val))}</span>`;
       });
     }
     if (overflowCount > 0) {
@@ -110,7 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const all = parseLines(allTA.value);
 
     if (fieldType === 'select') {
-      hint.textContent = all.length > 0 ? `Выпадающий список: ${all.join(', ')}` : '';
+      hint.textContent = all.length > 0 ? `Выпадающий список: ${all.map(parseLabel).join(', ')}` : '';
       return;
     }
 
@@ -127,8 +132,47 @@ document.addEventListener('DOMContentLoaded', () => {
       hint.textContent = '';
     } else {
       hint.textContent = hidden > 0
-        ? `Кнопки: ${visible.join(', ')} · В «Другое»: ещё ${hidden}`
-        : `Кнопки: ${visible.join(', ')} — все умещаются`;
+        ? `Кнопки: ${visible.map(parseLabel).join(', ')} · В «Другое»: ещё ${hidden}`
+        : `Кнопки: ${visible.map(parseLabel).join(', ')} — все умещаются`;
+    }
+  }
+
+  // ─── Default value dropdown sync ──────────────────────────────────────────────
+  function syncDefaultDropdown(card) {
+    const allTA = card.querySelector('[data-mapping-all-options]');
+    const defaultSelect = card.querySelector('[data-mapping-default]');
+    const defaultSection = card.querySelector('[data-mapping-default-section]');
+    if (!defaultSelect || !allTA) return;
+
+    const role = card.dataset.role || 'param';
+    const fieldType = card.dataset.fieldType || 'text';
+    const isEnum = ENUM_TYPES.has(fieldType) && role === 'param';
+
+    if (!isEnum || !allTA.value.trim()) {
+      if (defaultSection) defaultSection.style.display = 'none';
+      return;
+    }
+    if (defaultSection) defaultSection.style.display = '';
+
+    const currentVal = defaultSelect.value;
+    const initial = defaultSelect.dataset.initialDefault;
+    const lines = parseLines(allTA.value);
+
+    defaultSelect.innerHTML = '<option value="">\u2014 \u043d\u0435 \u0437\u0430\u0434\u0430\u043d\u043e \u2014</option>';
+    lines.forEach(function(raw) {
+      var parts = raw.split('|');
+      var value = parts[0].trim();
+      var label = parts.length > 1 ? parts[1].trim() : value;
+      var opt = document.createElement('option');
+      opt.value = value;
+      opt.textContent = label;
+      if (value === currentVal) opt.selected = true;
+      defaultSelect.appendChild(opt);
+    });
+
+    if (initial && !currentVal) {
+      defaultSelect.value = initial;
+      delete defaultSelect.dataset.initialDefault;
     }
   }
 
@@ -144,15 +188,20 @@ document.addEventListener('DOMContentLoaded', () => {
       const maxInput    = card.querySelector('[data-mapping-max-visible]');
       const showOtherCb = card.querySelector('[data-mapping-show-other]');
 
-      if (roleSelect) roleSelect.addEventListener('change', () => syncCardRole(card));
+      if (roleSelect) roleSelect.addEventListener('change', () => {
+        syncCardRole(card);
+        syncDefaultDropdown(card);
+      });
       if (typeSelect) typeSelect.addEventListener('change', () => {
         syncRowFieldType(card);
         updateChipsPreview(card);
         updateShowOtherHint(card);
+        syncDefaultDropdown(card);
       });
       if (allTA) allTA.addEventListener('input', () => {
         updateChipsPreview(card);
         updateShowOtherHint(card);
+        syncDefaultDropdown(card);
       });
       if (maxInput) maxInput.addEventListener('input', () => {
         updateChipsPreview(card);
@@ -165,6 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       updateChipsPreview(card);
       updateShowOtherHint(card);
+      syncDefaultDropdown(card);
     });
   }
 
@@ -210,7 +260,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!dims.length) return;
     const costs = {};
     pricingTableContainer.querySelectorAll('[data-pricing-cell]').forEach((inp) => {
-      costs[inp.dataset.pricingCell] = inp.value.trim();
+      costs[inp.dataset.pricingCell] = inp.value.trim().replace(/,/g, '.');
     });
     pricingBulkJsonTA.value = JSON.stringify({ cost_params: dims, costs }, null, 2);
   }
@@ -223,7 +273,14 @@ document.addEventListener('DOMContentLoaded', () => {
     inp.value = existingCosts[key] || '';
     inp.placeholder = '0.00';
     inp.autocomplete = 'off';
-    inp.addEventListener('input', serializePricingTable);
+    inp.addEventListener('input', function() {
+      if (inp.value.includes(',')) {
+        var pos = inp.selectionStart;
+        inp.value = inp.value.replace(/,/g, '.');
+        inp.setSelectionRange(pos, pos);
+      }
+      serializePricingTable();
+    });
     return inp;
   }
 
@@ -374,12 +431,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
       let optionsOverride = [];
       if (role === 'param' && ENUM_TYPES.has(fieldType) && allValues.length) {
-        optionsOverride = allValues.map((value, idx) => ({
-          value,
-          label: value,
-          featured: !showOther || idx < maxVisible,
-        }));
+        optionsOverride = allValues.map((raw, idx) => {
+          const parts = raw.split('|');
+          const value = parts[0].trim();
+          const label = parts.length > 1 ? parts[1].trim() : value;
+          return {
+            value,
+            label,
+            featured: !showOther || idx < maxVisible,
+          };
+        });
       }
+
+      const defaultSelect = card.querySelector('[data-mapping-default]');
+      const defaultValue = defaultSelect ? defaultSelect.value : '';
 
       return {
         placeholder,
@@ -389,6 +454,7 @@ document.addEventListener('DOMContentLoaded', () => {
         display_label:  labelInput ? labelInput.value.trim() : placeholder,
         request_path:   '',
         options_override: optionsOverride,
+        default_override: defaultValue || {},
         is_visible:     role === 'param',
       };
     });

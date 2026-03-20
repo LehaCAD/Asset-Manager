@@ -158,6 +158,12 @@ def describe_placeholder_for_admin(placeholder: str) -> str:
     return descriptions.get(placeholder, '')
 
 
+def _format_option_line(opt: dict[str, Any]) -> str:
+    v = str(opt['value'])
+    l = str(opt.get('label', v))
+    return f'{v}|{l}' if v != l else v
+
+
 def split_options_for_display(options: list[dict[str, Any]]) -> tuple[str, str, bool]:
     normalized = [option for option in options if isinstance(option, dict) and option.get('value') is not None]
     if not normalized:
@@ -166,10 +172,11 @@ def split_options_for_display(options: list[dict[str, Any]]) -> tuple[str, str, 
     featured = [opt for opt in normalized if opt.get('featured')]
     if not featured:
         featured = normalized[:3]
-    featured_values = [str(opt['value']) for opt in featured]
-    all_values = [str(opt['value']) for opt in normalized]
-    show_other = any(value not in featured_values for value in all_values)
-    return '\n'.join(all_values), '\n'.join(featured_values), show_other
+    featured_values_set = {str(opt['value']) for opt in featured}
+    all_values = [_format_option_line(opt) for opt in normalized]
+    featured_values_list = [_format_option_line(opt) for opt in featured]
+    show_other = any(str(opt['value']) not in featured_values_set for opt in normalized)
+    return '\n'.join(all_values), '\n'.join(featured_values_list), show_other
 
 
 def build_options_for_chips(options: list[dict[str, Any]], max_featured: int = 3) -> dict[str, Any]:
@@ -181,11 +188,12 @@ def build_options_for_chips(options: list[dict[str, Any]], max_featured: int = 3
     if not featured:
         featured = normalized[:max_featured]
     featured_set = {str(opt['value']) for opt in featured}
-    overflow = [str(opt['value']) for opt in normalized if str(opt['value']) not in featured_set]
+    featured_labels = [str(opt.get('label', opt['value'])) for opt in featured]
+    overflow_labels = [str(opt.get('label', opt['value'])) for opt in normalized if str(opt['value']) not in featured_set]
     return {
-        'featured': [str(opt['value']) for opt in featured],
-        'overflow': overflow,
-        'overflow_count': len(overflow),
+        'featured': featured_labels,
+        'overflow': overflow_labels,
+        'overflow_count': len(overflow_labels),
         'all_values': [str(opt['value']) for opt in normalized],
     }
 
@@ -301,6 +309,11 @@ def build_mapping_rows(ai_model: AIModel) -> list[dict[str, Any]]:
                     binding.options_override or binding.canonical_parameter.base_options or [], 3
                 ) if binding is not None else {'featured': [], 'overflow': [], 'overflow_count': 0, 'all_values': []},
                 'editor_hint': describe_placeholder_for_admin(placeholder),
+                'current_default': (
+                    binding.default_override
+                    if binding is not None and binding.default_override not in ({}, None, '')
+                    else ''
+                ),
             }
         )
 

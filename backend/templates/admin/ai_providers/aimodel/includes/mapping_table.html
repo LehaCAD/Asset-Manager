@@ -117,6 +117,13 @@
             </details>
           </div>
 
+          <div class="wf-card__default" data-mapping-default-section style="display:none">
+            <label class="wf-opts-editor__label">Значение по умолчанию</label>
+            <select data-mapping-default class="wf-select wf-select--inline" data-placeholder="{{ row.placeholder }}" data-initial-default="{{ row.current_default }}">
+              <option value="">— не задано —</option>
+            </select>
+          </div>
+
           {% if row.editor_hint %}
             <p class="wf-card__hint">{{ row.editor_hint }}</p>
           {% endif %}
