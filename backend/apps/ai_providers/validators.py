@@ -116,6 +116,11 @@ def validate_image_inputs_schema(value: Any) -> None:
                 group_slot_set.add(slot['key'])
             group_slot_keys[gkey] = group_slot_set
 
+            if 'extra_params' in group and not isinstance(group['extra_params'], dict):
+                raise ValidationError(
+                    f'Группа "{gkey}": extra_params должен быть объектом.'
+                )
+
         # Cross-reference: depends_on must reference slot key within SAME group
         for gi, group in enumerate(value['groups']):
             gkey = group['key']
