@@ -181,7 +181,7 @@ class AIModelAdmin(admin.ModelAdmin):
             seen_dimension_codes.add(code)
             pricing_dimensions.append({'code': code, 'label': row['label']})
         context['pricing_dimension_choices'] = pricing_dimensions
-        context['image_inputs_schema_json'] = json.dumps(obj.image_inputs_schema or [])
+        context['image_inputs_schema_json'] = json.dumps(obj.image_inputs_schema or []).replace('</', '<\\/')
         return context
 
     def save_related(self, request, form, formsets, change):

@@ -100,6 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
     el.querySelector('[data-ii-slot-min]').value         = slot.min != null ? slot.min : 0;
     el.querySelector('[data-ii-slot-max]').value         = slot.max != null ? slot.max : 1;
     el.querySelector('[data-ii-slot-depends-on]').value  = slot.depends_on || '';
+    el.dataset.pendingDependsOn = slot.depends_on || '';
 
     el.querySelector('[data-ii-remove-slot]').addEventListener('click', function() {
       el.remove();
@@ -233,6 +234,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (key === currentVal) opt.selected = true;
         select.appendChild(opt);
       });
+
+      // Restore pending depends_on value from initial load
+      var pending = slotEl.dataset.pendingDependsOn;
+      if (pending) {
+        select.value = pending;
+        delete slotEl.dataset.pendingDependsOn;
+      }
     });
   }
 

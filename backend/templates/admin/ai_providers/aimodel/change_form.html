@@ -4,8 +4,8 @@
 <div class="ai-model-workflow">
   <input type="hidden" name="mapping_payload" id="id_mapping_payload" value="{% firstof adminform.form.mapping_payload.value workflow.mapping_payload_json '[]' %}">
   <input type="hidden" name="pricing_dimensions" id="id_pricing_dimensions" value="{{ adminform.form.pricing_dimensions.value|default:'[]' }}">
-  <input type="hidden" name="image_inputs_payload" id="id_image_inputs_payload" value="">
-  <script type="application/json" id="image-inputs-initial">{{ workflow.image_inputs_schema_json|default:"[]" }}</script>
+  <input type="hidden" name="image_inputs_payload" id="id_image_inputs_payload" value="{{ workflow.image_inputs_schema_json|default:'[]'|escapejs }}">
+  <script type="application/json" id="image-inputs-initial">{{ workflow.image_inputs_schema_json|default:"[]"|safe }}</script>
 
   <div class="workflow-shell">
     <header class="workflow-hero">

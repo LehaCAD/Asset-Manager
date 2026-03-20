@@ -1095,13 +1095,13 @@
    Image Inputs Editor (Step 5)
    ═══════════════════════════════════════════════════════════ */
 
-.wf-tab-bar {
+.ai-model-workflow .wf-tab-bar {
   display: flex;
   gap: 0;
   border-bottom: 2px solid var(--wf-border);
   margin-bottom: 20px;
 }
-.wf-tab {
+.ai-model-workflow .wf-tab {
   padding: 8px 20px;
   border: none;
   background: none;
@@ -1112,19 +1112,19 @@
   margin-bottom: -2px;
   transition: color 0.15s, border-color 0.15s;
 }
-.wf-tab:hover { color: var(--wf-text); }
-.wf-tab--active {
+.ai-model-workflow .wf-tab:hover { color: var(--wf-text); }
+.ai-model-workflow .wf-tab--active {
   color: var(--wf-accent);
   border-bottom-color: var(--wf-accent);
   font-weight: 600;
 }
 
-.wf-toggle-row {
+.ai-model-workflow .wf-toggle-row {
   display: flex;
   gap: 24px;
   align-items: center;
 }
-.wf-radio-label {
+.ai-model-workflow .wf-radio-label {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1132,15 +1132,15 @@
   font-size: 14px;
 }
 
-.wf-ii-group {
+.ai-model-workflow .wf-ii-group {
   border: 1px solid var(--wf-border);
   border-radius: var(--wf-radius-sm);
   padding: 16px;
   margin-bottom: 16px;
   background: var(--wf-panel-soft);
 }
-.wf-ii-group__header { margin-bottom: 12px; }
-.wf-ii-group__title {
+.ai-model-workflow .wf-ii-group__header { margin-bottom: 12px; }
+.ai-model-workflow .wf-ii-group__title {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1148,37 +1148,37 @@
   font-weight: 600;
   margin-bottom: 8px;
 }
-.wf-ii-group__badge { color: var(--wf-accent); font-size: 14px; }
-.wf-ii-group__settings summary {
+.ai-model-workflow .wf-ii-group__badge { color: var(--wf-accent); font-size: 14px; }
+.ai-model-workflow .wf-ii-group__settings summary {
   cursor: pointer;
   font-size: 13px;
   color: var(--wf-muted);
   margin-bottom: 12px;
 }
-.wf-ii-group__slots {
+.ai-model-workflow .wf-ii-group__slots {
   display: flex;
   flex-direction: column;
   gap: 10px;
   margin-bottom: 12px;
 }
 
-.wf-ii-slot {
+.ai-model-workflow .wf-ii-slot {
   border: 1px solid #e5e7eb;
   border-radius: calc(var(--wf-radius-sm) - 2px);
   padding: 12px;
   background: #fff;
 }
-.wf-ii-slot__header {
+.ai-model-workflow .wf-ii-slot__header {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 10px;
 }
-.wf-ii-slot__badge { font-size: 10px; color: var(--wf-accent); }
+.ai-model-workflow .wf-ii-slot__badge { font-size: 10px; color: var(--wf-accent); }
 
-.wf-btn--sm { font-size: 12px; padding: 4px 12px; }
+.ai-model-workflow .wf-btn--sm { font-size: 12px; padding: 4px 12px; }
 
-.wf-btn-icon {
+.ai-model-workflow .wf-btn-icon {
   background: none;
   border: none;
   cursor: pointer;
@@ -1188,11 +1188,11 @@
   line-height: 1;
   transition: background 0.15s;
 }
-.wf-btn-icon:hover { background: rgba(0,0,0,0.05); }
-.wf-btn-icon--danger { color: #dc3545; }
-.wf-btn-icon--danger:hover { background: rgba(220,53,69,0.1); }
+.ai-model-workflow .wf-btn-icon:hover { background: rgba(0,0,0,0.05); }
+.ai-model-workflow .wf-btn-icon--danger { color: #dc3545; }
+.ai-model-workflow .wf-btn-icon--danger:hover { background: rgba(220,53,69,0.1); }
 
-.wf-validation-error {
+.ai-model-workflow .wf-validation-error {
   color: #dc3545;
   font-size: 13px;
   padding: 8px 12px;
@@ -1201,4 +1201,10 @@
   margin: 8px 0;
 }
 
-.wf-input--sm { padding: 4px 8px; font-size: 13px; }
+.ai-model-workflow .wf-input--sm { padding: 4px 8px; font-size: 13px; }
+
+.ai-model-workflow .wf-ii-group__settings .wf-muted-note {
+  font-size: 12px;
+  color: var(--wf-text-muted);
+  font-style: italic;
+}
