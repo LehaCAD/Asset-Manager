@@ -151,7 +151,7 @@ def finalize_generation_success(element_id: int, source_url: str) -> tuple[bool,
         (applied, file_url) where applied=False means another worker already finalized.
     """
     element = Element.objects.select_related("project", "scene").get(id=element_id)
-    file_url = _download_and_upload_result(
+    file_url, file_size = _download_and_upload_result(
         source_url=source_url,
         project_id=element.project_id,
         scene_id=element.scene_id,
@@ -160,6 +160,7 @@ def finalize_generation_success(element_id: int, source_url: str) -> tuple[bool,
     update_payload: dict[str, Any] = {
         "status": Element.STATUS_COMPLETED,
         "file_url": file_url,
+        "file_size": file_size,
         "error_message": "",
         "updated_at": timezone.now(),
     }
@@ -187,11 +188,12 @@ def finalize_generation_failure(element_id: int, error_message: str) -> bool:
     return updated > 0
 
 
-def _download_and_upload_result(source_url: str, project_id: int, scene_id: int) -> str:
-    """Stream file from provider to temp file and upload to S3."""
+def _download_and_upload_result(source_url: str, project_id: int, scene_id: int) -> tuple[str, int]:
+    """Stream file from provider to temp file and upload to S3. Returns (file_url, file_size)."""
     parsed_path = urlparse(source_url).path.lower()
     suffix = ".mp4" if parsed_path.endswith(".mp4") else ".jpg"
     tmp_path = ""
+    file_size = 0
 
     try:
         with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp_file:
@@ -202,11 +204,14 @@ def _download_and_upload_result(source_url: str, project_id: int, scene_id: int)
                     if chunk:
                         tmp_file.write(chunk)
 
-        return upload_staging_to_s3(
+        file_size = os.path.getsize(tmp_path)
+
+        file_url = upload_staging_to_s3(
             staging_path=tmp_path,
             project_id=project_id,
             scene_id=scene_id,
         )
+        return file_url, file_size
     finally:
         if tmp_path and os.path.exists(tmp_path):
             try:
