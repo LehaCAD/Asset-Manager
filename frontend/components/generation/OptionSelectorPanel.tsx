@@ -55,25 +55,31 @@ export function OptionSelectorPanel({
     <div
       ref={panelRef}
       className={cn(
-        "absolute left-full top-0 z-50 w-72",
-        "bg-background shadow-2xl rounded-lg",
+        "absolute left-full top-0 z-50 w-80",
+        "bg-card border border-border shadow-2xl rounded-md",
         "flex flex-col"
       )}
       style={{ maxHeight: 'calc(100vh - 280px)' }}
     >
       {/* Header */}
-      <div className="flex items-center p-3 shrink-0">
-        <h2 className="text-base font-semibold text-foreground truncate">{title}</h2>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
+        <h2 className="text-sm font-semibold text-foreground truncate">{title}</h2>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-muted-foreground hover:text-foreground transition-colors text-xs"
+        >
+          ✕
+        </button>
       </div>
 
-      {/* Scrollable options list */}
-      <div 
-        className="flex-1 overflow-y-auto px-3 pb-3"
-        style={{ scrollbarWidth: 'thin', scrollbarColor: 'hsl(var(--muted-foreground)) transparent' }}
+      {/* Scrollable options grid */}
+      <div
+        className="flex-1 overflow-y-auto p-3 scrollbar-thin"
       >
-        <div className="space-y-2">
+        <div className="grid grid-cols-3 gap-1.5">
           {options.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">
+            <p className="col-span-3 text-sm text-muted-foreground text-center py-8">
               Нет доступных опций
             </p>
           ) : (
@@ -84,14 +90,14 @@ export function OptionSelectorPanel({
                   key={String(option.value)}
                   onClick={() => handleSelect(option.value)}
                   className={cn(
-                    "w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors",
-                    "bg-muted/50 hover:bg-muted",
-                    isSelected && "ring-2 ring-primary bg-primary/5"
+                    "flex flex-col items-center justify-center gap-1 p-3 rounded-md text-center transition-all duration-150",
+                    "border",
+                    isSelected
+                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                      : "bg-card border-border text-muted-foreground hover:text-foreground hover:border-primary/40"
                   )}
                 >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm">{option.label}</p>
-                  </div>
+                  <span className="text-xs font-medium">{option.label}</span>
                 </button>
               );
             })

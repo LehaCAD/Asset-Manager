@@ -8,7 +8,7 @@ export default function WorkspaceLayout({
 }) {
   return (
     <AuthGuard>
-      <div className="flex min-h-screen flex-col bg-background">
+      <div className="flex h-screen flex-col bg-background overflow-hidden">
         <Navbar />
         <main className="flex-1 flex flex-col min-h-0">{children}</main>
       </div>
