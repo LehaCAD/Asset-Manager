@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -22,6 +23,14 @@ class Scene(models.Model):
         on_delete=models.CASCADE,
         related_name='scenes',
         verbose_name='Проект'
+    )
+    parent = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='children',
+        verbose_name='Родительская группа'
     )
     name = models.CharField(
         max_length=255,
@@ -57,9 +66,17 @@ class Scene(models.Model):
     )
 
     class Meta:
-        verbose_name = 'Сцена'
-        verbose_name_plural = 'Сцены'
         ordering = ['order_index', 'created_at']
+        verbose_name = 'Группа'
+        verbose_name_plural = 'Группы'
+
+    def clean(self):
+        super().clean()
+        if self.parent is not None and self.parent.parent is not None:
+            raise ValidationError(
+                'Максимальная вложенность — 2 уровня. '
+                'Нельзя поместить группу внутрь подгруппы.'
+            )
 
     def __str__(self) -> str:
         return f'{self.name} (Проект: {self.project.name})'
