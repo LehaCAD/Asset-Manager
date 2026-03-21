@@ -8,6 +8,7 @@ import {
   Pencil,
   Trash2,
   Layers,
+  Zap,
   ImageIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -36,7 +37,7 @@ import { Label } from "@/components/ui/label";
 import { useScenesStore } from "@/lib/store/scenes";
 import { scenesApi } from "@/lib/api/scenes";
 import { SCENE_STATUSES } from "@/lib/utils/constants";
-import { formatElementCount } from "@/lib/utils/format";
+import { formatElementCount, formatCurrency } from "@/lib/utils/format";
 import type { Scene } from "@/lib/types";
 
 interface SceneCardProps {
@@ -282,11 +283,19 @@ export function SceneCard({ scene, projectId, index, aspectClass = "aspect-video
               </DropdownMenu>
             </div>
           </div>
-          {/* Нижняя строка: количество элементов */}
-          <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
-            <Layers className="h-3 w-3" />
-            {formatElementCount(scene.element_count ?? 0)}
-          </p>
+          {/* Нижняя строка: количество элементов + потрачено */}
+          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+            <span className="flex items-center gap-1">
+              <Layers className="h-3 w-3" />
+              {formatElementCount(scene.element_count ?? 0)}
+            </span>
+            {scene.total_spent && parseFloat(scene.total_spent) > 0 && (
+              <span className="flex items-center gap-1">
+                <Zap className="h-3 w-3" />
+                {formatCurrency(scene.total_spent)}
+              </span>
+            )}
+          </div>
         </div>
         
       </div>
