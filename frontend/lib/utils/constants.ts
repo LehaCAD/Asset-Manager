@@ -36,9 +36,9 @@ export const ACCEPTED_VIDEO_TYPES = ["video/mp4", "video/webm", "video/mov"];
 export const MAX_FILE_SIZE_MB = 100;
 
 export const GRID_DENSITY_CONFIG = {
-  sm: { minSize: "140px", gap: "8px" },
-  md: { minSize: "200px", gap: "12px" },
-  lg: { minSize: "280px", gap: "16px" },
+  sm: { minSize: "140px", gap: "6px" },
+  md: { minSize: "180px", gap: "8px" },
+  lg: { minSize: "240px", gap: "12px" },
 } as const;
 
 export const DISPLAY_CARD_SIZES = [
@@ -142,45 +142,45 @@ export const CARD_TEXT_SIZES = {
 // CSS классы для grid с auto-fit
 export const DISPLAY_GRID_CONFIG = {
   compact: {
-    landscape: { 
-      gridStyle: "grid-template-columns: repeat(auto-fill, minmax(200px, 1fr))", 
-      gap: "gap-2" 
+    landscape: {
+      gridStyle: "grid-template-columns: repeat(auto-fill, minmax(180px, 1fr))",
+      gap: "gap-2"
     },
-    square:    { 
-      gridStyle: "grid-template-columns: repeat(auto-fill, minmax(140px, 1fr))", 
-      gap: "gap-2" 
+    square:    {
+      gridStyle: "grid-template-columns: repeat(auto-fill, minmax(180px, 1fr))",
+      gap: "gap-2"
     },
-    portrait:  { 
-      gridStyle: "grid-template-columns: repeat(auto-fill, minmax(120px, 1fr))", 
-      gap: "gap-2" 
+    portrait:  {
+      gridStyle: "grid-template-columns: repeat(auto-fill, minmax(180px, 1fr))",
+      gap: "gap-2"
     },
   },
   medium: {
-    landscape: { 
-      gridStyle: "grid-template-columns: repeat(auto-fill, minmax(260px, 1fr))", 
-      gap: "gap-3" 
+    landscape: {
+      gridStyle: "grid-template-columns: repeat(auto-fill, minmax(220px, 1fr))",
+      gap: "gap-2.5"
     },
-    square:    { 
-      gridStyle: "grid-template-columns: repeat(auto-fill, minmax(190px, 1fr))", 
-      gap: "gap-3" 
+    square:    {
+      gridStyle: "grid-template-columns: repeat(auto-fill, minmax(220px, 1fr))",
+      gap: "gap-2.5"
     },
-    portrait:  { 
-      gridStyle: "grid-template-columns: repeat(auto-fill, minmax(165px, 1fr))", 
-      gap: "gap-3" 
+    portrait:  {
+      gridStyle: "grid-template-columns: repeat(auto-fill, minmax(220px, 1fr))",
+      gap: "gap-2.5"
     },
   },
   large: {
-    landscape: { 
-      gridStyle: "grid-template-columns: repeat(auto-fill, minmax(320px, 1fr))", 
-      gap: "gap-4" 
+    landscape: {
+      gridStyle: "grid-template-columns: repeat(auto-fill, minmax(280px, 1fr))",
+      gap: "gap-3"
     },
-    square:    { 
-      gridStyle: "grid-template-columns: repeat(auto-fill, minmax(240px, 1fr))", 
-      gap: "gap-4" 
+    square:    {
+      gridStyle: "grid-template-columns: repeat(auto-fill, minmax(280px, 1fr))",
+      gap: "gap-3"
     },
-    portrait:  { 
-      gridStyle: "grid-template-columns: repeat(auto-fill, minmax(210px, 1fr))", 
-      gap: "gap-4" 
+    portrait:  {
+      gridStyle: "grid-template-columns: repeat(auto-fill, minmax(280px, 1fr))",
+      gap: "gap-3"
     },
   },
 } as const;
