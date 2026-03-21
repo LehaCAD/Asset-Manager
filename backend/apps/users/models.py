@@ -50,13 +50,13 @@ class UserQuota(models.Model):
     )
     max_scenes_per_project = models.IntegerField(
         default=20,
-        verbose_name='Максимум сцен на проект',
-        help_text='Максимальное количество сцен в одном проекте'
+        verbose_name='Макс. групп в проекте',
+        help_text='Максимальное количество групп в одном проекте'
     )
     max_elements_per_scene = models.IntegerField(
         default=10,
-        verbose_name='Максимум элементов на сцену',
-        help_text='Максимальное количество элементов в одной сцене'
+        verbose_name='Макс. элементов в группе',
+        help_text='Максимальное количество элементов в одной группе'
     )
     created_at = models.DateTimeField(
         auto_now_add=True,
