@@ -256,7 +256,7 @@ export function LightboxModal({
               "relative flex items-center justify-center",
               "w-full max-w-[80vw] md:max-w-[900px]",
               "h-full max-h-[65vh] md:max-h-[600px]",
-              "bg-muted/30 rounded-xl overflow-hidden"
+              "bg-muted/30 rounded-md overflow-hidden"
             )}
           >
             {isEmpty ? (

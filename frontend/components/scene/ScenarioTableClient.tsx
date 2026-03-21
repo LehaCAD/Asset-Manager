@@ -155,7 +155,7 @@ export function ScenarioTableClient({ projectId }: ScenarioTableClientProps) {
 
 function SceneCardSkeleton({ aspectClass = "aspect-video" }: { aspectClass?: string }) {
   return (
-    <div className="rounded-xl overflow-hidden border border-border bg-card">
+    <div className="rounded-md overflow-hidden border border-border bg-card">
       <Skeleton className={cn("w-full", aspectClass)} />
       <div className="p-3 flex items-center justify-between">
         <div className="space-y-1.5 flex-1">
@@ -171,7 +171,7 @@ function SceneCardSkeleton({ aspectClass = "aspect-video" }: { aspectClass?: str
 function EmptyState({ onCreateClick }: { onCreateClick: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
-      <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-muted mb-6">
+      <div className="flex h-20 w-20 items-center justify-center rounded-lg bg-muted mb-6">
         <Clapperboard className="h-10 w-10 text-muted-foreground" />
       </div>
       <h2 className="text-xl font-semibold mb-2">Нет групп</h2>

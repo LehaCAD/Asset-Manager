@@ -586,7 +586,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
 
         {/* Whole-area drag overlay */}
         {isDragActive && hasContent && (
-          <div className="absolute inset-0 z-50 border-2 border-dashed border-primary bg-primary/5 rounded-xl flex items-center justify-center pointer-events-none">
+          <div className="absolute inset-0 z-50 border-2 border-dashed border-primary bg-primary/5 rounded-md flex items-center justify-center pointer-events-none">
             <div className="flex flex-col items-center gap-3">
               <Upload className="h-10 w-10 text-primary animate-pulse" />
               <p className="text-lg font-medium text-primary">Отпустите файлы для загрузки</p>

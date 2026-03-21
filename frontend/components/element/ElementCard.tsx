@@ -114,7 +114,7 @@ export function ElementCard({
   return (
     <div
       className={cn(
-        "group relative rounded-xl overflow-hidden cursor-pointer",
+        "group relative rounded-md overflow-hidden cursor-pointer",
         "bg-muted transition-transform duration-150 ease-out",
         "hover:scale-[1.02] hover:shadow-lg",
         isSelected && "ring-2 ring-primary scale-[1.01]",

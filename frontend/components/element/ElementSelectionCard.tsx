@@ -35,7 +35,7 @@ export function ElementSelectionCard({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "group relative rounded-xl overflow-hidden cursor-pointer",
+        "group relative rounded-md overflow-hidden cursor-pointer",
         "bg-muted transition-all duration-150",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary",
         aspectClass,

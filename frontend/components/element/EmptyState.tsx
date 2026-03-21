@@ -13,7 +13,7 @@ export function EmptyState({ onUploadClick, isDragActive = false }: EmptyStatePr
       onClick={onUploadClick}
       className={cn(
         "w-full h-full min-h-[300px] flex flex-col items-center justify-center gap-5",
-        "rounded-2xl border-2 border-dashed transition-all duration-200",
+        "rounded-lg border-2 border-dashed transition-all duration-200",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
         "active:scale-[0.99]",
         isDragActive
@@ -24,7 +24,7 @@ export function EmptyState({ onUploadClick, isDragActive = false }: EmptyStatePr
       {/* Large upload icon container */}
       <div
         className={cn(
-          "relative w-24 h-24 rounded-2xl flex items-center justify-center",
+          "relative w-24 h-24 rounded-lg flex items-center justify-center",
           "transition-all duration-200",
           isDragActive
             ? "bg-primary/10 scale-110"
