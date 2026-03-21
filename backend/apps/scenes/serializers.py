@@ -4,21 +4,33 @@ from .models import Scene
 
 class SceneSerializer(serializers.ModelSerializer):
     """Сериализатор для модели Scene."""
-    
+
     elements_count = serializers.SerializerMethodField()
     project_name = serializers.SerializerMethodField()
     headliner_url = serializers.SerializerMethodField()
     headliner_thumbnail_url = serializers.SerializerMethodField()
     headliner_type = serializers.SerializerMethodField()
     status_display = serializers.SerializerMethodField()
-    
+    parent = serializers.PrimaryKeyRelatedField(
+        queryset=Scene.objects.all(),
+        required=False,
+        allow_null=True
+    )
+    parent_name = serializers.SerializerMethodField()
+    children_count = serializers.SerializerMethodField()
+    depth = serializers.SerializerMethodField()
+
     class Meta:
         model = Scene
         fields = [
-            'id', 
-            'project', 
+            'id',
+            'project',
             'project_name',
             'name',
+            'parent',
+            'parent_name',
+            'children_count',
+            'depth',
             'status',
             'status_display',
             'order_index',
@@ -27,11 +39,28 @@ class SceneSerializer(serializers.ModelSerializer):
             'headliner_thumbnail_url',
             'headliner_type',
             'elements_count',
-            'created_at', 
+            'created_at',
             'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
     
+    def validate_parent(self, value):
+        if value and value.parent is not None:
+            raise serializers.ValidationError(
+                'Максимальная вложенность — 2 уровня.'
+            )
+        return value
+
+    def get_parent_name(self, obj):
+        return obj.parent.name if obj.parent else None
+
+    def get_children_count(self, obj):
+        # Use annotated value to avoid N+1
+        return getattr(obj, '_children_count', obj.children.count())
+
+    def get_depth(self, obj):
+        return 1 if obj.parent else 0
+
     def get_elements_count(self, obj: Scene) -> int:
         """Получение количества элементов в сцене."""
         return obj.elements.count()

@@ -2,6 +2,7 @@ from decimal import Decimal
 from uuid import uuid4
 
 from django.db import transaction
+from django.db.models import Count
 from rest_framework import viewsets, permissions, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -41,13 +42,23 @@ class SceneViewSet(viewsets.ModelViewSet):
         """Возвращает только сцены проектов текущего пользователя с фильтрацией."""
         queryset = Scene.objects.filter(
             project__user=self.request.user
-        ).select_related('project', 'headliner').prefetch_related('elements')
-        
+        ).annotate(
+            _children_count=Count('children')
+        ).select_related('project', 'headliner', 'parent').prefetch_related('elements')
+
         # Фильтрация по project через query params
         project_id = self.request.query_params.get('project', None)
         if project_id is not None:
             queryset = queryset.filter(project_id=project_id)
-        
+
+        # Фильтрация по parent
+        parent_id = self.request.query_params.get('parent')
+        parent_null = self.request.query_params.get('parent__isnull')
+        if parent_id:
+            queryset = queryset.filter(parent_id=parent_id)
+        if parent_null == 'true':
+            queryset = queryset.filter(parent__isnull=True)
+
         return queryset
     
     def create(self, request, *args, **kwargs):
