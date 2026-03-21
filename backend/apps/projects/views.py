@@ -2,13 +2,20 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from django.db.models import Sum, Count, Value, DecimalField, BigIntegerField, Subquery, OuterRef
+from django.db.models.functions import Coalesce, Abs
+
 from .models import Project
-from .serializers import ProjectSerializer
+from .serializers import ProjectSerializer, ProjectStatsSerializer
+from apps.elements.models import Element
+from apps.credits.models import CreditsTransaction
+from apps.scenes.models import Scene
+from apps.common.utils import format_storage
 
 
 class IsOwner(permissions.BasePermission):
     """Пермишен: пользователь может работать только со своими проектами."""
-    
+
     def has_object_permission(self, request, view, obj):
         return obj.user == request.user
 
@@ -16,7 +23,7 @@ class IsOwner(permissions.BasePermission):
 class ProjectViewSet(viewsets.ModelViewSet):
     """
     ViewSet для CRUD операций с проектами.
-    
+
     list: Получить список проектов текущего пользователя
     create: Создать новый проект
     retrieve: Получить детали проекта
@@ -26,15 +33,41 @@ class ProjectViewSet(viewsets.ModelViewSet):
     """
     serializer_class = ProjectSerializer
     permission_classes = [IsAuthenticated, IsOwner]
-    
+
     def get_queryset(self):
-        """Возвращает только проекты текущего пользователя."""
-        return Project.objects.filter(user=self.request.user).prefetch_related('scenes')
-    
+        """Возвращает только проекты текущего пользователя с аннотациями метрик."""
+        spent_subquery = Subquery(
+            CreditsTransaction.objects.filter(
+                element__project=OuterRef('pk'),
+                reason=CreditsTransaction.REASON_GENERATION_DEBIT,
+            ).values('element__project').annotate(
+                total=Abs(Sum('amount'))
+            ).values('total')[:1],
+            output_field=DecimalField()
+        )
+
+        storage_subquery = Subquery(
+            Element.objects.filter(
+                project=OuterRef('pk'),
+                file_size__isnull=False,
+            ).values('project').annotate(
+                total=Sum('file_size')
+            ).values('total')[:1],
+            output_field=BigIntegerField()
+        )
+
+        return Project.objects.filter(
+            user=self.request.user
+        ).annotate(
+            _element_count=Count('elements'),
+            _total_spent=Coalesce(spent_subquery, Value(0), output_field=DecimalField()),
+            _storage_bytes=Coalesce(storage_subquery, Value(0), output_field=BigIntegerField()),
+        ).prefetch_related('scenes')
+
     def perform_create(self, serializer):
         """При создании автоматически устанавливает текущего пользователя и проверяет лимиты."""
         user = self.request.user
-        
+
         # # Проверяем лимит проектов
         # user_quota = user.quota
         # current_projects_count = Project.objects.filter(user=user).count()
@@ -54,9 +87,6 @@ class ProjectViewSet(viewsets.ModelViewSet):
         """
         project = self.get_object()
         item_order = request.data.get('item_order', [])
-
-        from apps.elements.models import Element
-        from apps.scenes.models import Scene
 
         for index, item in enumerate(item_order):
             item_type = item.get('type')
@@ -106,3 +136,47 @@ class ProjectViewSet(viewsets.ModelViewSet):
             ai_model_id=request.data.get('ai_model'),
         )
         return Response(data, status=http_status)
+
+    @action(detail=True, methods=['get'])
+    def stats(self, request, pk=None):
+        """
+        Детальная статистика проекта.
+
+        GET /api/projects/{id}/stats/
+        """
+        project = self.get_object()
+
+        total_spent = CreditsTransaction.objects.filter(
+            element__project=project,
+            reason=CreditsTransaction.REASON_GENERATION_DEBIT,
+        ).aggregate(total=Sum('amount'))['total'] or 0
+        total_spent = abs(total_spent)
+
+        elements_count = Element.objects.filter(project=project).count()
+
+        storage_bytes = Element.objects.filter(
+            project=project,
+            file_size__isnull=False,
+        ).aggregate(total=Sum('file_size'))['total'] or 0
+
+        groups_count = Scene.objects.filter(project=project).count()
+
+        last_tx = CreditsTransaction.objects.filter(
+            element__project=project,
+            reason=CreditsTransaction.REASON_GENERATION_DEBIT,
+        ).select_related('element__ai_model').order_by('-created_at').first()
+
+        data = {
+            'total_spent': total_spent,
+            'elements_count': elements_count,
+            'storage_bytes': storage_bytes,
+            'storage_display': format_storage(storage_bytes),
+            'groups_count': groups_count,
+            'last_generation_cost': abs(last_tx.amount) if last_tx else None,
+            'last_generation_model': (
+                last_tx.element.ai_model.name
+                if last_tx and last_tx.element and last_tx.element.ai_model
+                else None
+            ),
+        }
+        return Response(ProjectStatsSerializer(data).data)
