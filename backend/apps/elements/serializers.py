@@ -6,16 +6,21 @@ class ElementSerializer(serializers.ModelSerializer):
     """Сериализатор для модели Element."""
     
     scene_name = serializers.SerializerMethodField()
+    project_name = serializers.SerializerMethodField()
+    group_name = serializers.SerializerMethodField()
     ai_model_name = serializers.SerializerMethodField()
     status_display = serializers.SerializerMethodField()
     source_type_display = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = Element
         fields = [
             'id',
+            'project',
+            'project_name',
             'scene',
             'scene_name',
+            'group_name',
             'element_type',
             'order_index',
             'file_url',
@@ -36,10 +41,18 @@ class ElementSerializer(serializers.ModelSerializer):
             'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'external_task_id']
-    
+
     def get_scene_name(self, obj) -> str:
         """Получение названия сцены."""
-        return obj.scene.name
+        return obj.scene.name if obj.scene else None
+
+    def get_project_name(self, obj) -> str:
+        """Получение названия проекта."""
+        return obj.project.name
+
+    def get_group_name(self, obj):
+        """Получение названия группы (сцены)."""
+        return obj.scene.name if obj.scene else None
     
     def get_ai_model_name(self, obj) -> str:
         """Получение названия AI модели."""

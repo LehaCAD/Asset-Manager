@@ -36,6 +36,7 @@ class ElementModelTest(TestCase):
     
     def test_create_element_image(self):
         element = Element.objects.create(
+            project=self.project,
             scene=self.scene,
             element_type=Element.ELEMENT_TYPE_IMAGE,
             file_url='https://example.com/image.jpg',
@@ -48,6 +49,7 @@ class ElementModelTest(TestCase):
     
     def test_create_element_video(self):
         element = Element.objects.create(
+            project=self.project,
             scene=self.scene,
             element_type=Element.ELEMENT_TYPE_VIDEO,
             file_url='https://example.com/video.mp4'
@@ -56,28 +58,30 @@ class ElementModelTest(TestCase):
     
     def test_element_str(self):
         element = Element.objects.create(
+            project=self.project,
             scene=self.scene,
             element_type=Element.ELEMENT_TYPE_IMAGE
         )
-        expected_str = f'Изображение #{element.id} (Сцена: {self.scene.name})'
+        expected_str = f'IMAGE - {self.scene.name} - {element.id}'
         self.assertEqual(str(element), expected_str)
     
     def test_element_ordering(self):
-        element1 = Element.objects.create(scene=self.scene, element_type=Element.ELEMENT_TYPE_IMAGE, order_index=1)
-        element2 = Element.objects.create(scene=self.scene, element_type=Element.ELEMENT_TYPE_VIDEO, order_index=0)
+        element1 = Element.objects.create(project=self.project, scene=self.scene, element_type=Element.ELEMENT_TYPE_IMAGE, order_index=1)
+        element2 = Element.objects.create(project=self.project, scene=self.scene, element_type=Element.ELEMENT_TYPE_VIDEO, order_index=0)
         
         elements = Element.objects.all()
         self.assertEqual(elements[0], element2)
         self.assertEqual(elements[1], element1)
     
     def test_element_related_name(self):
-        Element.objects.create(scene=self.scene, element_type=Element.ELEMENT_TYPE_IMAGE)
-        Element.objects.create(scene=self.scene, element_type=Element.ELEMENT_TYPE_VIDEO)
+        Element.objects.create(project=self.project, scene=self.scene, element_type=Element.ELEMENT_TYPE_IMAGE)
+        Element.objects.create(project=self.project, scene=self.scene, element_type=Element.ELEMENT_TYPE_VIDEO)
         
         self.assertEqual(self.scene.elements.count(), 2)
     
     def test_element_type_choices(self):
         element = Element.objects.create(
+            project=self.project,
             scene=self.scene,
             element_type=Element.ELEMENT_TYPE_IMAGE
         )

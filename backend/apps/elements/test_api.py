@@ -62,6 +62,7 @@ class ElementAPITest(APITestCase):
         )
         
         self.element1 = Element.objects.create(
+            project=self.project1,
             scene=self.scene1,
             element_type=Element.ELEMENT_TYPE_IMAGE,
             file_url='https://example.com/1.jpg',
@@ -70,6 +71,7 @@ class ElementAPITest(APITestCase):
             ai_model=self.ai_model
         )
         self.element2 = Element.objects.create(
+            project=self.project1,
             scene=self.scene1,
             element_type=Element.ELEMENT_TYPE_VIDEO,
             file_url='https://example.com/2.mp4',
@@ -77,12 +79,14 @@ class ElementAPITest(APITestCase):
             is_favorite=False
         )
         self.element3 = Element.objects.create(
+            project=self.project1,
             scene=self.scene2,
             element_type=Element.ELEMENT_TYPE_IMAGE,
             file_url='https://example.com/3.jpg',
             is_favorite=True
         )
         self.element4 = Element.objects.create(
+            project=self.project2,
             scene=self.scene3,
             element_type=Element.ELEMENT_TYPE_IMAGE,
             file_url='https://example.com/4.jpg'
@@ -133,6 +137,7 @@ class ElementAPITest(APITestCase):
     def test_create_element(self):
         self.client.force_authenticate(user=self.user1)
         data = {
+            'project': self.project1.id,
             'scene': self.scene1.id,
             'element_type': Element.ELEMENT_TYPE_IMAGE,
             'file_url': 'https://example.com/new.jpg',

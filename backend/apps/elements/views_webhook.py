@@ -11,6 +11,7 @@ from apps.common.generation import (
     extract_result_url,
     finalize_generation_failure,
     finalize_generation_success,
+    normalize_provider_response,
 )
 from apps.elements.models import Element
 from apps.elements.tasks import notify_element_status
@@ -36,21 +37,30 @@ def generation_callback_view(request):
         return Response({"error": "Invalid JSON body"}, status=status.HTTP_400_BAD_REQUEST)
 
     task_id = _get_callback_field(payload, "taskId", "").strip()
-    state = str(_get_callback_field(payload, "state", "")).lower().strip()
     if not task_id:
         return Response({"error": "taskId is required"}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        element = Element.objects.select_related("scene", "scene__project").get(external_task_id=task_id)
+        element = Element.objects.select_related(
+            "project", "scene", "ai_model"
+        ).get(external_task_id=task_id)
     except Element.DoesNotExist:
         return Response({"error": "Element with taskId not found"}, status=status.HTTP_404_NOT_FOUND)
 
     if element.status in (Element.STATUS_COMPLETED, Element.STATUS_FAILED):
         return Response({"status": "ignored", "reason": "already_finalized"}, status=status.HTTP_200_OK)
 
+    # Determine response mapping from model config
+    response_mapping = getattr(element.ai_model, 'response_mapping', None) or {}
+    normalized = normalize_provider_response(payload, response_mapping)
+    state = normalized["state"]
+
     try:
         if state == "success":
-            source_url = extract_result_url(payload)
+            source_url = normalized.get("result_url")
+            if not source_url:
+                # Fallback: try standard extraction
+                source_url = extract_result_url(payload)
             applied, file_url = finalize_generation_success(element.id, source_url)
             if applied:
                 updated = Element.objects.get(id=element.id)
@@ -61,7 +71,7 @@ def generation_callback_view(request):
             )
 
         if state == "failed":
-            fail_msg = str(_get_callback_field(payload, "failMsg", "Generation failed"))
+            fail_msg = normalized.get("error") or "Generation failed"
             applied = finalize_generation_failure(element.id, fail_msg)
             if applied:
                 updated = Element.objects.get(id=element.id)
@@ -71,7 +81,7 @@ def generation_callback_view(request):
                 status=status.HTTP_200_OK,
             )
 
-        logger.info("Webhook state not final for taskId=%s, state=%s", task_id, state)
+        logger.info("Webhook state not final for taskId=%s, state=%s, format=%s", task_id, state, response_format)
         return Response(
             {"status": "ignored", "reason": "state_not_final", "state": state},
             status=status.HTTP_200_OK,

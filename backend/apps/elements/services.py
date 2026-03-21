@@ -97,8 +97,14 @@ def build_generation_context(
 
     for binding in ai_model.parameter_bindings.select_related('canonical_parameter').all():
         canonical_code = binding.canonical_parameter.code
+        # Map canonical code → placeholder name if needed
         if canonical_code in context and binding.placeholder not in context:
             context[binding.placeholder] = context[canonical_code]
+        # Fill in default for missing parameters
+        if binding.placeholder not in context:
+            default = binding.default_override
+            if default not in ({}, None, ''):
+                context[binding.placeholder] = default
 
     return context
 
@@ -113,7 +119,7 @@ def create_element(
 ) -> Element:
     """
     Создание нового элемента.
-    
+
     Args:
         scene: Сцена, к которой относится элемент
         element_type: Тип элемента (IMAGE или VIDEO)
@@ -121,12 +127,13 @@ def create_element(
         thumbnail_url: URL превью (опционально)
         prompt_text: Текст промпта (опционально)
         is_favorite: Избранное (по умолчанию False)
-        
+
     Returns:
         Созданный элемент
     """
     element = Element.objects.create(
         scene=scene,
+        project=scene.project,
         element_type=element_type,
         file_url=file_url,
         thumbnail_url=thumbnail_url,
@@ -205,7 +212,7 @@ def get_scene_elements(scene: Scene, element_type: Optional[str] = None) -> List
     Returns:
         Список элементов, отсортированных по дате создания (новые первыми)
     """
-    queryset = Element.objects.filter(scene=scene).select_related('scene', 'scene__project')
+    queryset = Element.objects.filter(scene=scene).select_related('project', 'scene')
     
     if element_type:
         queryset = queryset.filter(element_type=element_type)
@@ -225,7 +232,7 @@ def get_favorite_elements(scene: Scene) -> List[Element]:
     """
     return list(
         Element.objects.filter(scene=scene, is_favorite=True)
-        .select_related('scene', 'scene__project')
+        .select_related('project', 'scene')
     )
 
 

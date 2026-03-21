@@ -31,8 +31,99 @@ def is_public_callback_url(base_url: str) -> bool:
     return host not in {"localhost", "127.0.0.1", "0.0.0.0", "::1"}
 
 
+def _resolve_path(obj: Any, path: str) -> Any:
+    """
+    Resolve a dot-separated path on a nested dict/list.
+    Example: _resolve_path({"data": {"response": {"resultUrls": ["url"]}}}, "data.response.resultUrls.0")
+    → "url"
+    """
+    for part in path.split('.'):
+        if obj is None:
+            return None
+        if isinstance(obj, dict):
+            obj = obj.get(part)
+        elif isinstance(obj, list):
+            try:
+                obj = obj[int(part)]
+            except (ValueError, IndexError):
+                return None
+        else:
+            return None
+    return obj
+
+
+def normalize_provider_response(payload: dict[str, Any], response_mapping: dict[str, Any] | None = None) -> dict[str, Any]:
+    """
+    Normalize provider response using a configurable mapping.
+
+    response_mapping fields:
+        state_path:      dot-path to status field (default: "data.state")
+        success_value:   value meaning success (default: "success")
+        failed_values:   list of values meaning failed (default: ["failed"])
+        result_url_path: dot-path to first result URL (default: "data.resultJson.resultUrls.0")
+        error_path:      dot-path to error message (default: "data.failMsg")
+
+    Returns: {"state": "success"|"failed"|"processing", "result_url": str|None, "error": str|None}
+    """
+    mapping = response_mapping or {}
+
+    # Resolve state
+    state_path = mapping.get('state_path', 'data.state')
+    raw_state = _resolve_path(payload, state_path)
+
+    # If custom mapping is set but state field not found — flag it
+    mapping_error = None
+    if mapping and raw_state is None:
+        mapping_error = f"response_mapping: поле '{state_path}' не найдено в ответе"
+
+    success_value = mapping.get('success_value', 'success')
+    failed_values = mapping.get('failed_values', ['failed', 'fail'])
+
+    if raw_state == success_value or (isinstance(raw_state, str) and raw_state.lower() == str(success_value).lower()):
+        state = 'success'
+    elif raw_state in failed_values:
+        state = 'failed'
+    elif isinstance(raw_state, str) and raw_state.lower() in [str(v).lower() for v in failed_values]:
+        state = 'failed'
+    else:
+        state = 'processing'
+
+    # Check top-level code field (common Kie.ai pattern)
+    code = payload.get('code')
+    if code is not None and code != 200 and state == 'processing':
+        state = 'failed'
+
+    # Resolve result URL
+    result_url = None
+    if state == 'success':
+        url_path = mapping.get('result_url_path', '')
+        if url_path:
+            result_url = _resolve_path(payload, url_path)
+        # Handle case where resultUrls is a JSON string
+        if isinstance(result_url, str) and result_url.startswith('['):
+            try:
+                parsed = json.loads(result_url)
+                result_url = parsed[0] if parsed else None
+            except (json.JSONDecodeError, IndexError):
+                pass
+        # Fallback: try standard extraction
+        if not result_url:
+            try:
+                result_url = extract_result_url(payload)
+            except ValueError:
+                pass
+
+    # Resolve error
+    error_path = mapping.get('error_path', 'data.failMsg')
+    error = _resolve_path(payload, error_path)
+    if not error and state == 'failed':
+        error = payload.get('msg') or 'Generation failed'
+
+    return {"state": state, "result_url": result_url, "error": error, "mapping_error": mapping_error}
+
+
 def extract_result_url(payload: dict[str, Any]) -> str:
-    """Extract first result URL from Kie.ai response payload."""
+    """Extract first result URL from standard Kie.ai response payload."""
     data = payload.get("data", payload)
     result_json = data.get("resultJson")
     result_urls = data.get("resultUrls", [])
@@ -59,10 +150,10 @@ def finalize_generation_success(element_id: int, source_url: str) -> tuple[bool,
     Returns:
         (applied, file_url) where applied=False means another worker already finalized.
     """
-    element = Element.objects.select_related("scene", "scene__project").get(id=element_id)
+    element = Element.objects.select_related("project", "scene").get(id=element_id)
     file_url = _download_and_upload_result(
         source_url=source_url,
-        project_id=element.scene.project_id,
+        project_id=element.project_id,
         scene_id=element.scene_id,
     )
 

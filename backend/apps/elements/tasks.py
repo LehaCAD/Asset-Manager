@@ -21,6 +21,7 @@ from apps.common.generation import (
     finalize_generation_failure,
     finalize_generation_success,
     is_public_callback_url,
+    normalize_provider_response,
 )
 from apps.credits.models import CreditsTransaction
 from apps.credits.services import CreditsService
@@ -42,7 +43,7 @@ def notify_element_status(element: Element, status: str, file_url: str = '', err
         if channel_layer is None:
             return
 
-        project_id = element.scene.project_id
+        project_id = element.project_id
         group_name = f'project_{project_id}'
 
         async_to_sync(channel_layer.group_send)(
@@ -237,7 +238,7 @@ def start_generation(self, element_id: int) -> dict:
 
         # Критическая ошибка — переводим в FAILED, делаем refund и уведомляем фронтенд
         try:
-            element = Element.objects.get(id=element_id)
+            element = Element.objects.select_related('project').get(id=element_id)
             # Возврат средств при ошибке провайдера
             _refund_for_failure(element)
             finalize_generation_failure(element_id=element_id, error_message=str(e))
@@ -272,14 +273,18 @@ def check_generation_status(self, element_id: int) -> dict:
             raise ValueError("External task_id не найден")
         
         provider = element.ai_model.provider
-        
-        # URL для проверки статуса (Kie.ai: /api/v1/jobs/recordInfo)
-        check_url = f"{provider.base_url.rstrip('/')}/api/v1/jobs/recordInfo"
-        
+        response_mapping = element.ai_model.response_mapping or {}
+
+        # URL для проверки статуса — из модели или дефолт
+        status_endpoint = element.ai_model.status_check_endpoint
+        if not status_endpoint:
+            status_endpoint = '/api/v1/jobs/recordInfo'
+        check_url = f"{provider.base_url.rstrip('/')}/{status_endpoint.lstrip('/')}"
+
         headers = {}
         if provider.api_key:
             headers['Authorization'] = f'Bearer {provider.api_key}'
-        
+
         # Запрос статуса
         response = requests.get(
             check_url,
@@ -287,61 +292,81 @@ def check_generation_status(self, element_id: int) -> dict:
             headers=headers,
             timeout=30
         )
-        
+
         response.raise_for_status()
         result = response.json()
-        
-        data = result.get('data', {})
-        state = data.get('state', '').lower()
-        
-        logger.info("Статус генерации Element #%s: %s", element_id, state)
-        
+
+        normalized = normalize_provider_response(result, response_mapping)
+        state = normalized['state']
+
+        if normalized.get('mapping_error'):
+            logger.error(
+                "Element #%s: %s. Raw: %s",
+                element_id, normalized['mapping_error'], str(result)[:300],
+            )
+
+        logger.info("Статус генерации Element #%s: state=%s", element_id, state)
+
         if state == 'success':
-            source_url = extract_result_url(result)
+            source_url = normalized.get('result_url')
+            if not source_url:
+                raise ValueError("Генерация завершена, но result_url пустой")
+
             applied, s3_url = finalize_generation_success(element_id=element_id, source_url=source_url)
             if applied:
                 updated_element = Element.objects.get(id=element_id)
                 notify_element_status(updated_element, 'COMPLETED', file_url=s3_url)
-            
+
             return {
                 'element_id': element_id,
                 'status': 'completed',
                 'file_url': s3_url,
                 'applied': applied,
             }
-            
+
         elif state == 'failed':
-            # Генерация failed
-            fail_msg = data.get('failMsg', 'Unknown error')
-            
+            fail_msg = normalized.get('error') or 'Unknown error'
+
             try:
-                element = Element.objects.get(id=element_id)
-                # Возврат средств при ошибке провайдера
+                element = Element.objects.select_related('project').get(id=element_id)
                 _refund_for_failure(element, reason=fail_msg)
             except Element.DoesNotExist:
                 pass
-            
+
             applied = finalize_generation_failure(element_id=element_id, error_message=fail_msg)
             if applied:
                 updated_element = Element.objects.get(id=element_id)
                 notify_element_status(updated_element, 'FAILED', error_message=fail_msg)
             logger.warning("Генерация failed для Element #%s: %s", element_id, fail_msg)
-            
+
             return {
                 'element_id': element_id,
                 'status': 'failed',
                 'error': fail_msg,
                 'applied': applied,
             }
-            
+
         else:
             # Еще в процессе (pending, processing, etc.)
-            logger.info(
-                "Генерация в процессе Element #%s: %s, повтор через 10 сек",
-                element_id,
-                state,
-            )
-            
+            retry_count = self.request.retries or 0
+
+            # Первые 3 раза и потом каждые 10 — логируем raw ответ для дебага
+            if retry_count < 3 or retry_count % 10 == 0:
+                logger.info(
+                    "Генерация в процессе Element #%s: state=%s, retry=%d, raw_data_keys=%s",
+                    element_id, state, retry_count,
+                    list((result.get('data') or {}).keys()),
+                )
+
+            # Если после 10 попыток state всё ещё не распознан —
+            # скорее всего маппинг кривой, логируем WARNING с полным ответом
+            if retry_count == 10:
+                logger.warning(
+                    "Element #%s: 10 попыток, state=%s. Возможно кривой response_mapping. "
+                    "Raw response: %s",
+                    element_id, state, str(result)[:500],
+                )
+
             # Retry через 10 секунд
             raise self.retry(countdown=10, max_retries=60)
         
@@ -373,11 +398,11 @@ def process_uploaded_file(self, element_id: int, staging_path: str) -> dict:
     Вызывается из upload view вместо синхронной загрузки в S3.
     """
     try:
-        element = Element.objects.select_related('scene', 'scene__project').get(id=element_id)
+        element = Element.objects.select_related('project', 'scene').get(id=element_id)
 
         file_url = upload_staging_to_s3(
             staging_path,
-            project_id=element.scene.project_id,
+            project_id=element.project_id,
             scene_id=element.scene_id,
         )
 
@@ -390,7 +415,7 @@ def process_uploaded_file(self, element_id: int, staging_path: str) -> dict:
         elif element.element_type == Element.ELEMENT_TYPE_VIDEO:
             thumbnail_url = generate_video_thumbnail_from_path(
                 staging_path,
-                project_id=element.scene.project_id,
+                project_id=element.project_id,
                 scene_id=element.scene_id,
             )
             element.thumbnail_url = thumbnail_url or ''
@@ -436,7 +461,7 @@ def generate_upload_thumbnail(self, element_id: int) -> dict:
         import tempfile as _tempfile
         import os as _os
 
-        element = Element.objects.select_related('scene', 'scene__project').get(id=element_id)
+        element = Element.objects.select_related('project', 'scene').get(id=element_id)
 
         if element.element_type != Element.ELEMENT_TYPE_VIDEO:
             return {'element_id': element_id, 'status': 'skipped', 'reason': 'not_video'}
@@ -453,7 +478,7 @@ def generate_upload_thumbnail(self, element_id: int) -> dict:
 
         thumbnail_url = generate_video_thumbnail_from_path(
             tmp_path,
-            project_id=element.scene.project_id,
+            project_id=element.project_id,
             scene_id=element.scene_id,
         )
         if not thumbnail_url:
@@ -510,8 +535,8 @@ def _refund_for_failure(element: Element, reason: str = "provider_error") -> Non
         logger.error("Некорректная сумма списания '%s' для Element #%s", debit_amount_str, element.id)
         return
     
-    # Получаем пользователя через сцену и проект
-    user = element.scene.project.user
+    # Получаем пользователя через проект
+    user = element.project.user
     
     # Выполняем refund
     credits_service = CreditsService()

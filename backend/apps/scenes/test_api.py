@@ -57,11 +57,13 @@ class SceneAPITest(APITestCase):
         )
         
         Element.objects.create(
+            project=self.project1,
             scene=self.scene1,
             element_type=Element.ELEMENT_TYPE_IMAGE,
             file_url='https://example.com/1.jpg'
         )
         Element.objects.create(
+            project=self.project1,
             scene=self.scene1,
             element_type=Element.ELEMENT_TYPE_IMAGE,
             file_url='https://example.com/2.jpg'
@@ -181,6 +183,7 @@ class SceneAPITest(APITestCase):
         self.assertEqual(response.data['elements_count'], 2)
         
         Element.objects.create(
+            project=self.project1,
             scene=self.scene1,
             element_type=Element.ELEMENT_TYPE_VIDEO,
             file_url='https://example.com/video.mp4'

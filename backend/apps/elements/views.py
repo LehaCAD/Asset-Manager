@@ -13,10 +13,10 @@ logger = logging.getLogger(__name__)
 
 
 class IsSceneProjectOwner(permissions.BasePermission):
-    """Пермишен: пользователь может работать только с элементами сцен своих проектов."""
-    
+    """Пермишен: пользователь может работать только с элементами своих проектов."""
+
     def has_object_permission(self, request, view, obj):
-        return obj.scene.project.user == request.user
+        return obj.project.user == request.user
 
 
 class ElementViewSet(viewsets.ModelViewSet):
@@ -51,29 +51,34 @@ class ElementViewSet(viewsets.ModelViewSet):
         logger.info(f"Element {instance.id} deleted successfully")
     
     def get_queryset(self):
-        """Возвращает только элементы сцен проектов текущего пользователя с фильтрацией."""
+        """Возвращает только элементы проектов текущего пользователя с фильтрацией."""
         queryset = Element.objects.filter(
-            scene__project__user=self.request.user
-        ).select_related('scene', 'scene__project', 'ai_model')
-        
+            project__user=self.request.user
+        ).select_related('project', 'scene', 'ai_model')
+
         # Фильтрация по scene через query params
-        scene_id = self.request.query_params.get('scene', None)
-        if scene_id is not None:
+        scene_id = self.request.query_params.get('scene')
+        project_id = self.request.query_params.get('project')
+        scene_null = self.request.query_params.get('scene__isnull')
+
+        if scene_id:
             queryset = queryset.filter(scene_id=scene_id)
-        
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+        if scene_null == 'true':
+            queryset = queryset.filter(scene__isnull=True)
+
         # Фильтрация по element_type
-        element_type = self.request.query_params.get('element_type', None)
-        if element_type is not None:
+        element_type = self.request.query_params.get('element_type')
+        if element_type:
             queryset = queryset.filter(element_type=element_type)
-        
+
         # Фильтрация по is_favorite
-        is_favorite = self.request.query_params.get('is_favorite', None)
+        is_favorite = self.request.query_params.get('is_favorite')
         if is_favorite is not None:
-            # Преобразование строки в boolean
-            is_fav_bool = is_favorite.lower() in ('true', '1', 'yes')
-            queryset = queryset.filter(is_favorite=is_fav_bool)
-        
-        return queryset
+            queryset = queryset.filter(is_favorite=is_favorite.lower() == 'true')
+
+        return queryset.order_by('order_index', 'created_at')
     
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
     def reorder(self, request):
@@ -93,7 +98,7 @@ class ElementViewSet(viewsets.ModelViewSet):
         # Проверяем, что все элементы принадлежат пользователю
         user_element_ids = set(
             Element.objects.filter(
-                scene__project__user=request.user,
+                project__user=request.user,
                 id__in=element_ids
             ).values_list('id', flat=True)
         )

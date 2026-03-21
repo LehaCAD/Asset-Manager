@@ -151,6 +151,7 @@ class SceneViewSet(viewsets.ModelViewSet):
             from apps.elements.serializers import ElementSerializer
 
             element_data = {
+                'project': scene.project_id,
                 'scene': scene.id,
                 'element_type': element_type,
                 'order_index': 0,
@@ -278,6 +279,7 @@ class SceneViewSet(viewsets.ModelViewSet):
             from apps.elements.serializers import ElementSerializer
             
             element_data = {
+                'project': scene.project_id,
                 'scene': scene.id,
                 'element_type': element_type,
                 'prompt_text': prompt,
