@@ -45,7 +45,7 @@ export function SceneNavigation({
           title={previousScene.name}
         >
           <ChevronLeft className="h-4 w-4" />
-          <span>Сцена «{truncateName(previousScene.name)}»</span>
+          <span>Группа «{truncateName(previousScene.name)}»</span>
         </button>
       ) : (
         <div className="w-4" />
@@ -53,7 +53,7 @@ export function SceneNavigation({
 
       {/* Current scene */}
       <span className="font-medium text-foreground">
-        Сцена «{currentScene ? truncateName(currentScene.name) : "…"}»
+        Группа «{currentScene ? truncateName(currentScene.name) : "…"}»
       </span>
 
       {/* Next scene */}
@@ -63,7 +63,7 @@ export function SceneNavigation({
           className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
           title={nextScene.name}
         >
-          <span>Сцена «{truncateName(nextScene.name)}»</span>
+          <span>Группа «{truncateName(nextScene.name)}»</span>
           <ChevronRight className="h-4 w-4" />
         </button>
       ) : (

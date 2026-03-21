@@ -99,11 +99,11 @@ export function SceneCard({ scene, projectId, index, aspectClass = "aspect-video
     setIsSaving(true);
     try {
       await updateScene(scene.id, { name: editName.trim() });
-      toast.success("Сцена обновлена");
+      toast.success("Группа обновлена");
       setEditOpen(false);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Не удалось обновить сцену";
+        error instanceof Error ? error.message : "Не удалось обновить группу";
       toast.error(message);
     } finally {
       setIsSaving(false);
@@ -114,11 +114,11 @@ export function SceneCard({ scene, projectId, index, aspectClass = "aspect-video
     setIsDeleting(true);
     try {
       await deleteScene(scene.id);
-      toast.success("Сцена удалена");
+      toast.success("Группа удалена");
       setDeleteOpen(false);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Не удалось удалить сцену";
+        error instanceof Error ? error.message : "Не удалось удалить группу";
       toast.error(message);
     } finally {
       setIsDeleting(false);
@@ -279,7 +279,7 @@ export function SceneCard({ scene, projectId, index, aspectClass = "aspect-video
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Переименовать сцену</DialogTitle>
+            <DialogTitle>Переименовать группу</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleEditSubmit} className="space-y-4">
             <div className="space-y-2">
@@ -313,9 +313,9 @@ export function SceneCard({ scene, projectId, index, aspectClass = "aspect-video
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Удалить сцену?</DialogTitle>
+            <DialogTitle>Удалить группу?</DialogTitle>
             <DialogDescription>
-              Сцена «{scene.name}» и все её элементы будут удалены безвозвратно.
+              Группа «{scene.name}» и все её элементы будут удалены безвозвратно.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

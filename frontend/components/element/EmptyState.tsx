@@ -67,7 +67,7 @@ export function EmptyState({ onUploadClick, isDragActive = false }: EmptyStatePr
         </h3>
         <p className="text-sm text-muted-foreground max-w-xs">
           {isDragActive
-            ? "Файлы будут загружены в эту сцену"
+            ? "Файлы будут загружены в эту группу"
             : "или нажмите в любое место для выбора файлов (JPG, PNG, MP4, MOV)"}
         </p>
       </div>

@@ -15,10 +15,10 @@ interface WorkspaceHeaderProps {
 function pluralizeScenes(count: number): string {
   const lastDigit = count % 10;
   const lastTwoDigits = count % 100;
-  if (lastTwoDigits >= 11 && lastTwoDigits <= 19) return "сцен";
-  if (lastDigit === 1) return "сцена";
-  if (lastDigit >= 2 && lastTwoDigits <= 4) return "сцены";
-  return "сцен";
+  if (lastTwoDigits >= 11 && lastTwoDigits <= 19) return "групп";
+  if (lastDigit === 1) return "группа";
+  if (lastDigit >= 2 && lastTwoDigits <= 4) return "группы";
+  return "групп";
 }
 
 export function WorkspaceHeader({ projectId, sceneId }: WorkspaceHeaderProps) {

@@ -80,7 +80,7 @@ class SceneViewSet(viewsets.ModelViewSet):
         # current_scenes_count = Scene.objects.filter(project=project).count()
         # if current_scenes_count >= user_quota.max_scenes_per_project:
         #     return Response(
-        #         {'detail': f'Достигнут лимит сцен в проекте ({user_quota.max_scenes_per_project}). Обратитесь к администратору.'},
+        #         {'detail': f'Достигнут лимит групп в проекте ({user_quota.max_scenes_per_project}). Обратитесь к администратору.'},
         #         status=status.HTTP_403_FORBIDDEN
         #     )
         #
@@ -147,7 +147,7 @@ class SceneViewSet(viewsets.ModelViewSet):
             element = Element.objects.get(id=element_id, scene=scene)
         except Element.DoesNotExist:
             return Response(
-                {'error': 'Элемент не найден или не принадлежит этой сцене.'},
+                {'error': 'Элемент не найден или не принадлежит этой группе.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -179,7 +179,7 @@ class SceneViewSet(viewsets.ModelViewSet):
         )
         if set(scene_ids) != user_scene_ids:
             return Response(
-                {'error': 'Некоторые сцены не найдены или не принадлежат вам.'},
+                {'error': 'Некоторые группы не найдены или не принадлежат вам.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 

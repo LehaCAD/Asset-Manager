@@ -93,8 +93,8 @@ class SceneSerializer(serializers.ModelSerializer):
 
 
 class ReorderSerializer(serializers.Serializer):
-    """Сериализатор для изменения порядка сцен."""
+    """Сериализатор для изменения порядка групп."""
     scene_ids = serializers.ListField(
         child=serializers.IntegerField(),
-        help_text='Список ID сцен в новом порядке'
+        help_text='Список ID групп в новом порядке'
     )

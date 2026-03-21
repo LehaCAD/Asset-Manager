@@ -59,7 +59,7 @@ class Element(models.Model):
     order_index = models.IntegerField(
         default=0,
         verbose_name='Порядковый номер',
-        help_text='Порядок отображения элемента внутри сцены'
+        help_text='Порядок отображения элемента внутри группы'
     )
     file_url = models.URLField(
         max_length=500,

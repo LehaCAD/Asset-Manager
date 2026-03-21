@@ -43,7 +43,7 @@ export function pluralize(n: number, one: string, few: string, many: string): st
 }
 
 export function formatSceneCount(n: number): string {
-  return pluralize(n, "сцена", "сцены", "сцен");
+  return pluralize(n, "группа", "группы", "групп");
 }
 
 export function formatElementCount(n: number): string {

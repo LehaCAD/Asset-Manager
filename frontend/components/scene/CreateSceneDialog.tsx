@@ -33,11 +33,11 @@ export function CreateSceneDialog({ projectId, open, onOpenChange }: CreateScene
     setIsLoading(true);
     try {
       await createScene({ name: name.trim(), project: projectId });
-      toast.success("Сцена создана");
+      toast.success("Группа создана");
       setName("");
       onOpenChange(false);
     } catch {
-      toast.error("Не удалось создать сцену");
+      toast.error("Не удалось создать группу");
     } finally {
       setIsLoading(false);
     }
@@ -47,14 +47,14 @@ export function CreateSceneDialog({ projectId, open, onOpenChange }: CreateScene
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>Новая сцена</DialogTitle>
+          <DialogTitle>Новая группа</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="scene-name">Название сцены</Label>
+            <Label htmlFor="scene-name">Название группы</Label>
             <Input
               id="scene-name"
-              placeholder="Сцена 1..."
+              placeholder="Группа 1..."
               value={name}
               onChange={(e) => setName(e.target.value)}
               autoFocus

@@ -41,7 +41,7 @@ class Scene(models.Model):
         choices=STATUS_CHOICES,
         default=STATUS_DRAFT,
         verbose_name='Статус',
-        help_text='Статус сцены'
+        help_text='Статус группы'
     )
     order_index = models.IntegerField(
         default=0,
@@ -54,7 +54,7 @@ class Scene(models.Model):
         blank=True,
         related_name='headliner_for_scene',
         verbose_name='Лучший элемент',
-        help_text='Главный элемент — обложка сцены на сценарном столе'
+        help_text='Главный элемент — обложка группы на рабочем столе'
     )
     created_at = models.DateTimeField(
         auto_now_add=True,

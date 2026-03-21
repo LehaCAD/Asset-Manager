@@ -42,9 +42,9 @@ interface ScenarioTableClientProps {
 }
 
 function pluralizeScenes(count: number): string {
-  if (count === 1) return "сцена";
-  if (count >= 2 && count <= 4) return "сцены";
-  return "сцен";
+  if (count === 1) return "группа";
+  if (count >= 2 && count <= 4) return "группы";
+  return "групп";
 }
 
 export function ScenarioTableClient({ projectId }: ScenarioTableClientProps) {
@@ -106,7 +106,7 @@ export function ScenarioTableClient({ projectId }: ScenarioTableClientProps) {
           />
           <Button onClick={() => setCreateOpen(true)} size="sm">
             <Plus className="h-4 w-4 mr-2" />
-            Добавить сцену
+            Добавить группу
           </Button>
           <DisplaySettingsPopover />
         </div>
@@ -174,13 +174,13 @@ function EmptyState({ onCreateClick }: { onCreateClick: () => void }) {
       <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-muted mb-6">
         <Clapperboard className="h-10 w-10 text-muted-foreground" />
       </div>
-      <h2 className="text-xl font-semibold mb-2">Нет сцен</h2>
+      <h2 className="text-xl font-semibold mb-2">Нет групп</h2>
       <p className="text-sm text-muted-foreground mb-6 max-w-xs">
-        Добавьте первую сцену, чтобы начать наполнять раскадровку.
+        Добавьте первую группу, чтобы начать наполнять раскадровку.
       </p>
       <Button onClick={onCreateClick}>
         <Plus className="h-4 w-4 mr-2" />
-        Добавить сцену
+        Добавить группу
       </Button>
     </div>
   );

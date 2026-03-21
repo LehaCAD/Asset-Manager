@@ -51,13 +51,13 @@ class SharedLink(models.Model):
 
 
 class Comment(models.Model):
-    """Комментарий к сцене от клиента через публичную ссылку."""
+    """Комментарий к группе от клиента через публичную ссылку."""
     
     scene = models.ForeignKey(
         'scenes.Scene',
         on_delete=models.CASCADE,
         related_name='comments',
-        verbose_name='Сцена'
+        verbose_name='Группа'
     )
     author_name = models.CharField(
         max_length=100,

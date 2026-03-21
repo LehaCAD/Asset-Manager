@@ -188,7 +188,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
           <DialogHeader>
             <DialogTitle>Удалить проект?</DialogTitle>
             <DialogDescription>
-              Проект «{project.name}» и все его сцены будут удалены безвозвратно.
+              Проект «{project.name}» и все его группы будут удалены безвозвратно.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

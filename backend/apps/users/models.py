@@ -72,7 +72,7 @@ class UserQuota(models.Model):
         verbose_name_plural = 'Квоты пользователей'
 
     def __str__(self) -> str:
-        return f'Квота: {self.user.username} (Проекты: {self.max_projects}, Сцены: {self.max_scenes_per_project}, Элементы: {self.max_elements_per_scene})'
+        return f'Квота: {self.user.username} (Проекты: {self.max_projects}, Группы: {self.max_scenes_per_project}, Элементы: {self.max_elements_per_scene})'
 
 
 @receiver(post_save, sender=User)
