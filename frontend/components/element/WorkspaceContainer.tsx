@@ -286,7 +286,11 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
     disabled: isModalOpen,
   });
 
-  const isGroupDelete = confirmDeleteIds.length > 1;
+  const isBulkDelete = confirmDeleteIds.length > 1;
+  const deleteIncludesGroups = useMemo(() => {
+    const groupIdSet = new Set(groups.map((g) => g.id));
+    return confirmDeleteIds.some((id) => groupIdSet.has(id));
+  }, [confirmDeleteIds, groups]);
 
   const openDeleteDialog = (ids: number[]) => {
     if (ids.length === 0) return;
@@ -316,8 +320,8 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
     const idsToDelete = confirmDeleteIds;
     const deletingToastId = toast.loading(
       idsToDelete.length > 1
-        ? `Удаление ${idsToDelete.length} элементов...`
-        : 'Удаление элемента...',
+        ? `Удаление ${idsToDelete.length} объектов...`
+        : 'Удаление...',
     );
 
     setDeleteDialogOpen(false);
@@ -331,8 +335,25 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
     }
 
     try {
-      await deleteElements(idsToDelete);
+      // Split IDs into elements and groups
+      const groupIdSet = new Set(groups.map((g) => g.id));
+      const elementIdsToDelete = idsToDelete.filter((id) => !groupIdSet.has(id));
+      const groupIdsToDelete = idsToDelete.filter((id) => groupIdSet.has(id));
+
+      // Delete elements
+      if (elementIdsToDelete.length > 0) {
+        await deleteElements(elementIdsToDelete);
+      }
+      // Delete groups (cascade deletes their elements on backend)
+      for (const gId of groupIdsToDelete) {
+        await scenesApi.delete(gId);
+      }
+
       clearSelection();
+      // Refresh to reflect deleted groups
+      if (groupIdsToDelete.length > 0) {
+        loadWorkspace(projectId, groupId);
+      }
     } finally {
       toast.dismiss(deletingToastId);
     }
@@ -581,12 +602,16 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
           <DialogContent className="sm:max-w-sm">
             <DialogHeader>
               <DialogTitle>
-                {isGroupDelete ? 'Удалить выбранные элементы?' : 'Удалить элемент?'}
+                {isBulkDelete ? 'Удалить выбранное?' : deleteIncludesGroups ? 'Удалить группу?' : 'Удалить элемент?'}
               </DialogTitle>
               <DialogDescription>
-                {isGroupDelete
-                  ? `Будет удалено ${confirmDeleteIds.length} элементов. Это действие нельзя отменить.`
-                  : 'Элемент будет удалён безвозвратно.'}
+                {deleteIncludesGroups
+                  ? isBulkDelete
+                    ? `Будет удалено ${confirmDeleteIds.length} объектов. Группы удаляются вместе с содержимым. Это действие нельзя отменить.`
+                    : 'Группа будет удалена вместе со всем содержимым. Это действие нельзя отменить.'
+                  : isBulkDelete
+                    ? `Будет удалено ${confirmDeleteIds.length} элементов. Это действие нельзя отменить.`
+                    : 'Элемент будет удалён безвозвратно.'}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>

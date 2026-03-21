@@ -45,7 +45,7 @@ class Element(models.Model):
     )
     scene = models.ForeignKey(
         'scenes.Scene',
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,
         null=True,
         blank=True,
         related_name='elements',
