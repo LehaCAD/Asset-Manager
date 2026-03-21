@@ -287,11 +287,11 @@ export function SceneCard({ scene, projectId, index, aspectClass = "aspect-video
           <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
             <span className="flex items-center gap-1">
               <Layers className="h-3 w-3" />
-              {formatElementCount(scene.element_count ?? 0)}
+              {formatElementCount(scene.element_count ?? scene.elements_count ?? 0)}
             </span>
             {scene.total_spent && parseFloat(scene.total_spent) > 0 && (
               <span className="flex items-center gap-1">
-                <Zap className="h-3 w-3" />
+                <Zap className="h-3 w-3 text-amber-500 fill-amber-500" />
                 {formatCurrency(scene.total_spent)}
               </span>
             )}

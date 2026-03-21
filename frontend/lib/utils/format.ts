@@ -59,7 +59,6 @@ export function formatStorage(bytes: number): string {
 
 export function formatCurrency(amount: string | number): string {
   const num = typeof amount === "string" ? parseFloat(amount) : amount;
-  if (isNaN(num) || num === 0) return "0 зар.";
-  const formatted = parseFloat(num.toFixed(2)).toString();
-  return `${formatted} зар.`;
+  if (isNaN(num) || num === 0) return "0";
+  return parseFloat(num.toFixed(2)).toString();
 }

@@ -170,7 +170,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
             </span>
             {project.total_spent && parseFloat(project.total_spent) > 0 && (
               <span className="flex items-center gap-1">
-                <Zap className="h-3 w-3" />
+                <Zap className="h-3 w-3 text-amber-500 fill-amber-500" />
                 {formatCurrency(project.total_spent)}
               </span>
             )}

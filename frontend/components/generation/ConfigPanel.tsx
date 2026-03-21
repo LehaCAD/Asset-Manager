@@ -7,7 +7,7 @@ import { ModelSelector } from "@/components/generation/ModelSelector";
 import { ParametersForm } from "@/components/generation/ParametersForm";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { PanelLeftClose, PanelLeft, ChevronRight, AlertCircle } from "lucide-react";
+import { PanelLeftClose, PanelLeft, ChevronRight, AlertCircle, Zap } from "lucide-react";
 
 interface ConfigPanelProps {
   className?: string;
@@ -143,10 +143,11 @@ export function ConfigPanel({ className }: ConfigPanelProps) {
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Стоимость</span>
                   <span className={cn(
-                    "font-medium",
+                    "font-medium flex items-center gap-1",
                     canAfford ? "text-green-600" : "text-destructive"
                   )}>
-                    {parseFloat(estimateCost).toFixed(0)} ₽
+                    <Zap className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+                    {parseFloat(estimateCost).toFixed(0)}
                   </span>
                 </div>
               ) : null}

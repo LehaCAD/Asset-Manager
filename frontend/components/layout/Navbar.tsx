@@ -61,8 +61,8 @@ export function Navbar() {
           {/* Баланс */}
           {user && (
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/50 text-sm font-medium">
-              <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                <Zap className="h-3.5 w-3.5" />
+              <div className="flex items-center gap-1 text-sm">
+                <Zap className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
                 <span>{formatCurrency(balance)}</span>
               </div>
             </div>
