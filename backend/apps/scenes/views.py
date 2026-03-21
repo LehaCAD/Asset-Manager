@@ -1,6 +1,6 @@
 import logging
 
-from django.db.models import Count, Sum, Value, DecimalField, Subquery, OuterRef
+from django.db.models import Count, Q, Sum, Value, DecimalField, BigIntegerField, Subquery, OuterRef, Prefetch
 from django.db.models.functions import Coalesce, Abs
 from rest_framework import viewsets, permissions, status
 
@@ -97,14 +97,30 @@ class SceneViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """Возвращает только сцены проектов текущего пользователя с фильтрацией."""
+        # total_spent и storage с учётом вложенных групп (до 3 уровней)
+        descendant_scenes = Q(element__scene=OuterRef('pk')) | Q(element__scene__parent=OuterRef('pk')) | Q(element__scene__parent__parent=OuterRef('pk')) | Q(element__scene__parent__parent__parent=OuterRef('pk'))
         spent_subquery = Subquery(
             CreditsTransaction.objects.filter(
-                element__scene=OuterRef('pk'),
+                descendant_scenes,
                 reason=CreditsTransaction.REASON_GENERATION_DEBIT,
-            ).values('element__scene').annotate(
+            ).order_by().values(
+                dummy=Value(1)
+            ).annotate(
                 total=Abs(Sum('amount'))
             ).values('total')[:1],
             output_field=DecimalField()
+        )
+
+        descendant_elements = Q(scene=OuterRef('pk')) | Q(scene__parent=OuterRef('pk')) | Q(scene__parent__parent=OuterRef('pk')) | Q(scene__parent__parent__parent=OuterRef('pk'))
+        storage_subquery = Subquery(
+            Element.objects.filter(
+                descendant_elements,
+            ).order_by().values(
+                dummy=Value(1)
+            ).annotate(
+                total=Sum('file_size')
+            ).values('total')[:1],
+            output_field=BigIntegerField()
         )
 
         queryset = Scene.objects.filter(
@@ -113,7 +129,14 @@ class SceneViewSet(viewsets.ModelViewSet):
             _children_count=Count('children', distinct=True),
             _elements_count=Count('elements', distinct=True),
             _total_spent=Coalesce(spent_subquery, Value(0), output_field=DecimalField()),
-        ).select_related('project', 'headliner', 'parent')
+            _storage_bytes=Coalesce(storage_subquery, Value(0), output_field=BigIntegerField()),
+        ).select_related('project', 'headliner', 'parent').prefetch_related(
+            Prefetch(
+                'elements',
+                queryset=Element.objects.filter(status='COMPLETED').exclude(file_url='').order_by('-created_at'),
+                to_attr='_preview_elements'
+            )
+        )
 
         # Фильтрация по project через query params
         project_id = self.request.query_params.get('project', None)

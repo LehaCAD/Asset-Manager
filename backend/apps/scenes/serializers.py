@@ -20,6 +20,8 @@ class SceneSerializer(serializers.ModelSerializer):
     children_count = serializers.SerializerMethodField()
     depth = serializers.SerializerMethodField()
     total_spent = serializers.SerializerMethodField()
+    storage_bytes = serializers.SerializerMethodField()
+    preview_thumbnails = serializers.SerializerMethodField()
 
     class Meta:
         model = Scene
@@ -41,6 +43,8 @@ class SceneSerializer(serializers.ModelSerializer):
             'headliner_type',
             'elements_count',
             'total_spent',
+            'storage_bytes',
+            'preview_thumbnails',
             'created_at',
             'updated_at'
         ]
@@ -96,6 +100,25 @@ class SceneSerializer(serializers.ModelSerializer):
     def get_total_spent(self, obj) -> str:
         val = getattr(obj, '_total_spent', None)
         return str(val) if val else '0'
+
+    def get_storage_bytes(self, obj) -> int:
+        return getattr(obj, '_storage_bytes', None) or 0
+
+    def get_preview_thumbnails(self, obj) -> list[str]:
+        """First 4 element thumbnail URLs for preview grid."""
+        if hasattr(obj, '_preview_elements'):
+            elements = obj._preview_elements[:4]
+        else:
+            elements = obj.elements.filter(
+                status='COMPLETED'
+            ).exclude(
+                file_url=''
+            ).order_by('-created_at')[:4]
+        return [
+            e.thumbnail_url or e.file_url
+            for e in elements
+            if e.file_url
+        ]
 
 
 class SceneStatsSerializer(serializers.Serializer):

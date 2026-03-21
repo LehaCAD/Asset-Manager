@@ -14,6 +14,8 @@ export interface UserQuota {
   max_scenes_used: number;
   max_elements_per_scene: number;
   max_elements_used: number;
+  storage_limit_bytes: number;
+  storage_used_bytes: number;
 }
 
 export interface TokenPair {
@@ -48,6 +50,7 @@ export interface Project {
   element_count?: number;
   total_spent?: string;
   storage_bytes?: number;
+  preview_thumbnails?: string[];
 }
 
 export interface CreateProjectPayload {
@@ -84,6 +87,8 @@ export interface Scene {
   children_count?: number;
   depth?: number;
   total_spent?: string;
+  storage_bytes?: number;
+  preview_thumbnails?: string[];
   created_at: string;
   updated_at: string;
 }
