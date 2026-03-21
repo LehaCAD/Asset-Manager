@@ -17,7 +17,7 @@ export function ProjectGrid() {
   }, [loadProjects]);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-3.5rem)]">
+    <div className="flex flex-col flex-1 min-h-0">
       {/* Header - breadcrumbs + count + button (left-aligned) */}
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex items-center gap-4 px-4 py-3">
@@ -35,22 +35,24 @@ export function ProjectGrid() {
       </div>
 
       {/* Grid - full width, no max-width */}
-      <div className="flex-1 overflow-auto px-4 py-6">
-        {isLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <ProjectCardSkeleton key={i} />
-            ))}
-          </div>
-        ) : projects.length === 0 ? (
-          <EmptyState onCreateClick={() => setCreateOpen(true)} />
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
-            {projects.map((project) => (
-              <ProjectCard key={project.id} project={project} />
-            ))}
-          </div>
-        )}
+      <div className="flex-1 overflow-auto px-4 py-4">
+        <div className="max-w-[1600px] mx-auto">
+          {isLoading ? (
+            <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
+              {Array.from({ length: 8 }).map((_, i) => (
+                <ProjectCardSkeleton key={i} />
+              ))}
+            </div>
+          ) : projects.length === 0 ? (
+            <EmptyState onCreateClick={() => setCreateOpen(true)} />
+          ) : (
+            <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
+              {projects.map((project) => (
+                <ProjectCard key={project.id} project={project} />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <CreateProjectDialog open={createOpen} onOpenChange={setCreateOpen} />
@@ -60,7 +62,7 @@ export function ProjectGrid() {
 
 function ProjectCardSkeleton() {
   return (
-    <div className="rounded-xl overflow-hidden border border-border bg-card">
+    <div className="rounded-md overflow-hidden border border-border bg-card">
       <Skeleton className="aspect-video w-full" />
       <div className="p-3 space-y-2">
         <div className="flex items-center justify-between gap-2">
