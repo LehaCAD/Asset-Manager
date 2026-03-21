@@ -130,7 +130,12 @@ class Element(models.Model):
         help_text='Task ID от Kie.ai или другого провайдера',
         db_index=True
     )
-    
+    file_size = models.BigIntegerField(
+        null=True,
+        blank=True,
+        verbose_name='Размер файла (байт)',
+    )
+
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name='Дата создания'
