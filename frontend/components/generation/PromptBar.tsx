@@ -5,6 +5,7 @@ import { useGenerationStore, ImageFileEntry } from "@/lib/store/generation";
 import { useCreditsStore } from "@/lib/store/credits";
 import { ElementSelectionModal } from "@/components/element/ElementSelectionModal";
 import { PromptThumbnailPopup } from "./PromptThumbnailPopup";
+import { ModeSelector } from "./ModeSelector";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -15,23 +16,29 @@ import {
 import { cn } from "@/lib/utils";
 import { Sparkles, Loader2, Plus } from "lucide-react";
 import type { Element, ModalSelectionByScene } from "@/lib/types";
+import { isGroupsSchema } from "@/lib/types";
 
 interface PromptBarProps {
   projectId: number;
-  sceneId: number;
+  sceneId?: number;
+  groupId?: number;
   className?: string;
 }
 
 const MAX_TEXTAREA_HEIGHT = 144; // 6 строк * 24px
 
-export function PromptBar({ projectId, sceneId, className }: PromptBarProps) {
+export function PromptBar({ projectId, sceneId, groupId, className }: PromptBarProps) {
+  // Resolve the effective groupId: explicit groupId prop takes precedence, then sceneId for backward compat
+  const effectiveGroupId = groupId ?? (sceneId && sceneId > 0 ? sceneId : undefined);
   const {
     selectedModel,
     prompt,
     imageInputs,
+    selectedGroup,
     isGenerating,
     setPrompt,
     setImageInput,
+    selectGroup,
     generate,
     canGenerate,
   } = useGenerationStore();
@@ -48,6 +55,7 @@ export function PromptBar({ projectId, sceneId, className }: PromptBarProps) {
   const [selectionModalOpen, setSelectionModalOpen] = useState(false);
   const [activeInputKey, setActiveInputKey] = useState<string | null>(null);
   const [activeFileIndex, setActiveFileIndex] = useState<number | null>(null); // Для replace конкретного файла
+  const [modeSelectorOpen, setModeSelectorOpen] = useState(false);
 
   // Auto-resize textarea — корректное измерение через cloneNode
   const resizeTextarea = useCallback(() => {
@@ -100,8 +108,24 @@ export function PromptBar({ projectId, sceneId, className }: PromptBarProps) {
     return imageInputs.reduce((sum, input) => sum + input.files.length, 0);
   }, [imageInputs]);
 
-  // Проверка: можно ли выбирать изображения (есть ли модель со схемой)
-  const canSelectImages = selectedModel && imageInputs.length > 0;
+  // Groups schema detection
+  const groupsSchema = selectedModel && isGroupsSchema(selectedModel.image_inputs_schema)
+    ? selectedModel.image_inputs_schema
+    : null;
+
+  // Проверка: можно ли выбирать изображения
+  const canSelectImages = selectedModel && (imageInputs.length > 0 || !!groupsSchema);
+
+  // Callback for ModeSelector → select group + open modal for specific slot
+  const handleSlotSelect = useCallback((groupKey: string, slotKey: string) => {
+    selectGroup(groupKey);
+    // Defer to next tick so imageInputs is updated from selectGroup
+    setTimeout(() => {
+      setActiveInputKey(slotKey);
+      setActiveFileIndex(null);
+      setSelectionModalOpen(true);
+    }, 0);
+  }, [selectGroup]);
 
   const handleOpenSelector = useCallback((key: string, fileIndex?: number) => {
     setActiveInputKey(key);
@@ -148,10 +172,10 @@ export function PromptBar({ projectId, sceneId, className }: PromptBarProps) {
 
   const handleGenerate = useCallback(async () => {
     if (!canGenerate()) return;
-    await generate(sceneId);
+    await generate(projectId, effectiveGroupId);
     // Reset textarea height after generation
     setTextareaHeight(24);
-  }, [canGenerate, generate, sceneId]);
+  }, [canGenerate, generate, projectId, effectiveGroupId]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -208,46 +232,73 @@ export function PromptBar({ projectId, sceneId, className }: PromptBarProps) {
     
     if (elementIds.length === 0) return {};
     
-    // All selected elements are from current workspace scene
-    return { [sceneId]: elementIds };
-  }, [activeInput, sceneId]);
+    // All selected elements are from current workspace scene/group
+    const targetId = effectiveGroupId ?? 0;
+    return targetId > 0 ? { [targetId]: elementIds } : {};
+  }, [activeInput, effectiveGroupId]);
 
   return (
-    <div className={cn("border-t bg-background p-4", className)}>
-      {/* Единый prompt-container */}
+    <div className={cn("p-4", className)}>
       <div
         className={cn(
-          "relative flex flex-col gap-3 rounded-xl border border-input bg-background p-3",
-          "transition-shadow focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
+          "relative flex items-start gap-3 rounded-xl border border-border/40 bg-foreground/[0.03] p-3",
+          "transition-shadow focus-within:border-primary/30 focus-within:ring-1 focus-within:ring-ring/20"
         )}
       >
-        {/* Верхний ряд: Add-кнопка | textarea | Создать */}
-        <div className="flex items-start gap-3">
           {/* Add-кнопка */}
           {canSelectImages ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+            groupsSchema ? (
+              // Groups format → ALWAYS ModeSelector popover
+              <ModeSelector
+                groups={groupsSchema.groups}
+                imageInputs={imageInputs}
+                open={modeSelectorOpen}
+                onOpenChange={setModeSelectorOpen}
+                onSelectSlot={handleSlotSelect}
+              >
                 <button
                   type="button"
                   className={cn(
                     "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border",
-                    "border-dashed border-input bg-muted hover:bg-accent hover:border-accent-foreground/50",
+                    "border-dashed border-border/40 bg-foreground/[0.04] hover:bg-foreground/[0.08] hover:border-primary/40",
                     "transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
                   )}
                   aria-label="Добавить изображение"
                 >
                   <Plus className="h-5 w-5 text-muted-foreground" />
                 </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                {imageInputs.length === 1 ? (
-                  <DropdownMenuItem
-                    onClick={() => handleOpenSelector(imageInputs[0].key)}
+              </ModeSelector>
+            ) : // Simple format (array)
+            imageInputs.length === 1 ? (
+              <button
+                type="button"
+                onClick={() => handleOpenSelector(imageInputs[0].key)}
+                className={cn(
+                  "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border",
+                  "border-dashed border-white/[0.15] bg-white/[0.04] hover:bg-white/[0.08] hover:border-[#6C5CE7]/40",
+                  "transition-colors focus:outline-none focus:ring-2 focus:ring-[#6C5CE7]/40"
+                )}
+                aria-label="Добавить изображение"
+              >
+                <Plus className="h-5 w-5 text-white/40" />
+              </button>
+            ) : (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border",
+                      "border-dashed border-white/[0.15] bg-white/[0.04] hover:bg-white/[0.08] hover:border-[#6C5CE7]/40",
+                      "transition-colors focus:outline-none focus:ring-2 focus:ring-[#6C5CE7]/40"
+                    )}
+                    aria-label="Добавить изображение"
                   >
-                    Выбрать изображение
-                  </DropdownMenuItem>
-                ) : (
-                  imageInputs.map((input) => (
+                    <Plus className="h-5 w-5 text-muted-foreground" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  {imageInputs.map((input) => (
                     <DropdownMenuItem
                       key={input.key}
                       onClick={() => handleOpenSelector(input.key)}
@@ -257,21 +308,21 @@ export function PromptBar({ projectId, sceneId, className }: PromptBarProps) {
                         <span className="text-destructive ml-1">*</span>
                       )}
                     </DropdownMenuItem>
-                  ))
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )
           ) : (
             <button
               type="button"
               disabled
               className={cn(
                 "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border",
-                "border-dashed border-input bg-muted opacity-50 cursor-not-allowed"
+                "border-dashed border-border/30 bg-foreground/[0.02] opacity-50 cursor-not-allowed"
               )}
               aria-label="Изображения недоступны"
             >
-              <Plus className="h-5 w-5 text-muted-foreground" />
+              <Plus className="h-5 w-5 text-muted-foreground/50" />
             </button>
           )}
 
@@ -285,7 +336,7 @@ export function PromptBar({ projectId, sceneId, className }: PromptBarProps) {
               placeholder="Опишите, что хотите сгенерировать..."
               disabled={isGenerating}
               className={cn(
-                "w-full resize-none border-0 bg-transparent px-0 pt-0 pb-2 text-sm",
+                "w-full resize-none border-0 bg-transparent px-0 pt-0 pb-2 text-sm text-foreground",
                 "placeholder:text-muted-foreground",
                 "focus-visible:outline-none focus-visible:ring-0",
                 "disabled:cursor-not-allowed disabled:opacity-50",
@@ -313,7 +364,7 @@ export function PromptBar({ projectId, sceneId, className }: PromptBarProps) {
             )}
           </div>
 
-          {/* Кнопка Создать — всегда видна справа */}
+          {/* Кнопка Создать */}
           <div className="flex justify-end">
             <Button
               onClick={handleGenerate}
@@ -328,11 +379,6 @@ export function PromptBar({ projectId, sceneId, className }: PromptBarProps) {
               Создать
             </Button>
           </div>
-        </div>
-
-
-
-       
       </div>
 
       {/* Element Selection Modal */}
@@ -342,12 +388,12 @@ export function PromptBar({ projectId, sceneId, className }: PromptBarProps) {
           onClose={handleCloseModal}
           onConfirm={handleSelectionConfirm}
           projectId={projectId}
-          currentSceneId={sceneId}
+          currentSceneId={effectiveGroupId ?? 0}
           max={activeFileIndex !== null ? 1 : activeInput.max}
           min={activeFileIndex !== null ? 1 : activeInput.min}
           initialSelection={initialSelection}
           elementTypeFilter="IMAGE"
-          title={`Выбор: ${activeInput.label}`}
+          title={activeInput.label}
         />
       )}
     </div>

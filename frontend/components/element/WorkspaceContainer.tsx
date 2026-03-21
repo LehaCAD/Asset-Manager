@@ -1,29 +1,26 @@
-/**
- * @deprecated Use WorkspaceContainer instead. This component is kept temporarily
- * for backward compatibility with old routes that reference it directly.
- * See WorkspaceContainer.tsx for the unified workspace that supports both
- * project root and group views with mixed grid (groups + elements).
- */
-"use client";
+'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useDropzone } from "react-dropzone";
-import { useSceneWorkspaceStore } from "@/lib/store/scene-workspace";
-import { useCreditsStore } from "@/lib/store/credits";
-import { useGenerationStore } from "@/lib/store/generation";
-import { useUIStore } from "@/lib/store/ui";
-import { wsManager } from "@/lib/api/websocket";
-import { ElementGrid } from "@/components/element/ElementGrid";
-import { ElementFilters } from "@/components/element/ElementFilters";
-import { ElementBulkBar } from "@/components/element/ElementBulkBar";
-import { ConfigPanel } from "@/components/generation/ConfigPanel";
-import { PromptBar } from "@/components/generation/PromptBar";
-import { EmptyState } from "@/components/element/EmptyState";
-import { DisplaySettingsPopover } from "@/components/display/DisplaySettingsPopover";
-import { LightboxModal } from "@/components/lightbox/LightboxModal";
-import { DetailPanel } from "@/components/lightbox/DetailPanel";
-import { useKeyboard } from "@/lib/hooks/use-keyboard";
-import { Upload } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useDropzone } from 'react-dropzone';
+import { useSceneWorkspaceStore } from '@/lib/store/scene-workspace';
+import { useCreditsStore } from '@/lib/store/credits';
+import { useGenerationStore } from '@/lib/store/generation';
+import { useUIStore } from '@/lib/store/ui';
+import { useDisplayStore } from '@/lib/store/project-display';
+import { wsManager } from '@/lib/api/websocket';
+import { ElementGrid } from '@/components/element/ElementGrid';
+import { GroupCard } from '@/components/element/GroupCard';
+import { ElementFilters } from '@/components/element/ElementFilters';
+import { ElementBulkBar } from '@/components/element/ElementBulkBar';
+import { ConfigPanel } from '@/components/generation/ConfigPanel';
+import { PromptBar } from '@/components/generation/PromptBar';
+import { EmptyState } from '@/components/element/EmptyState';
+import { DisplaySettingsPopover } from '@/components/display/DisplaySettingsPopover';
+import { LightboxModal } from '@/components/lightbox/LightboxModal';
+import { DetailPanel } from '@/components/lightbox/DetailPanel';
+import { useKeyboard } from '@/lib/hooks/use-keyboard';
+import { Upload, ChevronLeft } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -31,36 +28,42 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
-import { cn } from "@/lib/utils";
-import { MAX_FILE_SIZE_MB } from "@/lib/utils/constants";
-import type { WSEvent } from "@/lib/types";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import { MAX_FILE_SIZE_MB, DISPLAY_GRID_CONFIG, CARD_SIZES } from '@/lib/utils/constants';
+import type { WSEvent } from '@/lib/types';
 
-interface SceneWorkspaceProps {
+interface WorkspaceContainerProps {
   projectId: number;
-  sceneId: number;
+  groupId?: number;
 }
 
-export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
+export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerProps) {
+  const router = useRouter();
+
   const {
     elements,
+    groups,
     filter,
     selectedIds,
-    loadScene,
+    isMultiSelectMode,
+    scene,
+    lightboxOpen,
+    lightboxElementId,
+    isLoading,
+    loadWorkspace,
     setFilter,
     clearSelection,
     toggleSelectAll,
     getFilteredElements,
     updateElement,
     enqueueUploads,
-    scene,
-    lightboxOpen,
-    lightboxElementId,
   } = useSceneWorkspaceStore();
 
   const { loadModels } = useGenerationStore();
+  const { preferences } = useDisplayStore();
 
   const [confirmDeleteIds, setConfirmDeleteIds] = useState<number[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -77,13 +80,13 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
   const setHeadliner = useSceneWorkspaceStore((s) => s.setHeadliner);
   const deleteElement = useSceneWorkspaceStore((s) => s.deleteElement);
 
-  // Load scene data
+  // Load workspace data
   useEffect(() => {
-    loadScene(sceneId);
+    loadWorkspace(projectId, groupId);
     return () => {
       resetWorkspace();
     };
-  }, [sceneId, loadScene, resetWorkspace]);
+  }, [projectId, groupId, loadWorkspace, resetWorkspace]);
 
   // Load models for generation
   useEffect(() => {
@@ -97,16 +100,15 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
     const hasPendingOrProcessingElements = () =>
       useSceneWorkspaceStore
         .getState()
-        .elements.some((element) => element.status === "PENDING" || element.status === "PROCESSING");
+        .elements.some((element) => element.status === 'PENDING' || element.status === 'PROCESSING');
 
-    // Для optimistic generation: проверяем есть ли элементы в submitting состоянии
     const hasSubmittingGenerationElements = () =>
       useSceneWorkspaceStore
         .getState()
         .elements.some(
           (element) =>
-            element.client_optimistic_kind === "generation" &&
-            element.client_generation_submit_state === "submitting"
+            element.client_optimistic_kind === 'generation' &&
+            element.client_generation_submit_state === 'submitting',
         );
 
     const stopFallbackRefetch = () => {
@@ -123,44 +125,41 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
     const tryFallbackRefetch = () => {
       const hasPendingElements = hasPendingOrProcessingElements() || hasSubmittingGenerationElements();
       if (!wsManager.isConnected && hasPendingElements) {
-        useSceneWorkspaceStore.getState().loadScene(sceneId);
+        useSceneWorkspaceStore.getState().loadWorkspace(projectId, groupId);
       } else if (!hasPendingElements) {
         stopFallbackRefetch();
       }
     };
 
     const unsubscribe = wsManager.on((event: WSEvent) => {
-      if (event.type === "element_status_changed") {
-        if (event.status === "COMPLETED") {
+      if (event.type === 'element_status_changed') {
+        if (event.status === 'COMPLETED') {
           const completedUpdates: Partial<{
-            status: "COMPLETED";
+            status: 'COMPLETED';
             file_url: string;
             thumbnail_url: string;
           }> = {
-            status: "COMPLETED",
+            status: 'COMPLETED',
           };
-          if (typeof event.file_url === "string" && event.file_url.length > 0) {
+          if (typeof event.file_url === 'string' && event.file_url.length > 0) {
             completedUpdates.file_url = event.file_url;
           }
-          if (
-            typeof event.thumbnail_url === "string" &&
-            event.thumbnail_url.length > 0
-          ) {
+          if (typeof event.thumbnail_url === 'string' && event.thumbnail_url.length > 0) {
             completedUpdates.thumbnail_url = event.thumbnail_url;
           }
           updateElement(event.element_id, completedUpdates);
-        } else if (event.status === "FAILED") {
-          const err = (event.error_message ?? "").toLowerCase();
+        } else if (event.status === 'FAILED') {
+          const err = (event.error_message ?? '').toLowerCase();
           const isCreditsError =
-            err.includes("credits") || err.includes("недостаточно средств");
+            err.includes('credits') || err.includes('недостаточно средств');
           if (isCreditsError) {
-            toast.error("Недостаточно средств для генерации. Карточка удалена.");
+            toast.error('Недостаточно средств для генерации. Карточка удалена.');
             void deleteElement(event.element_id, { silent: true });
             void useCreditsStore.getState().loadBalance();
           } else {
             updateElement(event.element_id, {
-              status: "FAILED",
-              error_message: event.error_message ?? "",
+              status: 'FAILED',
+              error_message: event.error_message ?? '',
             });
             void useCreditsStore.getState().loadBalance();
           }
@@ -169,6 +168,7 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
         }
       }
     });
+
     const unsubscribeConnect = wsManager.onConnect(() => {
       stopFallbackRefetch();
     });
@@ -181,14 +181,13 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
       }, 1500);
     });
     const unsubscribeReconnectExhausted = wsManager.onReconnectExhausted(() => {
-      toast.warning("Соединение нестабильно, обновляю статусы в фоновом режиме");
+      toast.warning('Соединение нестабильно, обновляю статусы в фоновом режиме');
       tryFallbackRefetch();
       if (!fallbackRefetchIntervalRef.current) {
         fallbackRefetchIntervalRef.current = setInterval(tryFallbackRefetch, 8000);
       }
     });
 
-    // Initial fallback check для optimistic generation
     if (!wsManager.isConnected && hasSubmittingGenerationElements()) {
       if (!fallbackRefetchIntervalRef.current) {
         fallbackRefetchIntervalRef.current = setInterval(tryFallbackRefetch, 8000);
@@ -203,29 +202,27 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
       unsubscribeReconnectExhausted();
       wsManager.disconnect();
     };
-  }, [projectId, sceneId, updateElement, deleteElement]);
+  }, [projectId, groupId, updateElement, deleteElement]);
 
-  // Calculate filter counts
+  // Filter counts
   const filterCounts = useMemo(() => {
     return {
       all: elements.length,
       favorites: elements.filter((e) => e.is_favorite).length,
-      images: elements.filter((e) => e.element_type === "IMAGE").length,
-      videos: elements.filter((e) => e.element_type === "VIDEO").length,
+      images: elements.filter((e) => e.element_type === 'IMAGE').length,
+      videos: elements.filter((e) => e.element_type === 'VIDEO').length,
     };
   }, [elements]);
 
-  // File drop handler — moved to SceneWorkspace level
+  // File drop handler
   const handleFileDrop = useCallback(
     async (acceptedFiles: File[]) => {
-      if (!scene) return;
-
       const validFiles: File[] = [];
       for (const file of acceptedFiles) {
         const fileSizeMB = file.size / (1024 * 1024);
         if (fileSizeMB > MAX_FILE_SIZE_MB) {
           toast.error(
-            `Файл "${file.name}" слишком большой (макс. ${MAX_FILE_SIZE_MB} МБ)`
+            `Файл "${file.name}" слишком большой (макс. ${MAX_FILE_SIZE_MB} МБ)`,
           );
           continue;
         }
@@ -234,21 +231,28 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
 
       if (validFiles.length === 0) return;
 
-      enqueueUploads(scene.id, validFiles);
+      // If inside a group, upload to the group (scene). Otherwise use project-level upload.
+      // For now, enqueueUploads expects a sceneId. When at project root (no groupId),
+      // we pass 0 as a sentinel — the upload queue will need to handle project-level uploads.
+      // TODO: Update upload queue to support project-level uploads
+      const uploadTargetId = groupId ?? 0;
+      if (uploadTargetId > 0) {
+        enqueueUploads(uploadTargetId, validFiles);
+      } else {
+        toast.info('Загрузка файлов в корень проекта пока не поддерживается');
+      }
     },
-    [scene, enqueueUploads]
+    [groupId, enqueueUploads],
   );
 
-  // Check if modal is open to disable scene dropzone
+  // Check if modal is open to disable dropzone
   const isModalOpen = useUIStore((s) => s.isElementSelectionModalOpen);
-  
-  // Dropzone setup — noClick: true means drag works, click doesn't
-  // disabled when modal is open
+
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop: handleFileDrop,
     accept: {
-      "image/*": [".jpg", ".jpeg", ".png", ".webp", ".gif"],
-      "video/*": [".mp4", ".webm", ".mov"],
+      'image/*': ['.jpg', '.jpeg', '.png', '.webp', '.gif'],
+      'video/*': ['.mp4', '.webm', '.mov'],
     },
     noClick: true,
     noKeyboard: true,
@@ -263,27 +267,20 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
     setDeleteDialogOpen(true);
   };
 
-  // Handle delete from lightbox - prepare next element to show after delete
   const handleLightboxDelete = (id: number) => {
     const filteredElements = getFilteredElements();
     const currentIndex = filteredElements.findIndex((e) => e.id === id);
-    
-    // Determine next element to show after delete
+
     let nextId: number | null = null;
     if (filteredElements.length > 1) {
       if (currentIndex < filteredElements.length - 1) {
-        // Show next element
         nextId = filteredElements[currentIndex + 1].id;
       } else if (currentIndex > 0) {
-        // Show previous element (if deleting last)
         nextId = filteredElements[currentIndex - 1].id;
       }
     }
-    
-    // Save next element id for after delete confirmation
+
     setNextElementIdAfterDelete(nextId);
-    
-    // Open delete dialog
     openDeleteDialog([id]);
   };
 
@@ -293,21 +290,19 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
     const deletingToastId = toast.loading(
       idsToDelete.length > 1
         ? `Удаление ${idsToDelete.length} элементов...`
-        : "Удаление элемента..."
+        : 'Удаление элемента...',
     );
 
     setDeleteDialogOpen(false);
     setConfirmDeleteIds([]);
-    
-    // Navigate to next element after delete (for lightbox)
+
     if (nextElementIdAfterDelete !== null) {
       openLightbox(nextElementIdAfterDelete);
       setNextElementIdAfterDelete(null);
     } else if (nextElementIdAfterDelete === null && lightboxOpen) {
-      // No elements left - close lightbox
       closeLightbox();
     }
-    
+
     try {
       await deleteElements(idsToDelete);
       clearSelection();
@@ -316,7 +311,24 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
     }
   };
 
-  const hasElements = elements.length > 0;
+  // Navigate into a group
+  const handleGroupClick = useCallback(
+    (groupCardId: number) => {
+      router.push(`/projects/${projectId}/groups/${groupCardId}`);
+    },
+    [router, projectId],
+  );
+
+  // Navigate back
+  const handleBack = useCallback(() => {
+    if (scene?.parent) {
+      router.push(`/projects/${projectId}/groups/${scene.parent}`);
+    } else {
+      router.push(`/projects/${projectId}`);
+    }
+  }, [router, projectId, scene]);
+
+  const hasContent = elements.length > 0 || groups.length > 0;
 
   // Current element for lightbox detail panel
   const currentElementForLightbox = useMemo(() => {
@@ -326,8 +338,8 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
 
   // Keyboard shortcuts for lightbox
   useKeyboard({
-    onArrowLeft: () => lightboxOpen && navigateLightbox("prev"),
-    onArrowRight: () => lightboxOpen && navigateLightbox("next"),
+    onArrowLeft: () => lightboxOpen && navigateLightbox('prev'),
+    onArrowRight: () => lightboxOpen && navigateLightbox('next'),
     onEscape: () => lightboxOpen && closeLightbox(),
     onF: () => lightboxOpen && lightboxElementId && toggleFavorite(lightboxElementId),
     onDelete: () => {
@@ -338,6 +350,39 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
     enabled: lightboxOpen,
   });
 
+  // Grid config for mixed grid rendering
+  const gridConfig = DISPLAY_GRID_CONFIG[preferences.size][preferences.aspectRatio];
+  const minCardWidth = CARD_SIZES[preferences.size][preferences.aspectRatio].width;
+
+  // Build breadcrumb parts
+  const breadcrumbs = useMemo(() => {
+    const parts: { label: string; href?: string }[] = [];
+
+    if (groupId && scene) {
+      // Inside a group
+      if (scene.parent_name && scene.parent) {
+        // Subgroup: Project > Parent > Current
+        parts.push({
+          label: scene.project_name ?? `Проект #${projectId}`,
+          href: `/projects/${projectId}`,
+        });
+        parts.push({
+          label: scene.parent_name,
+          href: `/projects/${projectId}/groups/${scene.parent}`,
+        });
+        parts.push({ label: scene.name });
+      } else {
+        // Direct group: Project > Current
+        parts.push({
+          label: scene.project_name ?? `Проект #${projectId}`,
+          href: `/projects/${projectId}`,
+        });
+        parts.push({ label: scene.name });
+      }
+    }
+    return parts;
+  }, [groupId, scene, projectId]);
+
   return (
     <div className="flex h-full overflow-hidden">
       {/* Zone 1: Config Panel (left sidebar) */}
@@ -345,18 +390,49 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
         <ConfigPanel />
       </div>
 
-      {/* Main content area — whole-scene dropzone (drag only, no click) */}
+      {/* Main content area */}
       <div
         className={cn(
-          "flex flex-1 flex-col min-w-0 relative",
-          isDragActive && "bg-primary/5"
+          'flex flex-1 flex-col min-w-0 relative',
+          isDragActive && 'bg-primary/5',
         )}
         {...getRootProps()}
       >
         <input {...getInputProps()} />
 
-        {/* Filters toolbar - inside scene workspace */}
+        {/* Breadcrumbs + Filters toolbar */}
         <div className="border-b px-4 py-2 shrink-0 bg-background">
+          {/* Breadcrumbs (only when inside a group) */}
+          {groupId && breadcrumbs.length > 0 && (
+            <div className="flex items-center gap-1 mb-2">
+              <button
+                type="button"
+                onClick={handleBack}
+                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                <span>Назад</span>
+              </button>
+              <span className="text-muted-foreground/50 mx-1">/</span>
+              {breadcrumbs.map((crumb, i) => (
+                <span key={i} className="flex items-center gap-1">
+                  {i > 0 && <span className="text-muted-foreground/50 mx-1">&gt;</span>}
+                  {crumb.href ? (
+                    <button
+                      type="button"
+                      onClick={() => router.push(crumb.href!)}
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {crumb.label}
+                    </button>
+                  ) : (
+                    <span className="text-sm text-foreground font-medium">{crumb.label}</span>
+                  )}
+                </span>
+              ))}
+            </div>
+          )}
+
           <div className="flex items-center gap-4">
             <ElementFilters
               filter={filter}
@@ -369,27 +445,65 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
 
         {/* Zone 3: Grid area - scrollable */}
         <div className="flex-1 overflow-auto p-4 relative min-h-0">
-          {hasElements ? (
-            <ElementGrid onRequestDelete={openDeleteDialog} />
-          ) : (
+          {hasContent ? (
+            <div>
+              {/* Mixed grid: groups first, then elements */}
+              {groups.length > 0 && (
+                <div
+                  className={cn('grid mb-4', gridConfig.gap)}
+                  style={{
+                    gridTemplateColumns: `repeat(auto-fill, minmax(${minCardWidth}px, 1fr))`,
+                  }}
+                >
+                  {groups
+                    .sort((a, b) => a.order_index - b.order_index)
+                    .map((group) => (
+                      <GroupCard
+                        key={`group-${group.id}`}
+                        group={group}
+                        isSelected={selectedIds.has(group.id)}
+                        isMultiSelectMode={isMultiSelectMode}
+                        onSelect={(id, add) => {
+                          useSceneWorkspaceStore.getState().selectElement(id, add);
+                        }}
+                        onClick={handleGroupClick}
+                        size={preferences.size}
+                        aspectRatio={preferences.aspectRatio}
+                        fitMode={preferences.fitMode}
+                      />
+                    ))}
+                </div>
+              )}
+
+              {/* Elements grid with DnD */}
+              {elements.length > 0 ? (
+                <ElementGrid onRequestDelete={openDeleteDialog} />
+              ) : groups.length > 0 ? (
+                // Groups exist but no elements — show subtle hint
+                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                  <p className="text-sm">Нет элементов в этом уровне</p>
+                </div>
+              ) : null}
+            </div>
+          ) : isLoading ? null : (
             <EmptyState onUploadClick={open} isDragActive={isDragActive} />
           )}
         </div>
 
         {/* Zone 2: Prompt Bar (bottom) */}
-        <PromptBar projectId={projectId} sceneId={sceneId} />
+        <PromptBar projectId={projectId} groupId={groupId} />
 
-        {/* Bulk actions bar - shown when items selected */}
+        {/* Bulk actions bar */}
         <ElementBulkBar
           selectedCount={selectedIds.size}
-          totalCount={getFilteredElements().length}
+          totalCount={getFilteredElements().length + groups.length}
           onDeleteSelected={() => openDeleteDialog(Array.from(selectedIds))}
           onClearSelection={clearSelection}
           onToggleSelectAll={toggleSelectAll}
         />
 
-        {/* Whole-scene drag overlay - only during drag */}
-        {isDragActive && hasElements && (
+        {/* Whole-area drag overlay */}
+        {isDragActive && hasContent && (
           <div className="absolute inset-0 z-50 border-2 border-dashed border-primary bg-primary/5 rounded-xl flex items-center justify-center pointer-events-none">
             <div className="flex flex-col items-center gap-3">
               <Upload className="h-10 w-10 text-primary animate-pulse" />
@@ -404,25 +518,19 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
           <DialogContent className="sm:max-w-sm">
             <DialogHeader>
               <DialogTitle>
-                {isGroupDelete ? "Удалить выбранные элементы?" : "Удалить элемент?"}
+                {isGroupDelete ? 'Удалить выбранные элементы?' : 'Удалить элемент?'}
               </DialogTitle>
               <DialogDescription>
                 {isGroupDelete
                   ? `Будет удалено ${confirmDeleteIds.length} элементов. Это действие нельзя отменить.`
-                  : "Элемент будет удалён безвозвратно."}
+                  : 'Элемент будет удалён безвозвратно.'}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button
-                variant="ghost"
-                onClick={() => setDeleteDialogOpen(false)}
-              >
+              <Button variant="ghost" onClick={() => setDeleteDialogOpen(false)}>
                 Отмена
               </Button>
-              <Button
-                variant="destructive"
-                onClick={handleConfirmDelete}
-              >
+              <Button variant="destructive" onClick={handleConfirmDelete}>
                 Удалить
               </Button>
             </DialogFooter>
