@@ -400,3 +400,18 @@ class SceneViewSet(viewsets.ModelViewSet):
 
         reorder_scenes(scene_ids)
         return Response({'status': 'ok'})
+
+    @action(detail=True, methods=['get'], url_path='delete-info')
+    def delete_info(self, request, pk=None):
+        """Return counts for deletion confirmation dialog."""
+        scene = self.get_object()
+        from apps.elements.models import Element
+        children = scene.children.all()
+        child_element_count = Element.objects.filter(scene__in=children).count()
+
+        return Response({
+            'element_count': scene.elements.count(),
+            'children_count': children.count(),
+            'child_element_count': child_element_count,
+            'total_elements_affected': scene.elements.count() + child_element_count,
+        })
