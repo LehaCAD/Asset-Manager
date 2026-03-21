@@ -1,5 +1,7 @@
 from rest_framework import viewsets, permissions
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 from .models import Project
 from .serializers import ProjectSerializer
 
@@ -43,3 +45,26 @@ class ProjectViewSet(viewsets.ModelViewSet):
         #     )
         #
         serializer.save(user=user)
+
+    @action(detail=True, methods=['post'], url_path='reorder-items')
+    def reorder_items(self, request, pk=None):
+        """
+        Reorder mixed grid of elements and groups.
+        Accepts: item_order: [{type: "element", id: 1}, {type: "group", id: 2}, ...]
+        """
+        project = self.get_object()
+        item_order = request.data.get('item_order', [])
+
+        from apps.elements.models import Element
+        from apps.scenes.models import Scene
+
+        for index, item in enumerate(item_order):
+            item_type = item.get('type')
+            item_id = item.get('id')
+
+            if item_type == 'element':
+                Element.objects.filter(id=item_id, project=project).update(order_index=index)
+            elif item_type == 'group':
+                Scene.objects.filter(id=item_id, project=project).update(order_index=index)
+
+        return Response({'status': 'ok'})
