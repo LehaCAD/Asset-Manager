@@ -87,7 +87,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
         <div className={`${aspectClass} bg-muted relative overflow-hidden`}>
           {project.preview_thumbnails && project.preview_thumbnails.length > 0 ? (
             /* 2x2 Preview Grid */
-            <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-px">
+            <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-0.5">
               {Array.from({ length: 4 }).map((_, i) => {
                 const src = project.preview_thumbnails![i];
                 return src ? (

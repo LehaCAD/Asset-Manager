@@ -74,7 +74,7 @@ export function GroupCard({
       {/* Preview area - full card */}
       <div className="absolute inset-0">
         {group.preview_thumbnails && group.preview_thumbnails.length > 0 ? (
-          <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-px bg-border/30">
+          <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-0.5">
             {[0, 1, 2, 3].map((i) => {
               const url = group.preview_thumbnails?.[i];
               return (

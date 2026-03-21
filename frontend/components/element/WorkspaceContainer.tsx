@@ -553,22 +553,20 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
 
         {/* Zone 3: Grid area - scrollable */}
         <div className="flex-1 overflow-auto p-2 sm:p-4 relative min-h-0">
-          <div className="max-w-[1600px] mx-auto">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-16">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-              </div>
-            ) : hasContent ? (
-              <ElementGrid
-                onRequestDelete={openDeleteDialog}
-                groups={groups}
-                onGroupClick={handleGroupClick}
-                onGroupDelete={handleRequestGroupDelete}
-              />
-            ) : (
-              <EmptyState onUploadClick={open} isDragActive={isDragActive} />
-            )}
-          </div>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+            </div>
+          ) : hasContent ? (
+            <ElementGrid
+              onRequestDelete={openDeleteDialog}
+              groups={groups}
+              onGroupClick={handleGroupClick}
+              onGroupDelete={handleRequestGroupDelete}
+            />
+          ) : (
+            <EmptyState onUploadClick={open} isDragActive={isDragActive} />
+          )}
         </div>
 
         {/* Zone 2: Prompt Bar (bottom) */}

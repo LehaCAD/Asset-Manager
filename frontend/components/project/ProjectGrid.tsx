@@ -36,8 +36,7 @@ export function ProjectGrid() {
 
       {/* Grid - full width, no max-width */}
       <div className="flex-1 overflow-auto px-4 py-4">
-        <div className="max-w-[1600px] mx-auto">
-          {isLoading ? (
+        {isLoading ? (
             <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
               {Array.from({ length: 8 }).map((_, i) => (
                 <ProjectCardSkeleton key={i} />
@@ -52,7 +51,6 @@ export function ProjectGrid() {
               ))}
             </div>
           )}
-        </div>
       </div>
 
       <CreateProjectDialog open={createOpen} onOpenChange={setCreateOpen} />

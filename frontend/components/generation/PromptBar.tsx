@@ -249,8 +249,8 @@ export function PromptBar({ projectId, sceneId, groupId, className }: PromptBarP
     <div className={cn("p-4", className)}>
       <div
         className={cn(
-          "relative flex items-start gap-3 rounded-md border border-border/40 bg-foreground/[0.03] p-3",
-          "transition-shadow focus-within:border-primary/30 focus-within:ring-1 focus-within:ring-ring/20"
+          "relative flex items-start gap-3 rounded-md border border-border bg-card/50 p-3",
+          "transition-shadow focus-within:border-primary/40 focus-within:ring-1 focus-within:ring-ring/20"
         )}
       >
           {/* Add-кнопка */}

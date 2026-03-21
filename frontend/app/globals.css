@@ -101,34 +101,35 @@
 }
 
 /* ── Dark theme ──────────────────────────────────────────── */
+/* Colors matched to pen/pencil-new.pen design mockups */
 .dark {
-  --background:         oklch(0.115 0.013 265);    /* #0C0F16 — deeper, neutral */
-  --foreground:         oklch(0.948 0.006 265);    /* #F0F1F4 */
-  --card:               oklch(0.155 0.013 265);    /* #1A1D28 — neutral elevated */
-  --card-foreground:    oklch(0.948 0.006 265);
-  --popover:            oklch(0.155 0.013 265);
-  --popover-foreground: oklch(0.948 0.006 265);
-  --primary:            oklch(0.646 0.204 281.4);  /* #8B7CF7 — same */
-  --primary-foreground: oklch(0.1 0.025 280);      /* #0F0A1E */
-  --secondary:          oklch(0.195 0.015 265);    /* #252832 — softer */
-  --secondary-foreground: oklch(0.948 0.006 265);
-  --muted:              oklch(0.155 0.013 265);    /* #1A1D28 */
-  --muted-foreground:   oklch(0.58 0.02 265);      /* #8B8FA3 — brandbook text-secondary */
-  --accent:             oklch(0.195 0.015 265);
-  --accent-foreground:  oklch(0.948 0.006 265);
+  --background:         oklch(0.145 0.028 265);    /* ~#111827 — dark navy, matches pen workspace bg */
+  --foreground:         oklch(0.95 0.006 265);     /* #EFF1F5 */
+  --card:               oklch(0.19 0.03 265);      /* ~#1C2640 — clearly lighter than bg, matches pen cards */
+  --card-foreground:    oklch(0.95 0.006 265);
+  --popover:            oklch(0.21 0.03 265);      /* ~#212B45 — popovers slightly above cards */
+  --popover-foreground: oklch(0.95 0.006 265);
+  --primary:            oklch(0.646 0.204 281.4);  /* #8B7CF7 — purple accent */
+  --primary-foreground: oklch(0.985 0 0);          /* white text on purple buttons */
+  --secondary:          oklch(0.22 0.025 265);     /* ~#232E48 — button/toggle bg */
+  --secondary-foreground: oklch(0.95 0.006 265);
+  --muted:              oklch(0.19 0.03 265);      /* same as card */
+  --muted-foreground:   oklch(0.58 0.02 265);      /* #8B8FA3 — secondary text */
+  --accent:             oklch(0.22 0.025 265);
+  --accent-foreground:  oklch(0.95 0.006 265);
   --destructive:        oklch(0.704 0.191 22.216);
-  --border:             oklch(0.195 0.015 265);    /* #252832 — softer borders */
-  --input:              oklch(1 0 0 / 5%);         /* rgba(255,255,255,0.05) */
+  --border:             oklch(0.26 0.025 265);     /* ~#2D3A55 — visible borders, matches pen */
+  --input:              oklch(0.19 0.03 265);      /* same as card bg for inputs */
   --ring:               oklch(0.646 0.204 281.4);
 
-  /* Sidebar */
-  --sidebar:            oklch(0.135 0.013 265);    /* #13161F — bg-surface */
-  --sidebar-foreground: oklch(0.948 0.006 265);
+  /* Sidebar — slightly darker than main bg */
+  --sidebar:            oklch(0.13 0.025 265);     /* ~#0F1525 — darker panel */
+  --sidebar-foreground: oklch(0.95 0.006 265);
   --sidebar-primary:    oklch(0.646 0.204 281.4);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent:     oklch(0.195 0.015 265);
-  --sidebar-accent-foreground: oklch(0.948 0.006 265);
-  --sidebar-border:     oklch(0.195 0.015 265);
+  --sidebar-accent:     oklch(0.22 0.025 265);
+  --sidebar-accent-foreground: oklch(0.95 0.006 265);
+  --sidebar-border:     oklch(0.26 0.025 265);
   --sidebar-ring:       oklch(0.646 0.204 281.4);
 
   /* Charts */
@@ -139,11 +140,11 @@
   --chart-5: oklch(0.645 0.246 16.439);
 
   /* Semantic tokens */
-  --base:        oklch(0.115 0.013 265);           /* #0C0F16 */
-  --surface:     oklch(0.135 0.013 265);           /* #13161F */
-  --card-bg:     oklch(0.155 0.013 265);           /* #1A1D28 */
+  --base:        oklch(0.145 0.028 265);           /* ~#111827 — page bg */
+  --surface:     oklch(0.16 0.028 265);            /* ~#151D30 — panels */
+  --card-bg:     oklch(0.19 0.03 265);             /* ~#1C2640 — cards */
   --text-accent: oklch(0.646 0.204 281.4);         /* #8B7CF7 */
-  --bg-elevated-hover: oklch(0.175 0.014 265);    /* #1F2330 */
+  --bg-elevated-hover: oklch(0.23 0.028 265);      /* ~#242E48 — hover on cards */
 }
 
 @layer base {

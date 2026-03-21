@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import type { ElementFilter } from "@/lib/types";
 
 export interface ElementFiltersProps {
@@ -51,17 +51,24 @@ export function ElementFilters({
     <div className="flex items-center gap-4">
       {/* Filter tabs - left aligned */}
       <div className="flex items-center gap-1">
-        {filterTabs.map((tab) => (
-          <Button
-            key={tab.value}
-            variant={filter === tab.value ? "default" : "ghost"}
-            size="sm"
-            onClick={() => onFilterChange(tab.value)}
-            className="h-8 px-3"
-          >
-            {tab.label} ({getCount(tab.value)})
-          </Button>
-        ))}
+        {filterTabs.map((tab) => {
+          const isActive = filter === tab.value;
+          return (
+            <button
+              key={tab.value}
+              onClick={() => onFilterChange(tab.value)}
+              className={cn(
+                "h-8 px-3 rounded-md text-xs font-medium transition-all duration-150",
+                "border",
+                isActive
+                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                  : "bg-transparent border-transparent text-muted-foreground hover:text-foreground hover:bg-card"
+              )}
+            >
+              {tab.label} ({getCount(tab.value)})
+            </button>
+          );
+        })}
       </div>
 
       {/* Density controls - MOVED to DisplaySettingsPopover 

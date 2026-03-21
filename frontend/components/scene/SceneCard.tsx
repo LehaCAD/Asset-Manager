@@ -152,7 +152,7 @@ export function SceneCard({ scene, projectId, index, aspectClass = "aspect-video
         <div className={cn("bg-muted relative overflow-hidden", aspectClass)}>
           {scene.preview_thumbnails && scene.preview_thumbnails.length > 0 ? (
             /* 2x2 preview grid */
-            <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-px">
+            <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-0.5">
               {[0, 1, 2, 3].map((i) => {
                 const url = scene.preview_thumbnails![i];
                 return url ? (

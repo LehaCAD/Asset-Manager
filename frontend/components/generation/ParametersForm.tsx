@@ -134,28 +134,39 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
       <div className="space-y-2">
         <label className="text-sm font-medium">{label}</label>
         <div className="flex flex-wrap gap-1.5">
-          {featuredOptions.map((opt) => (
-            <Button
-              key={String(opt.value)}
-              type="button"
-              variant={currentValue === opt.value ? "default" : "outline"}
-              size="sm"
-              onClick={() => onChange(request_key, opt.value)}
-              className="h-8 px-2.5 text-xs transition-colors active:bg-accent"
-            >
-              {opt.label}
-            </Button>
-          ))}
+          {featuredOptions.map((opt) => {
+            const isSelected = currentValue === opt.value;
+            return (
+              <button
+                key={String(opt.value)}
+                type="button"
+                onClick={() => onChange(request_key, opt.value)}
+                className={cn(
+                  "h-9 px-3 rounded-md text-xs font-medium transition-all duration-150",
+                  "border",
+                  isSelected
+                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                    : "bg-card border-border text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-card/80"
+                )}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
           {hasOverflow && (
-            <Button
+            <button
               type="button"
-              variant={selectedOverflowOption ? "default" : "outline"}
-              size="sm"
               onClick={() => onOpenCustom(param)}
-              className="h-8 px-2.5 text-xs transition-colors active:bg-accent"
+              className={cn(
+                "h-9 px-3 rounded-md text-xs font-medium transition-all duration-150",
+                "border",
+                selectedOverflowOption
+                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                  : "bg-card border-border text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-card/80"
+              )}
             >
               {selectedOverflowOption?.label ?? "Другое"}
-            </Button>
+            </button>
           )}
         </div>
       </div>
