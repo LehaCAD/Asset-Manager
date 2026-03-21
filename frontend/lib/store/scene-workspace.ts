@@ -172,6 +172,8 @@ interface SceneWorkspaceState {
   // Data
   scene: Scene | null;
   elements: WorkspaceElement[];
+  groups: Scene[];
+  projectId: number | null;
 
   // UI state
   selectedIds: Set<number>;
@@ -186,6 +188,7 @@ interface SceneWorkspaceState {
   error: string | null;
 
   // Data actions
+  loadWorkspace: (projectId: number, groupId?: number) => Promise<void>;
   loadScene: (sceneId: number) => Promise<void>;
   addElement: (element: WorkspaceElement) => void;
   updateElement: (id: number, updates: Partial<WorkspaceElement>) => void;
@@ -229,6 +232,8 @@ interface SceneWorkspaceState {
 export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) => ({
   scene: null,
   elements: [],
+  groups: [],
+  projectId: null,
   selectedIds: new Set<number>(),
   isMultiSelectMode: false,
   filter: "all",
@@ -238,7 +243,7 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
   isLoading: false,
   error: null,
 
-  loadScene: async (sceneId: number) => {
+  loadWorkspace: async (projectId: number, groupId?: number) => {
     latestLoadSceneRequestId += 1;
     const requestId = latestLoadSceneRequestId;
 
@@ -248,10 +253,12 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
     const controller = new AbortController();
     activeLoadSceneController = controller;
 
-    // Reset transient UI state when switching scenes to avoid stale selections/loading artifacts.
+    // Reset transient UI state when switching context to avoid stale selections/loading artifacts.
     set({
       scene: null,
       elements: [],
+      groups: [],
+      projectId,
       selectedIds: new Set<number>(),
       isMultiSelectMode: false,
       lightboxOpen: false,
@@ -260,15 +267,30 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
       error: null,
     });
     try {
-      const [scene, elements] = await Promise.all([
-        scenesApi.getById(sceneId, { signal: controller.signal }),
-        elementsApi.getByScene(sceneId, { signal: controller.signal }),
-      ]);
+      let elements: Element[];
+      let scene: Scene | null = null;
+      let groups: Scene[] = [];
+
+      if (groupId) {
+        // Inside a group
+        [scene, elements, groups] = await Promise.all([
+          scenesApi.getById(groupId, { signal: controller.signal }),
+          elementsApi.getByScene(groupId, { signal: controller.signal }),
+          scenesApi.getChildren(projectId, groupId),
+        ]);
+      } else {
+        // Project root
+        [elements, groups] = await Promise.all([
+          elementsApi.getByProject(projectId, true, { signal: controller.signal }),
+          scenesApi.getChildren(projectId, null),
+        ]);
+      }
+
       if (requestId !== latestLoadSceneRequestId) {
         return;
       }
       const sortedElements = elements.sort((a, b) => a.order_index - b.order_index);
-      set({ scene, elements: sortedElements, isLoading: false });
+      set({ scene, elements: sortedElements, groups, isLoading: false });
     } catch (error) {
       if (requestId !== latestLoadSceneRequestId) {
         return;
@@ -277,13 +299,19 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
         set({ isLoading: false });
         return;
       }
-      set({ error: "Failed to load scene", isLoading: false });
-      toast.error("Не удалось загрузить сцену");
+      set({ error: "Ошибка загрузки", isLoading: false });
+      toast.error("Не удалось загрузить рабочую область");
     } finally {
       if (requestId === latestLoadSceneRequestId && activeLoadSceneController === controller) {
         activeLoadSceneController = null;
       }
     }
+  },
+
+  loadScene: async (sceneId: number) => {
+    // Deprecated: use loadWorkspace instead
+    const scene = await scenesApi.getById(sceneId);
+    get().loadWorkspace(scene.project, sceneId);
   },
 
   addElement: (element: WorkspaceElement) => {
@@ -587,6 +615,8 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
     set({
       scene: null,
       elements: [],
+      groups: [],
+      projectId: null,
       selectedIds: new Set<number>(),
       isMultiSelectMode: false,
       filter: "all",

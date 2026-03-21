@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { toast } from "sonner";
 import { aiModelsApi } from "@/lib/api/ai-models";
 import { scenesApi } from "@/lib/api/scenes";
+import { projectsApi } from "@/lib/api/projects";
 import { useSceneWorkspaceStore } from "@/lib/store/scene-workspace";
 import { useCreditsStore } from "@/lib/store/credits";
 import type {
@@ -9,7 +10,10 @@ import type {
   GeneratePayload,
   GenerationSubmitResult,
   GenerationSubmitState,
+  ImageInputGroup,
+  ImageInputGroupsSchema,
 } from "@/lib/types";
+import { isGroupsSchema } from "@/lib/types";
 
 export interface ImageFileEntry {
   displayUrl: string; // Для PromptThumbnail: thumbnail_url || file_url
@@ -33,6 +37,7 @@ interface GenerationState {
   parameters: Record<string, unknown>;
   prompt: string;
   imageInputs: ImageInput[];
+  selectedGroup: ImageInputGroup | null;
   isGenerating: boolean;
   submitState: GenerationSubmitState;
   lastSubmitResult: GenerationSubmitResult | null;
@@ -44,14 +49,16 @@ interface GenerationState {
   // Actions
   loadModels: () => Promise<void>;
   selectModel: (model: AIModel) => void;
+  selectGroup: (groupKey: string) => void;
+  clearGroup: () => void;
   setParameter: (key: string, value: unknown) => void;
   setPrompt: (text: string) => void;
   setImageInput: (key: string, files: ImageFileEntry[]) => void;
   clearImageInput: (key: string) => void;
-  generate: (sceneId: number) => Promise<GenerationSubmitResult>;
+  generate: (projectId: number, groupId?: number) => Promise<GenerationSubmitResult>;
   canGenerate: () => boolean;
   clearSubmitResult: () => void;
-  
+
   // Internal
   _requestEstimate: () => void;
 
@@ -68,6 +75,7 @@ export const useGenerationStore = create<GenerationState>()((set, get) => ({
   parameters: {},
   prompt: "",
   imageInputs: [],
+  selectedGroup: null,
   isGenerating: false,
   submitState: "idle",
   lastSubmitResult: null,
@@ -110,24 +118,77 @@ export const useGenerationStore = create<GenerationState>()((set, get) => ({
     }
 
     // Build imageInputs from image_inputs_schema
-    const inputs: ImageInput[] = model.image_inputs_schema.map((schema) => ({
-      key: schema.key,
-      label: schema.label,
-      required: schema.required,
-      min: schema.min,
-      max: schema.max,
-      files: [],
-    }));
+    const rawSchema = model.image_inputs_schema;
+    let inputs: ImageInput[] = [];
+
+    if (Array.isArray(rawSchema)) {
+      // Simple format: [{key, label, min, max}] — build inputs directly
+      inputs = rawSchema.map((schema) => ({
+        key: schema.key,
+        label: schema.label,
+        required: !!schema.required,
+        min: schema.min,
+        max: schema.max,
+        files: [],
+      }));
+    }
+    // Groups format: don't build inputs — wait for user to pick a slot in ModeSelector
 
     set({
       selectedModel: model,
       parameters: defaults,
       imageInputs: inputs,
+      selectedGroup: null,
       modelSelectorOpen: false,
     });
     
     // Запрашиваем оценку стоимости для новой модели
     get()._requestEstimate();
+  },
+
+  selectGroup: (groupKey) => {
+    const { selectedModel, selectedGroup: currentGroup, imageInputs } = get();
+    if (!selectedModel) return;
+    const rawSchema = selectedModel.image_inputs_schema;
+    if (!isGroupsSchema(rawSchema)) return;
+
+    const group = rawSchema.groups.find((g) => g.key === groupKey);
+    if (!group) return;
+
+    // If same group already selected — keep existing files, don't reset
+    if (currentGroup?.key === groupKey) return;
+
+    // Switching to different group — revoke old blob URLs
+    for (const input of imageInputs) {
+      const urlsToRevoke = input.files.flatMap((f) =>
+        [f.displayUrl, f.apiUrl].filter((u) => u.startsWith("blob:"))
+      );
+      urlsToRevoke.forEach((u) => URL.revokeObjectURL(u));
+    }
+
+    // Build imageInputs from selected group's slots only
+    const inputs: ImageInput[] = group.slots.map((slot) => ({
+      key: slot.key,
+      label: slot.label,
+      required: slot.min > 0,
+      min: slot.min,
+      max: slot.max,
+      files: [],
+    }));
+
+    set({ selectedGroup: group, imageInputs: inputs });
+  },
+
+  clearGroup: () => {
+    const { imageInputs } = get();
+    // Revoke blob URLs
+    for (const input of imageInputs) {
+      const urlsToRevoke = input.files.flatMap((f) =>
+        [f.displayUrl, f.apiUrl].filter((u) => u.startsWith("blob:"))
+      );
+      urlsToRevoke.forEach((u) => URL.revokeObjectURL(u));
+    }
+    set({ selectedGroup: null, imageInputs: [] });
   },
 
   setParameter: (key, value) => {
@@ -160,6 +221,28 @@ export const useGenerationStore = create<GenerationState>()((set, get) => ({
       toast.warning(`Максимум ${input.max} изображений для ${input.label}`);
     }
 
+    // If clearing a slot, promote dependent slot's files up (depends_on cascade)
+    if (newFiles.length === 0) {
+      const { selectedGroup } = get();
+      if (selectedGroup) {
+        const dependentSlot = selectedGroup.slots.find((s) => s.depends_on === key);
+        if (dependentSlot) {
+          const dependentInput = imageInputs.find((i) => i.key === dependentSlot.key);
+          if (dependentInput && dependentInput.files.length > 0) {
+            // Promote: dependent files → parent slot, clear dependent
+            set((state) => ({
+              imageInputs: state.imageInputs.map((i) => {
+                if (i.key === key) return { ...i, files: dependentInput.files };
+                if (i.key === dependentSlot.key) return { ...i, files: [] };
+                return i;
+              }),
+            }));
+            return;
+          }
+        }
+      }
+    }
+
     set((state) => ({
       imageInputs: state.imageInputs.map((i) =>
         i.key === key ? { ...i, files: newFiles } : i
@@ -185,7 +268,7 @@ export const useGenerationStore = create<GenerationState>()((set, get) => ({
     }));
   },
 
-  generate: async (sceneId) => {
+  generate: async (projectId, groupId?) => {
     if (!get().canGenerate()) {
       const result: GenerationSubmitResult = {
         ok: false,
@@ -203,26 +286,52 @@ export const useGenerationStore = create<GenerationState>()((set, get) => ({
 
     // Build generation config
     const imageInputsMap: Record<string, string[]> = {};
+    const rawSchema = get().selectedModel?.image_inputs_schema;
+    const { selectedGroup } = get();
+
+    // Build collect_to mapping from selected group
+    const collectToMap: Record<string, string> = {};
+    if (selectedGroup?.collect_to) {
+      for (const slot of selectedGroup.slots) {
+        collectToMap[slot.key] = selectedGroup.collect_to;
+      }
+    }
+
     for (const input of get().imageInputs) {
       if (input.files.length > 0) {
-        imageInputsMap[input.key] = input.files.map((f) => f.apiUrl);
+        const targetKey = collectToMap[input.key] || input.key;
+        const urls = input.files.map((f) => f.apiUrl);
+        imageInputsMap[targetKey] = [...(imageInputsMap[targetKey] || []), ...urls];
+      }
+    }
+
+    // Build extra_params from selected group or no_images_params
+    let schemaExtraParams: Record<string, unknown> = {};
+    if (rawSchema && isGroupsSchema(rawSchema)) {
+      const hasAnyImages = Object.keys(imageInputsMap).length > 0;
+      if (!hasAnyImages && rawSchema.no_images_params) {
+        schemaExtraParams = { ...rawSchema.no_images_params };
+      } else if (selectedGroup?.extra_params) {
+        schemaExtraParams = { ...selectedGroup.extra_params };
       }
     }
 
     const generationConfig = {
       ...get().parameters,
       ...imageInputsMap,
+      ...schemaExtraParams,
     };
 
     // Create optimistic generation item FIRST (before API call)
+    // Use groupId as sceneId for optimistic element if inside a group, otherwise 0 (project root)
     const optimisticId = useSceneWorkspaceStore
       .getState()
       .createOptimisticGeneration({
-        sceneId,
+        sceneId: groupId ?? 0,
         promptText: get().prompt,
         aiModelId: get().selectedModel!.id,
         generationConfig,
-        elementType: "IMAGE",
+        elementType: get().selectedModel!.model_type === "VIDEO" ? "VIDEO" : "IMAGE",
       });
 
     set({
@@ -238,7 +347,12 @@ export const useGenerationStore = create<GenerationState>()((set, get) => ({
         generation_config: generationConfig,
       };
 
-      const element = await scenesApi.generate(sceneId, payload);
+      let element;
+      if (groupId) {
+        element = await scenesApi.generate(groupId, payload);
+      } else {
+        element = await projectsApi.generateInProject(projectId, payload);
+      }
 
       // Success: resolve optimistic generation to real element
       useSceneWorkspaceStore.getState().resolveOptimisticGeneration(optimisticId, element);
