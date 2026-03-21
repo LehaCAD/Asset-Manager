@@ -26,7 +26,7 @@ export function ElementBulkBar({
   return (
     <div
       className={cn(
-        "fixed bottom-24 left-1/2 -translate-x-1/2 z-30",
+        "fixed bottom-24 left-1/2 -translate-x-1/2 z-50",
         "bg-background border shadow-lg rounded-xl px-4 py-3",
         "flex items-center gap-4",
         "transition-transform duration-200 ease-out"

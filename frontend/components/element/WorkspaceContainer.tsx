@@ -7,10 +7,8 @@ import { useSceneWorkspaceStore } from '@/lib/store/scene-workspace';
 import { useCreditsStore } from '@/lib/store/credits';
 import { useGenerationStore } from '@/lib/store/generation';
 import { useUIStore } from '@/lib/store/ui';
-import { useDisplayStore } from '@/lib/store/project-display';
 import { wsManager } from '@/lib/api/websocket';
 import { ElementGrid } from '@/components/element/ElementGrid';
-import { GroupCard } from '@/components/element/GroupCard';
 import { ElementFilters } from '@/components/element/ElementFilters';
 import { ElementBulkBar } from '@/components/element/ElementBulkBar';
 import { ConfigPanel } from '@/components/generation/ConfigPanel';
@@ -34,7 +32,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { MAX_FILE_SIZE_MB, DISPLAY_GRID_CONFIG, CARD_SIZES } from '@/lib/utils/constants';
+import { MAX_FILE_SIZE_MB } from '@/lib/utils/constants';
 import type { WSEvent } from '@/lib/types';
 
 interface WorkspaceContainerProps {
@@ -65,8 +63,6 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   } = useSceneWorkspaceStore();
 
   const { loadModels } = useGenerationStore();
-  const { preferences } = useDisplayStore();
-
   const [confirmDeleteIds, setConfirmDeleteIds] = useState<number[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [nextElementIdAfterDelete, setNextElementIdAfterDelete] = useState<number | null>(null);
@@ -419,36 +415,29 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
     enabled: lightboxOpen,
   });
 
-  // Grid config for mixed grid rendering
-  const gridConfig = DISPLAY_GRID_CONFIG[preferences.size][preferences.aspectRatio];
-  const minCardWidth = CARD_SIZES[preferences.size][preferences.aspectRatio].width;
 
-  // Build breadcrumb parts
+  // Build breadcrumb parts — always visible
   const breadcrumbs = useMemo(() => {
     const parts: { label: string; href?: string }[] = [];
 
+    // Always show project
+    const projectName = scene?.project_name ?? `Проект #${projectId}`;
+    parts.push({
+      label: `Проект «${projectName}»`,
+      href: groupId ? `/projects/${projectId}` : undefined,
+    });
+
     if (groupId && scene) {
-      // Inside a group
       if (scene.parent_name && scene.parent) {
-        // Subgroup: Project > Parent > Current
+        // Subgroup
         parts.push({
-          label: scene.project_name ?? `Проект #${projectId}`,
-          href: `/projects/${projectId}`,
-        });
-        parts.push({
-          label: scene.parent_name,
+          label: `Группа «${scene.parent_name}»`,
           href: `/projects/${projectId}/groups/${scene.parent}`,
         });
-        parts.push({ label: scene.name });
-      } else {
-        // Direct group: Project > Current
-        parts.push({
-          label: scene.project_name ?? `Проект #${projectId}`,
-          href: `/projects/${projectId}`,
-        });
-        parts.push({ label: scene.name });
       }
+      parts.push({ label: `Группа «${scene.name}»` });
     }
+
     return parts;
   }, [groupId, scene, projectId]);
 
@@ -471,18 +460,22 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
 
         {/* Breadcrumbs + Filters toolbar */}
         <div className="border-b px-4 py-2 shrink-0 bg-background">
-          {/* Breadcrumbs (only when inside a group) */}
-          {groupId && breadcrumbs.length > 0 && (
+          {/* Breadcrumbs — always visible */}
+          {breadcrumbs.length > 0 && (
             <div className="flex items-center gap-1 mb-2">
-              <button
-                type="button"
-                onClick={handleBack}
-                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4" />
-                <span>Назад</span>
-              </button>
-              <span className="text-muted-foreground/50 mx-1">/</span>
+              {groupId && (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleBack}
+                    className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    <span>Назад</span>
+                  </button>
+                  <span className="text-muted-foreground/50 mx-1">/</span>
+                </>
+              )}
               {breadcrumbs.map((crumb, i) => (
                 <span key={i} className="flex items-center gap-1">
                   {i > 0 && <span className="text-muted-foreground/50 mx-1">&gt;</span>}
@@ -515,46 +508,12 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
         {/* Zone 3: Grid area - scrollable */}
         <div className="flex-1 overflow-auto p-4 relative min-h-0">
           {hasContent ? (
-            <div>
-              {/* Mixed grid: groups first, then elements */}
-              {groups.length > 0 && (
-                <div
-                  className={cn('grid mb-4', gridConfig.gap)}
-                  style={{
-                    gridTemplateColumns: `repeat(auto-fill, minmax(${minCardWidth}px, 1fr))`,
-                  }}
-                >
-                  {groups
-                    .sort((a, b) => a.order_index - b.order_index)
-                    .map((group) => (
-                      <GroupCard
-                        key={`group-${group.id}`}
-                        group={group}
-                        isSelected={selectedIds.has(group.id)}
-                        isMultiSelectMode={isMultiSelectMode}
-                        onSelect={(id, add) => {
-                          useSceneWorkspaceStore.getState().selectElement(id, add);
-                        }}
-                        onClick={handleGroupClick}
-                        onDelete={handleRequestGroupDelete}
-                        size={preferences.size}
-                        aspectRatio={preferences.aspectRatio}
-                        fitMode={preferences.fitMode}
-                      />
-                    ))}
-                </div>
-              )}
-
-              {/* Elements grid with DnD */}
-              {elements.length > 0 ? (
-                <ElementGrid onRequestDelete={openDeleteDialog} />
-              ) : groups.length > 0 ? (
-                // Groups exist but no elements — show subtle hint
-                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                  <p className="text-sm">Нет элементов в этом уровне</p>
-                </div>
-              ) : null}
-            </div>
+            <ElementGrid
+              onRequestDelete={openDeleteDialog}
+              groups={groups}
+              onGroupClick={handleGroupClick}
+              onGroupDelete={handleRequestGroupDelete}
+            />
           ) : isLoading ? null : (
             <EmptyState onUploadClick={open} isDragActive={isDragActive} />
           )}
