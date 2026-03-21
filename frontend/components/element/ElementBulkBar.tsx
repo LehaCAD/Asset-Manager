@@ -1,11 +1,12 @@
 import { Button } from "@/components/ui/button";
-import { CheckSquare, Trash2, X } from "lucide-react";
+import { CheckSquare, FolderInput, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface ElementBulkBarProps {
   selectedCount: number;
   totalCount: number;
   onDeleteSelected: () => void;
+  onMoveSelected?: () => void;
   onClearSelection: () => void;
   onToggleSelectAll: () => void;
 }
@@ -14,6 +15,7 @@ export function ElementBulkBar({
   selectedCount,
   totalCount,
   onDeleteSelected,
+  onMoveSelected,
   onClearSelection,
   onToggleSelectAll,
 }: ElementBulkBarProps) {
@@ -53,6 +55,18 @@ export function ElementBulkBar({
             </>
           )}
         </Button>
+
+        {onMoveSelected && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onMoveSelected}
+            className="gap-2"
+          >
+            <FolderInput className="h-4 w-4" />
+            Переместить
+          </Button>
+        )}
 
         <Button
           variant="destructive"

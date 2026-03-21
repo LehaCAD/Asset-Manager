@@ -34,6 +34,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useScenesStore } from "@/lib/store/scenes";
+import { scenesApi } from "@/lib/api/scenes";
 import { SCENE_STATUSES } from "@/lib/utils/constants";
 import { formatElementCount } from "@/lib/utils/format";
 import type { Scene } from "@/lib/types";
@@ -63,6 +64,12 @@ export function SceneCard({ scene, projectId, index, aspectClass = "aspect-video
   const [editName, setEditName] = useState(scene.name);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isLoadingDeleteInfo, setIsLoadingDeleteInfo] = useState(false);
+  const [deleteInfo, setDeleteInfo] = useState<{
+    element_count: number;
+    children_count: number;
+    total_elements_affected: number;
+  } | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -253,9 +260,18 @@ export function SceneCard({ scene, projectId, index, aspectClass = "aspect-video
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
-                    onSelect={(e) => {
+                    onSelect={async (e) => {
                       e.preventDefault();
                       e.stopPropagation();
+                      setIsLoadingDeleteInfo(true);
+                      try {
+                        const info = await scenesApi.getDeleteInfo(scene.id);
+                        setDeleteInfo(info);
+                      } catch {
+                        setDeleteInfo(null);
+                      } finally {
+                        setIsLoadingDeleteInfo(false);
+                      }
                       setDeleteOpen(true);
                     }}
                   >
@@ -315,7 +331,11 @@ export function SceneCard({ scene, projectId, index, aspectClass = "aspect-video
           <DialogHeader>
             <DialogTitle>Удалить группу?</DialogTitle>
             <DialogDescription>
-              Группа «{scene.name}» и все её элементы будут удалены безвозвратно.
+              {deleteInfo && deleteInfo.children_count > 0
+                ? `Удаление группы также удалит ${deleteInfo.children_count} подгрупп. Все ${deleteInfo.total_elements_affected} элементов будут перемещены в корень проекта.`
+                : deleteInfo && deleteInfo.total_elements_affected > 0
+                  ? `Удаление группы переместит ${deleteInfo.total_elements_affected} элементов в корень проекта.`
+                  : `Группа «${scene.name}» будет удалена.`}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

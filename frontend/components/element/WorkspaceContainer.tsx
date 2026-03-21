@@ -20,6 +20,8 @@ import { DisplaySettingsPopover } from '@/components/display/DisplaySettingsPopo
 import { LightboxModal } from '@/components/lightbox/LightboxModal';
 import { DetailPanel } from '@/components/lightbox/DetailPanel';
 import { useKeyboard } from '@/lib/hooks/use-keyboard';
+import { scenesApi } from '@/lib/api/scenes';
+import { MoveToGroupDialog } from '@/components/element/MoveToGroupDialog';
 import { Upload, ChevronLeft } from 'lucide-react';
 import {
   Dialog,
@@ -68,6 +70,15 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   const [confirmDeleteIds, setConfirmDeleteIds] = useState<number[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [nextElementIdAfterDelete, setNextElementIdAfterDelete] = useState<number | null>(null);
+  const [moveDialogOpen, setMoveDialogOpen] = useState(false);
+  const [groupDeleteDialogOpen, setGroupDeleteDialogOpen] = useState(false);
+  const [groupDeleteTarget, setGroupDeleteTarget] = useState<number | null>(null);
+  const [groupDeleteInfo, setGroupDeleteInfo] = useState<{
+    element_count: number;
+    children_count: number;
+    total_elements_affected: number;
+  } | null>(null);
+  const [isGroupDeleting, setIsGroupDeleting] = useState(false);
   const fallbackRefetchIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const disconnectDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -319,6 +330,64 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
     [router, projectId],
   );
 
+  // Separate selected IDs into element IDs and group IDs
+  const selectedElementIds = useMemo(() => {
+    const elementIdSet = new Set(elements.map((e) => e.id));
+    return Array.from(selectedIds).filter((id) => elementIdSet.has(id));
+  }, [selectedIds, elements]);
+
+  const selectedGroupIds = useMemo(() => {
+    const groupIdSet = new Set(groups.map((g) => g.id));
+    return Array.from(selectedIds).filter((id) => groupIdSet.has(id));
+  }, [selectedIds, groups]);
+
+  // Open move dialog
+  const handleOpenMoveDialog = useCallback(() => {
+    if (selectedIds.size === 0) return;
+    setMoveDialogOpen(true);
+  }, [selectedIds]);
+
+  // Handle move completion
+  const handleMoved = useCallback(() => {
+    clearSelection();
+    loadWorkspace(projectId, groupId);
+  }, [clearSelection, loadWorkspace, projectId, groupId]);
+
+  // Handle group delete with confirmation (fetches counts first)
+  const handleRequestGroupDelete = useCallback(
+    async (groupIdToDelete: number) => {
+      setGroupDeleteTarget(groupIdToDelete);
+      try {
+        const info = await scenesApi.getDeleteInfo(groupIdToDelete);
+        setGroupDeleteInfo(info);
+        setGroupDeleteDialogOpen(true);
+      } catch {
+        toast.error('Не удалось получить информацию о группе');
+      }
+    },
+    [],
+  );
+
+  const handleConfirmGroupDelete = useCallback(async () => {
+    if (groupDeleteTarget === null) return;
+    setIsGroupDeleting(true);
+    try {
+      await scenesApi.delete(groupDeleteTarget);
+      toast.success('Группа удалена');
+      setGroupDeleteDialogOpen(false);
+      setGroupDeleteTarget(null);
+      setGroupDeleteInfo(null);
+      clearSelection();
+      loadWorkspace(projectId, groupId);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Не удалось удалить группу';
+      toast.error(message);
+    } finally {
+      setIsGroupDeleting(false);
+    }
+  }, [groupDeleteTarget, clearSelection, loadWorkspace, projectId, groupId]);
+
   // Navigate back
   const handleBack = useCallback(() => {
     if (scene?.parent) {
@@ -467,6 +536,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
                           useSceneWorkspaceStore.getState().selectElement(id, add);
                         }}
                         onClick={handleGroupClick}
+                        onDelete={handleRequestGroupDelete}
                         size={preferences.size}
                         aspectRatio={preferences.aspectRatio}
                         fitMode={preferences.fitMode}
@@ -498,6 +568,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
           selectedCount={selectedIds.size}
           totalCount={getFilteredElements().length + groups.length}
           onDeleteSelected={() => openDeleteDialog(Array.from(selectedIds))}
+          onMoveSelected={handleOpenMoveDialog}
           onClearSelection={clearSelection}
           onToggleSelectAll={toggleSelectAll}
         />
@@ -532,6 +603,49 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
               </Button>
               <Button variant="destructive" onClick={handleConfirmDelete}>
                 Удалить
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Move to group dialog */}
+        <MoveToGroupDialog
+          open={moveDialogOpen}
+          onOpenChange={setMoveDialogOpen}
+          projectId={projectId}
+          selectedElementIds={selectedElementIds}
+          selectedGroupIds={selectedGroupIds}
+          currentGroupId={groupId}
+          onMoved={handleMoved}
+        />
+
+        {/* Group delete confirmation dialog */}
+        <Dialog open={groupDeleteDialogOpen} onOpenChange={setGroupDeleteDialogOpen}>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Удалить группу?</DialogTitle>
+              <DialogDescription>
+                {groupDeleteInfo && groupDeleteInfo.children_count > 0
+                  ? `Удаление группы также удалит ${groupDeleteInfo.children_count} подгрупп. Все ${groupDeleteInfo.total_elements_affected} элементов будут перемещены в корень проекта.`
+                  : groupDeleteInfo && groupDeleteInfo.total_elements_affected > 0
+                    ? `Удаление группы переместит ${groupDeleteInfo.total_elements_affected} элементов в корень проекта.`
+                    : 'Пустая группа будет удалена.'}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="ghost"
+                onClick={() => setGroupDeleteDialogOpen(false)}
+                disabled={isGroupDeleting}
+              >
+                Отмена
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleConfirmGroupDelete}
+                disabled={isGroupDeleting}
+              >
+                {isGroupDeleting ? 'Удаление...' : 'Удалить'}
               </Button>
             </DialogFooter>
           </DialogContent>

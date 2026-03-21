@@ -2,7 +2,7 @@
 
 import { cn } from '@/lib/utils';
 import { ASPECT_RATIO_CLASSES, FIT_MODE_CLASSES, CARD_ICON_SIZES, CARD_TEXT_SIZES } from '@/lib/utils/constants';
-import { Folder, Check } from 'lucide-react';
+import { Folder, Check, Trash2 } from 'lucide-react';
 import type { Scene, DisplayCardSize, DisplayAspectRatio, DisplayFitMode } from '@/lib/types';
 
 export interface GroupCardProps {
@@ -11,6 +11,7 @@ export interface GroupCardProps {
   isMultiSelectMode: boolean;
   onSelect: (id: number, addToSelection: boolean) => void;
   onClick: (id: number) => void;
+  onDelete?: (id: number) => void;
   className?: string;
   style?: React.CSSProperties;
   size?: DisplayCardSize;
@@ -24,6 +25,7 @@ export function GroupCard({
   isMultiSelectMode,
   onSelect,
   onClick,
+  onDelete,
   className,
   style,
   size = 'medium',
@@ -123,15 +125,38 @@ export function GroupCard({
         )}
       </button>
 
-      {/* Folder badge (top right) */}
-      <div
-        className={cn(
-          'absolute top-2 right-2 z-40 rounded-full bg-black/50 text-white',
-          iconSizes.padding,
+      {/* Top right controls */}
+      <div className="absolute top-2 right-2 z-40 flex items-center gap-1">
+        {/* Delete button (visible on hover) */}
+        {onDelete && (
+          <button
+            type="button"
+            aria-label="Удалить группу"
+            title="Удалить группу"
+            onPointerDown={handleControlPointerDown}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(group.id);
+            }}
+            className={cn(
+              'rounded-full bg-black/50 text-white hover:bg-destructive transition-colors',
+              'opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto',
+              iconSizes.padding,
+            )}
+          >
+            <Trash2 className={iconSizes.sm} />
+          </button>
         )}
-        title="Группа"
-      >
-        <Folder className={iconSizes.sm} />
+        {/* Folder badge */}
+        <div
+          className={cn(
+            'rounded-full bg-black/50 text-white',
+            iconSizes.padding,
+          )}
+          title="Группа"
+        >
+          <Folder className={iconSizes.sm} />
+        </div>
       </div>
 
       {/* Bottom bar with name and count */}
