@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { formatDate } from "@/lib/utils/format";
+import { formatDate, formatStorage, formatCurrency } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import { Copy, Check, Save } from "lucide-react";
 import { toast } from "sonner";
@@ -37,8 +37,10 @@ export function DetailPanel({ element, onUpdateElement }: DetailPanelProps) {
   const hasPromptChanged = promptText !== (element.prompt_text ?? "");
 
   const metadata = [
-    { label: "Модель", value: element.ai_model_name ?? "—" },
-    { label: "Seed", value: element.seed ?? "—" },
+    ...(element.ai_model_name ? [{ label: "Модель", value: element.ai_model_name }] : []),
+    ...(element.generation_cost ? [{ label: "Стоимость", value: formatCurrency(element.generation_cost) }] : []),
+    ...(element.file_size ? [{ label: "Размер", value: formatStorage(element.file_size) }] : []),
+    ...(element.seed ? [{ label: "Seed", value: String(element.seed) }] : []),
     { label: "Создан", value: formatDate(element.created_at) },
     { label: "Источник", value: sourceLabels[element.source_type] ?? element.source_type },
     { label: "Тип", value: element.element_type === "IMAGE" ? "Изображение" : "Видео" },
