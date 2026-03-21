@@ -71,6 +71,44 @@ export const scenesApi = {
     }
   },
 
+  async getChildren(
+    projectId: number,
+    parentId?: number | null
+  ): Promise<Scene[]> {
+    try {
+      const params: Record<string, string> = { project: String(projectId) };
+      if (parentId === null || parentId === undefined) {
+        params["parent__isnull"] = "true";
+      } else {
+        params["parent"] = String(parentId);
+      }
+      const { data } = await apiClient.get<Scene[]>("/api/scenes/", {
+        params,
+      });
+      return data;
+    } catch (error) {
+      throw normalizeError(error);
+    }
+  },
+
+  async getDeleteInfo(
+    sceneId: number
+  ): Promise<{
+    element_count: number;
+    children_count: number;
+    child_element_count: number;
+    total_elements_affected: number;
+  }> {
+    try {
+      const { data } = await apiClient.get(
+        `/api/scenes/${sceneId}/delete-info/`
+      );
+      return data;
+    } catch (error) {
+      throw normalizeError(error);
+    }
+  },
+
   async setHeadliner(sceneId: number, elementId: number | null): Promise<Scene> {
     try {
       const { data } = await apiClient.post<Scene>(

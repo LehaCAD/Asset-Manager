@@ -76,9 +76,15 @@ export interface Scene {
   headliner_type?: ElementType | null;
   element_count?: number;
   elements_count?: number;
+  parent: number | null;
+  parent_name?: string | null;
+  children_count?: number;
+  depth?: number;
   created_at: string;
   updated_at: string;
 }
+
+export type Group = Scene;
 
 export interface CreateScenePayload {
   name: string;
@@ -106,7 +112,10 @@ export type GenerationSubmitState = "idle" | "submitting" | "accepted" | "reject
 
 export interface Element {
   id: number;
-  scene: number;
+  scene: number | null;
+  project: number;
+  project_name?: string;
+  group_name?: string | null;
   element_type: ElementType;
   order_index: number;
   file_url: string;
@@ -176,6 +185,11 @@ export interface ReorderElementsPayload {
   element_ids: number[];
 }
 
+export interface ReorderItem {
+  type: 'element' | 'group';
+  id: number;
+}
+
 export interface SetHeadlinerPayload {
   element_id: number;
 }
@@ -227,7 +241,35 @@ export interface ImageInputSchemaItem {
   label: string;
   min: number;
   max: number;
-  required: boolean;
+  required?: boolean;
+  description?: string;
+  icon?: string;
+  illustration?: string;
+  depends_on?: string;
+}
+
+export interface ImageInputGroup {
+  key: string;
+  label: string;
+  description?: string;
+  icon?: string;
+  illustration?: string;
+  collect_to?: string;
+  exclusive_with?: string[];
+  extra_params?: Record<string, unknown>;
+  slots: ImageInputSchemaItem[];
+}
+
+export interface ImageInputGroupsSchema {
+  mode: "groups";
+  groups: ImageInputGroup[];
+  no_images_params?: Record<string, unknown>;
+}
+
+export type ImageInputsSchema = ImageInputSchemaItem[] | ImageInputGroupsSchema;
+
+export function isGroupsSchema(schema: ImageInputsSchema): schema is ImageInputGroupsSchema {
+  return !Array.isArray(schema) && typeof schema === 'object' && schema?.mode === 'groups';
 }
 
 export interface AIModel {
@@ -239,7 +281,7 @@ export interface AIModel {
   preview_url: string;
   description: string;
   tags: string[];
-  image_inputs_schema: ImageInputSchemaItem[];
+  image_inputs_schema: ImageInputsSchema;
   is_active: boolean;
 }
 

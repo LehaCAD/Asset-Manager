@@ -61,6 +61,36 @@ export const elementsApi = {
     }
   },
 
+  async getByProject(
+    projectId: number,
+    rootOnly?: boolean,
+    options?: { signal?: AbortSignal }
+  ): Promise<Element[]> {
+    try {
+      const params: Record<string, string> = { project: String(projectId) };
+      if (rootOnly) params["scene__isnull"] = "true";
+      const { data } = await apiClient.get<Element[]>("/api/elements/", {
+        params,
+        signal: options?.signal,
+      });
+      return data;
+    } catch (error) {
+      throw normalizeError(error);
+    }
+  },
+
+  async move(payload: {
+    element_ids?: number[];
+    group_ids?: number[];
+    target_scene: number | null;
+  }): Promise<void> {
+    try {
+      await apiClient.post("/api/elements/move/", payload);
+    } catch (error) {
+      throw normalizeError(error);
+    }
+  },
+
   async toggleFavorite(id: number, isFavorite: boolean): Promise<Element> {
     try {
       const { data } = await apiClient.patch<Element>(`/api/elements/${id}/`, {
