@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LogOut, User, Clapperboard } from "lucide-react";
+import { LogOut, User, Clapperboard, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -16,6 +16,7 @@ import {
 import { ThemeToggle } from "./ThemeToggle";
 import { useAuthStore } from "@/lib/store/auth";
 import { useCreditsStore } from "@/lib/store/credits";
+import { formatCurrency } from "@/lib/utils/format";
 
 export function Navbar() {
   const user = useAuthStore((s) => s.user);
@@ -60,9 +61,10 @@ export function Navbar() {
           {/* Баланс */}
           {user && (
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/50 text-sm font-medium">
-              <span className="text-muted-foreground">
-                {parseFloat(balance).toFixed(0)} ₽
-              </span>
+              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                <Zap className="h-3.5 w-3.5" />
+                <span>{formatCurrency(balance)}</span>
+              </div>
             </div>
           )}
           
