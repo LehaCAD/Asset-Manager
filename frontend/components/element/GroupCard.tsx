@@ -1,8 +1,10 @@
 'use client';
 
 import { cn } from '@/lib/utils';
+import { formatCurrency, formatStorage } from '@/lib/utils/format';
 import { ASPECT_RATIO_CLASSES, CARD_ICON_SIZES, CARD_TEXT_SIZES } from '@/lib/utils/constants';
-import { Folder, FolderOpen, Check, Trash2 } from 'lucide-react';
+import { Folder, FolderOpen, Check, Trash2, Layers, HardDrive } from 'lucide-react';
+import { ChargeIcon } from '@/components/ui/charge-icon';
 import type { Scene, DisplayCardSize, DisplayAspectRatio, DisplayFitMode } from '@/lib/types';
 
 export interface GroupCardProps {
@@ -36,7 +38,6 @@ export function GroupCard({
   const aspectClass = ASPECT_RATIO_CLASSES[aspectRatio];
 
   const elementCount = group.element_count ?? group.elements_count ?? 0;
-  const childrenCount = group.children_count ?? 0;
 
   const handleCardClick = (e: React.MouseEvent) => {
     if (e.ctrlKey || e.metaKey || isMultiSelectMode) {
@@ -55,24 +56,14 @@ export function GroupCard({
     e.stopPropagation();
   };
 
-  // Build count label
-  const countParts: string[] = [];
-  if (childrenCount > 0) {
-    countParts.push(`${childrenCount} подгрупп`);
-  }
-  if (elementCount > 0) {
-    countParts.push(`${elementCount} элем.`);
-  }
-  const countLabel = countParts.length > 0 ? countParts.join(' · ') : 'Пустая группа';
-
   return (
     <div
       className={cn(
-        'group relative rounded-xl overflow-hidden cursor-pointer',
-        'border-2 border-primary/30 hover:border-primary/60',
-        'bg-gradient-to-br from-zinc-900 via-zinc-800/80 to-zinc-900',
-        'transition-all duration-150 ease-out',
-        'hover:shadow-lg hover:shadow-primary/10',
+        'group relative rounded-md overflow-hidden cursor-pointer',
+        'border border-border hover:border-primary/50',
+        'bg-card',
+        'transition-all duration-150',
+        'hover:shadow-md hover:shadow-primary/5',
         isSelected && 'ring-2 ring-primary border-primary',
         aspectClass,
         className,
@@ -80,18 +71,55 @@ export function GroupCard({
       style={style}
       onClick={handleCardClick}
     >
-      {/* Folder visual — centered icon + name */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
-        <div className="relative">
-          <Folder className="w-14 h-14 text-primary/40 group-hover:hidden transition-opacity" strokeWidth={1.5} />
-          <FolderOpen className="w-14 h-14 text-primary/60 hidden group-hover:block transition-opacity" strokeWidth={1.5} />
-        </div>
-        <span className={cn('mt-3 text-foreground font-medium text-center line-clamp-2', textSizes.title)}>
+      {/* Preview area - full card */}
+      <div className="absolute inset-0">
+        {group.preview_thumbnails && group.preview_thumbnails.length > 0 ? (
+          <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-px bg-border/30">
+            {[0, 1, 2, 3].map((i) => {
+              const url = group.preview_thumbnails?.[i];
+              return (
+                <div key={i} className="relative overflow-hidden bg-muted">
+                  {url ? (
+                    <img src={url} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                  ) : (
+                    <div className="absolute inset-0" />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          /* Empty state: subtle gradient with folder icon */
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/5 to-primary/10">
+            <Folder className="w-10 h-10 text-primary/30 group-hover:hidden" strokeWidth={1.5} />
+            <FolderOpen className="w-10 h-10 text-primary/40 hidden group-hover:block" strokeWidth={1.5} />
+          </div>
+        )}
+      </div>
+
+      {/* Gradient overlay footer at bottom */}
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent p-2 pt-6 z-10">
+        <span className={cn('text-white font-medium line-clamp-1 drop-shadow-sm', textSizes.title)}>
           {group.name}
         </span>
-        <span className={cn('mt-1 text-muted-foreground', textSizes.meta)}>
-          {countLabel}
-        </span>
+        <div className={cn('flex items-center gap-2 text-white/70 mt-0.5', textSizes.meta)}>
+          <span className="flex items-center gap-0.5">
+            <Layers className="h-3 w-3" />
+            {elementCount}
+          </span>
+          {group.total_spent && parseFloat(group.total_spent) > 0 && (
+            <span className="flex items-center gap-0.5">
+              <ChargeIcon size="sm" />
+              {formatCurrency(group.total_spent)}
+            </span>
+          )}
+          {(group.storage_bytes ?? 0) > 0 && (
+            <span className="flex items-center gap-0.5">
+              <HardDrive className="h-3 w-3" />
+              {formatStorage(group.storage_bytes!)}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Selection checkbox - always present, visible on hover */}
