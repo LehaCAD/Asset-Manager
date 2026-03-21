@@ -19,6 +19,7 @@ class SceneSerializer(serializers.ModelSerializer):
     parent_name = serializers.SerializerMethodField()
     children_count = serializers.SerializerMethodField()
     depth = serializers.SerializerMethodField()
+    total_spent = serializers.SerializerMethodField()
 
     class Meta:
         model = Scene
@@ -39,6 +40,7 @@ class SceneSerializer(serializers.ModelSerializer):
             'headliner_thumbnail_url',
             'headliner_type',
             'elements_count',
+            'total_spent',
             'created_at',
             'updated_at'
         ]
@@ -63,7 +65,7 @@ class SceneSerializer(serializers.ModelSerializer):
 
     def get_elements_count(self, obj: Scene) -> int:
         """Получение количества элементов в сцене."""
-        return obj.elements.count()
+        return getattr(obj, '_elements_count', obj.elements.count())
     
     def get_project_name(self, obj: Scene) -> str:
         """Получение названия проекта."""
@@ -90,6 +92,18 @@ class SceneSerializer(serializers.ModelSerializer):
     def get_status_display(self, obj: Scene) -> str:
         """Получение читаемого статуса."""
         return obj.get_status_display()
+
+    def get_total_spent(self, obj) -> str:
+        val = getattr(obj, '_total_spent', None)
+        return str(val) if val else '0'
+
+
+class SceneStatsSerializer(serializers.Serializer):
+    """Detailed stats for a single scene/group."""
+    total_spent = serializers.DecimalField(max_digits=12, decimal_places=2)
+    elements_count = serializers.IntegerField()
+    storage_bytes = serializers.IntegerField()
+    storage_display = serializers.CharField()
 
 
 class ReorderSerializer(serializers.Serializer):
