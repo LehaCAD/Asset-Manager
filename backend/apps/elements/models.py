@@ -37,11 +37,19 @@ class Element(models.Model):
         (SOURCE_IMG2VID, 'Img2Vid преобразование'),
     ]
     
-    scene = models.ForeignKey(
-        'scenes.Scene',
+    project = models.ForeignKey(
+        'projects.Project',
         on_delete=models.CASCADE,
         related_name='elements',
-        verbose_name='Сцена'
+        verbose_name='Проект'
+    )
+    scene = models.ForeignKey(
+        'scenes.Scene',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='elements',
+        verbose_name='Группа'
     )
     element_type = models.CharField(
         max_length=10,
@@ -138,4 +146,5 @@ class Element(models.Model):
         ordering = ['order_index', 'created_at']
 
     def __str__(self) -> str:
-        return f'{self.get_element_type_display()} #{self.id} (Сцена: {self.scene.name})'
+        group_name = self.scene.name if self.scene else "Root"
+        return f"{self.element_type} - {group_name} - {self.id}"
