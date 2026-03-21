@@ -7,6 +7,7 @@ import { useSceneWorkspaceStore } from '@/lib/store/scene-workspace';
 import { useCreditsStore } from '@/lib/store/credits';
 import { useGenerationStore } from '@/lib/store/generation';
 import { useUIStore } from '@/lib/store/ui';
+import { useProjectsStore } from '@/lib/store/projects';
 import { wsManager } from '@/lib/api/websocket';
 import { ElementGrid } from '@/components/element/ElementGrid';
 import { ElementFilters } from '@/components/element/ElementFilters';
@@ -64,6 +65,18 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   } = useSceneWorkspaceStore();
 
   const { loadModels } = useGenerationStore();
+  const projects = useProjectsStore((s) => s.projects);
+  const loadProjects = useProjectsStore((s) => s.loadProjects);
+
+  // Load projects for breadcrumb name
+  useEffect(() => {
+    if (projects.length === 0) void loadProjects();
+  }, [projects.length, loadProjects]);
+
+  const projectName = useMemo(() => {
+    return projects.find((p) => p.id === projectId)?.name;
+  }, [projects, projectId]);
+
   const [confirmDeleteIds, setConfirmDeleteIds] = useState<number[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [nextElementIdAfterDelete, setNextElementIdAfterDelete] = useState<number | null>(null);
@@ -427,10 +440,10 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   const breadcrumbs = useMemo(() => {
     const parts: { label: string; href?: string }[] = [];
 
-    // Always show project
-    const projectName = scene?.project_name ?? `Проект #${projectId}`;
+    // Always show project — use name from projects store, fallback to scene data
+    const displayName = projectName ?? scene?.project_name ?? `#${projectId}`;
     parts.push({
-      label: `Проект «${projectName}»`,
+      label: `Проект «${displayName}»`,
       href: groupId ? `/projects/${projectId}` : undefined,
     });
 
@@ -446,7 +459,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
     }
 
     return parts;
-  }, [groupId, scene, projectId]);
+  }, [groupId, scene, projectId, projectName]);
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -633,6 +646,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
         {/* Create group dialog */}
         <CreateSceneDialog
           projectId={projectId}
+          parentId={groupId}
           open={createGroupOpen}
           onOpenChange={(open) => {
             setCreateGroupOpen(open);

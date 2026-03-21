@@ -17,11 +17,12 @@ import { useScenesStore } from "@/lib/store/scenes";
 
 interface CreateSceneDialogProps {
   projectId: number;
+  parentId?: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function CreateSceneDialog({ projectId, open, onOpenChange }: CreateSceneDialogProps) {
+export function CreateSceneDialog({ projectId, parentId, open, onOpenChange }: CreateSceneDialogProps) {
   const createScene = useScenesStore((s) => s.createScene);
   const [name, setName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -32,7 +33,7 @@ export function CreateSceneDialog({ projectId, open, onOpenChange }: CreateScene
 
     setIsLoading(true);
     try {
-      await createScene({ name: name.trim(), project: projectId });
+      await createScene({ name: name.trim(), project: projectId, parent: parentId ?? null });
       toast.success("Группа создана");
       setName("");
       onOpenChange(false);

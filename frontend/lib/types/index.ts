@@ -89,6 +89,7 @@ export type Group = Scene;
 export interface CreateScenePayload {
   name: string;
   project: number;
+  parent?: number | null;
 }
 
 export interface UpdateScenePayload {
