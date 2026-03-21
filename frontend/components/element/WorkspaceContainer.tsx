@@ -258,16 +258,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
 
       if (validFiles.length === 0) return;
 
-      // If inside a group, upload to the group (scene). Otherwise use project-level upload.
-      // For now, enqueueUploads expects a sceneId. When at project root (no groupId),
-      // we pass 0 as a sentinel — the upload queue will need to handle project-level uploads.
-      // TODO: Update upload queue to support project-level uploads
-      const uploadTargetId = groupId ?? 0;
-      if (uploadTargetId > 0) {
-        enqueueUploads(uploadTargetId, validFiles);
-      } else {
-        toast.info('Загрузка файлов в корень проекта пока не поддерживается');
-      }
+      enqueueUploads(groupId ?? 0, validFiles, projectId);
     },
     [groupId, enqueueUploads],
   );
@@ -461,7 +452,10 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   const breadcrumbs = useMemo(() => {
     const parts: { label: string; href?: string }[] = [];
 
-    // Always show project — use name from projects store, fallback to scene data
+    // "Проекты" link — always first, always clickable
+    parts.push({ label: 'Проекты', href: '/projects' });
+
+    // Project name — clickable when inside a group
     const displayName = projectName ?? scene?.project_name ?? `#${projectId}`;
     parts.push({
       label: `Проект «${displayName}»`,
@@ -536,7 +530,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
             </div>
           )}
 
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4">
             <ElementFilters
               filter={filter}
               onFilterChange={setFilter}
@@ -551,26 +545,30 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
               <FolderPlus className="h-4 w-4" />
               Создать группу
             </Button>
-            <DisplaySettingsPopover />
+            <div className="ml-auto">
+              <DisplaySettingsPopover />
+            </div>
           </div>
         </div>
 
         {/* Zone 3: Grid area - scrollable */}
-        <div className="flex-1 overflow-auto p-4 relative min-h-0">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-            </div>
-          ) : hasContent ? (
-            <ElementGrid
-              onRequestDelete={openDeleteDialog}
-              groups={groups}
-              onGroupClick={handleGroupClick}
-              onGroupDelete={handleRequestGroupDelete}
-            />
-          ) : (
-            <EmptyState onUploadClick={open} isDragActive={isDragActive} />
-          )}
+        <div className="flex-1 overflow-auto p-2 sm:p-4 relative min-h-0">
+          <div className="max-w-[1600px] mx-auto">
+            {isLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+              </div>
+            ) : hasContent ? (
+              <ElementGrid
+                onRequestDelete={openDeleteDialog}
+                groups={groups}
+                onGroupClick={handleGroupClick}
+                onGroupDelete={handleRequestGroupDelete}
+              />
+            ) : (
+              <EmptyState onUploadClick={open} isDragActive={isDragActive} />
+            )}
+          </div>
         </div>
 
         {/* Zone 2: Prompt Bar (bottom) */}
