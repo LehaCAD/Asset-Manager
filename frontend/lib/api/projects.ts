@@ -6,6 +6,7 @@ import type {
   UpdateProjectPayload,
   GeneratePayload,
   ReorderItem,
+  ProjectStats,
 } from "@/lib/types";
 
 export const projectsApi = {
@@ -88,6 +89,15 @@ export const projectsApi = {
           signal: options?.signal,
         }
       );
+      return data;
+    } catch (error) {
+      throw normalizeError(error);
+    }
+  },
+
+  async getStats(projectId: number): Promise<ProjectStats> {
+    try {
+      const { data } = await apiClient.get<ProjectStats>(`/api/projects/${projectId}/stats/`);
       return data;
     } catch (error) {
       throw normalizeError(error);

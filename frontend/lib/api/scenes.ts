@@ -6,6 +6,7 @@ import type {
   UpdateScenePayload,
   ReorderScenesPayload,
   GeneratePayload,
+  SceneStats,
 } from "@/lib/types";
 
 export const scenesApi = {
@@ -115,6 +116,15 @@ export const scenesApi = {
         `/api/scenes/${sceneId}/set_headliner/`,
         { element_id: elementId }
       );
+      return data;
+    } catch (error) {
+      throw normalizeError(error);
+    }
+  },
+
+  async getStats(sceneId: number): Promise<SceneStats> {
+    try {
+      const { data } = await apiClient.get<SceneStats>(`/api/scenes/${sceneId}/stats/`);
       return data;
     } catch (error) {
       throw normalizeError(error);
