@@ -1,5 +1,7 @@
 import logging
 
+from django.db.models import Sum, Subquery, OuterRef, DecimalField
+from django.db.models.functions import Abs
 from rest_framework import viewsets, permissions, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -8,6 +10,7 @@ from .models import Element
 from .serializers import ElementSerializer, ReorderSerializer
 from .services import reorder_elements
 from apps.scenes.s3_utils import delete_file_from_s3
+from apps.credits.models import CreditsTransaction
 
 logger = logging.getLogger(__name__)
 
@@ -34,19 +37,24 @@ class ElementViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsSceneProjectOwner]
     
     def perform_destroy(self, instance):
-        """Удаление элемента с очисткой файлов из S3."""
+        """Удаление элемента с очисткой файлов из S3 и headliner."""
         logger.info(f"Deleting element {instance.id}: file_url={instance.file_url}, thumbnail_url={instance.thumbnail_url}")
-        
+
+        # Clear headliner reference if this element is the headliner
+        if instance.scene and instance.scene.headliner_id == instance.id:
+            instance.scene.headliner = None
+            instance.scene.save(update_fields=['headliner', 'updated_at'])
+
         # Удаляем основной файл из S3
         if instance.file_url:
             result = delete_file_from_s3(instance.file_url)
             logger.info(f"Deleted main file for element {instance.id}: success={result}")
-        
+
         # Удаляем превью из S3
         if instance.thumbnail_url:
             result = delete_file_from_s3(instance.thumbnail_url)
             logger.info(f"Deleted thumbnail for element {instance.id}: success={result}")
-        
+
         instance.delete()
         logger.info(f"Element {instance.id} deleted successfully")
     
@@ -77,6 +85,18 @@ class ElementViewSet(viewsets.ModelViewSet):
         is_favorite = self.request.query_params.get('is_favorite')
         if is_favorite is not None:
             queryset = queryset.filter(is_favorite=is_favorite.lower() == 'true')
+
+        queryset = queryset.annotate(
+            _generation_cost=Subquery(
+                CreditsTransaction.objects.filter(
+                    element=OuterRef('pk'),
+                    reason=CreditsTransaction.REASON_GENERATION_DEBIT,
+                ).values('element').annotate(
+                    cost=Abs(Sum('amount'))
+                ).values('cost')[:1],
+                output_field=DecimalField()
+            )
+        )
 
         return queryset.order_by('order_index', 'created_at')
     

@@ -11,6 +11,8 @@ class ElementSerializer(serializers.ModelSerializer):
     ai_model_name = serializers.SerializerMethodField()
     status_display = serializers.SerializerMethodField()
     source_type_display = serializers.SerializerMethodField()
+    file_size = serializers.IntegerField(read_only=True, allow_null=True)
+    generation_cost = serializers.SerializerMethodField()
 
     class Meta:
         model = Element
@@ -37,6 +39,8 @@ class ElementSerializer(serializers.ModelSerializer):
             'source_type',
             'source_type_display',
             'external_task_id',
+            'file_size',
+            'generation_cost',
             'created_at',
             'updated_at'
         ]
@@ -67,6 +71,10 @@ class ElementSerializer(serializers.ModelSerializer):
     def get_source_type_display(self, obj) -> str:
         """Получение читаемого типа источника."""
         return obj.get_source_type_display()
+
+    def get_generation_cost(self, obj) -> str | None:
+        val = getattr(obj, '_generation_cost', None)
+        return str(val) if val else None
 
 
 class ReorderSerializer(serializers.Serializer):
