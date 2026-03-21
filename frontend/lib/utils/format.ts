@@ -49,3 +49,17 @@ export function formatSceneCount(n: number): string {
 export function formatElementCount(n: number): string {
   return pluralize(n, "элемент", "элемента", "элементов");
 }
+
+export function formatStorage(bytes: number): string {
+  if (bytes < 1024) return `${bytes} Б`;
+  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} КБ`;
+  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} МБ`;
+  return `${(bytes / 1024 ** 3).toFixed(1)} ГБ`;
+}
+
+export function formatCurrency(amount: string | number): string {
+  const num = typeof amount === "string" ? parseFloat(amount) : amount;
+  if (isNaN(num) || num === 0) return "0 зар.";
+  const formatted = parseFloat(num.toFixed(2)).toString();
+  return `${formatted} зар.`;
+}

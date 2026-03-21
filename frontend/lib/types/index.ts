@@ -45,6 +45,9 @@ export interface Project {
   created_at: string;
   updated_at: string;
   scene_count?: number;
+  element_count?: number;
+  total_spent?: string;
+  storage_bytes?: number;
 }
 
 export interface CreateProjectPayload {
@@ -80,6 +83,7 @@ export interface Scene {
   parent_name?: string | null;
   children_count?: number;
   depth?: number;
+  total_spent?: string;
   created_at: string;
   updated_at: string;
 }
@@ -130,6 +134,8 @@ export interface Element {
   status: ElementStatus;
   error_message: string;
   source_type: ElementSource;
+  file_size?: number | null;
+  generation_cost?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -414,4 +420,23 @@ export interface CreditsEstimateResponse {
   balance: string;
   can_afford: boolean;
   error: string | null;
+}
+
+/* ── Stats / Metrics ─────────────────────────────────────── */
+
+export interface ProjectStats {
+  total_spent: string;
+  elements_count: number;
+  storage_bytes: number;
+  storage_display: string;
+  groups_count: number;
+  last_generation_cost: string | null;
+  last_generation_model: string | null;
+}
+
+export interface SceneStats {
+  total_spent: string;
+  elements_count: number;
+  storage_bytes: number;
+  storage_display: string;
 }
