@@ -406,12 +406,15 @@ def process_uploaded_file(self, element_id: int, staging_path: str) -> dict:
             scene_id=element.scene_id,
         )
 
+        file_size = os.path.getsize(staging_path) if os.path.exists(staging_path) else None
+
         element.file_url = file_url
+        element.file_size = file_size
         element.status = Element.STATUS_COMPLETED
 
         if element.element_type == Element.ELEMENT_TYPE_IMAGE:
             element.thumbnail_url = file_url
-            element.save(update_fields=['file_url', 'thumbnail_url', 'status', 'updated_at'])
+            element.save(update_fields=['file_url', 'file_size', 'thumbnail_url', 'status', 'updated_at'])
         elif element.element_type == Element.ELEMENT_TYPE_VIDEO:
             thumbnail_url = generate_video_thumbnail_from_path(
                 staging_path,
@@ -419,9 +422,9 @@ def process_uploaded_file(self, element_id: int, staging_path: str) -> dict:
                 scene_id=element.scene_id,
             )
             element.thumbnail_url = thumbnail_url or ''
-            element.save(update_fields=['file_url', 'thumbnail_url', 'status', 'updated_at'])
+            element.save(update_fields=['file_url', 'file_size', 'thumbnail_url', 'status', 'updated_at'])
         else:
-            element.save(update_fields=['file_url', 'status', 'updated_at'])
+            element.save(update_fields=['file_url', 'file_size', 'status', 'updated_at'])
 
         notify_element_status(element, 'COMPLETED', file_url=file_url)
 
