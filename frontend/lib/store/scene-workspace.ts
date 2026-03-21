@@ -356,6 +356,7 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
     const optimistic: WorkspaceElement = {
       id: tempId,
       scene: sceneId,
+      project: get().projectId ?? 0,
       element_type: elementType,
       order_index: currentOrderMax + 1,
       file_url: "",
@@ -569,6 +570,7 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
       const optimistic: WorkspaceElement = {
         id: tempId,
         scene: sceneId,
+        project: get().projectId ?? 0,
         element_type: isVideo ? "VIDEO" : "IMAGE",
         order_index: currentOrderMax,
         file_url: objectUrl,

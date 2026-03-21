@@ -1,4 +1,4 @@
-import WorkspaceContainer from '@/components/element/WorkspaceContainer';
+import { WorkspaceContainer } from '@/components/element/WorkspaceContainer';
 
 interface ProjectPageProps {
   params: Promise<{ id: string }>;

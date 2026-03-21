@@ -1,4 +1,4 @@
-import WorkspaceContainer from '@/components/element/WorkspaceContainer';
+import { WorkspaceContainer } from '@/components/element/WorkspaceContainer';
 
 interface GroupWorkspacePageProps {
   params: Promise<{ id: string; groupId: string }>;
