@@ -93,7 +93,10 @@ export const useScenesStore = create<ScenesState>()((set, get) => ({
 
   deleteScene: async (id) => {
     await scenesApi.delete(id);
-    set((s) => ({ scenes: s.scenes.filter((sc) => sc.id !== id) }));
+    // Remove the scene and any children (backend CASCADE deletes them)
+    set((s) => ({
+      scenes: s.scenes.filter((sc) => sc.id !== id && sc.parent !== id),
+    }));
   },
 
   reorderScenes: async (projectId, sceneIds) => {

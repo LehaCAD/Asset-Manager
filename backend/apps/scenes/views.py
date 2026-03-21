@@ -19,16 +19,50 @@ class IsProjectOwner(permissions.BasePermission):
 class SceneViewSet(viewsets.ModelViewSet):
     """
     ViewSet для CRUD операций со сценами.
-    
+
     list: Получить список сцен пользователя (с фильтрацией по project)
     create: Создать новую сцену
     retrieve: Получить детали сцены
     update: Обновить сцену (PUT)
     partial_update: Частично обновить сцену (PATCH)
-    destroy: Удалить сцену
+    destroy: Удалить сцену (CASCADE: удаляет все элементы и дочерние группы)
     """
     serializer_class = SceneSerializer
     permission_classes = [IsAuthenticated, IsProjectOwner]
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        Удаление группы со всем содержимым.
+
+        Явно удаляем элементы и дочерние группы, чтобы CASCADE
+        работал надёжно независимо от DB-level constraint.
+        """
+        scene = self.get_object()
+        from apps.elements.models import Element
+
+        # Collect all descendant scene IDs (children, grandchildren, etc.)
+        descendant_ids = []
+        queue = list(scene.children.values_list('id', flat=True))
+        while queue:
+            current_id = queue.pop()
+            descendant_ids.append(current_id)
+            child_ids = list(Scene.objects.filter(parent_id=current_id).values_list('id', flat=True))
+            queue.extend(child_ids)
+
+        # Delete elements in descendant scenes
+        if descendant_ids:
+            Element.objects.filter(scene_id__in=descendant_ids).delete()
+
+        # Delete elements in this scene
+        Element.objects.filter(scene=scene).delete()
+
+        # Delete descendant scenes (bottom-up order not needed since we already deleted elements)
+        if descendant_ids:
+            Scene.objects.filter(id__in=descendant_ids).delete()
+
+        # Delete the scene itself
+        scene.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
     
     def get_queryset(self):
         """Возвращает только сцены проектов текущего пользователя с фильтрацией."""

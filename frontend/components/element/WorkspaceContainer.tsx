@@ -643,9 +643,9 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
               <DialogTitle>Удалить группу?</DialogTitle>
               <DialogDescription>
                 {groupDeleteInfo && groupDeleteInfo.children_count > 0
-                  ? `Удаление группы также удалит ${groupDeleteInfo.children_count} подгрупп. Все ${groupDeleteInfo.total_elements_affected} элементов будут перемещены в корень проекта.`
+                  ? `Будет удалено: ${groupDeleteInfo.children_count} подгрупп и ${groupDeleteInfo.total_elements_affected} элементов. Это действие нельзя отменить.`
                   : groupDeleteInfo && groupDeleteInfo.total_elements_affected > 0
-                    ? `Удаление группы переместит ${groupDeleteInfo.total_elements_affected} элементов в корень проекта.`
+                    ? `Будет удалено ${groupDeleteInfo.total_elements_affected} элементов внутри группы. Это действие нельзя отменить.`
                     : 'Пустая группа будет удалена.'}
               </DialogDescription>
             </DialogHeader>
