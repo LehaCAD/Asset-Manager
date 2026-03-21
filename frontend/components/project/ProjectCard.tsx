@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, Pencil, Trash2, Film, Layers, HardDrive } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash2, Film, Layers, HardDrive, ImageIcon } from "lucide-react";
 import { ChargeIcon } from "@/components/ui/charge-icon";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -81,29 +81,52 @@ export function ProjectCard({ project }: ProjectCardProps) {
     <>
       <div
         onClick={handleCardClick}
-        className="group relative bg-card border border-border rounded-xl overflow-hidden cursor-pointer hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 transition-all duration-200"
+        className="group relative bg-card border border-border rounded-md overflow-hidden cursor-pointer hover:border-primary/40 hover:shadow-md hover:shadow-primary/5 transition-all duration-150"
       >
         {/* Thumbnail area */}
         <div className={`${aspectClass} bg-muted relative overflow-hidden`}>
-          {/* Decorative grid pattern */}
-          <div className="absolute inset-0 opacity-[0.07]"
-            style={{
-              backgroundImage: "linear-gradient(var(--foreground) 1px, transparent 1px), linear-gradient(90deg, var(--foreground) 1px, transparent 1px)",
-              backgroundSize: "24px 24px",
-            }}
-          />
-          {/* Film icon placeholder */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Film className="h-10 w-10 text-muted-foreground/30" />
-          </div>
+          {project.preview_thumbnails && project.preview_thumbnails.length > 0 ? (
+            /* 2x2 Preview Grid */
+            <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-px">
+              {Array.from({ length: 4 }).map((_, i) => {
+                const src = project.preview_thumbnails![i];
+                return src ? (
+                  <img
+                    key={i}
+                    src={src}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div key={i} className="w-full h-full bg-muted flex items-center justify-center">
+                    <ImageIcon className="h-4 w-4 text-muted-foreground/20" />
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <>
+              {/* Decorative grid pattern */}
+              <div className="absolute inset-0 opacity-[0.07]"
+                style={{
+                  backgroundImage: "linear-gradient(var(--foreground) 1px, transparent 1px), linear-gradient(90deg, var(--foreground) 1px, transparent 1px)",
+                  backgroundSize: "24px 24px",
+                }}
+              />
+              {/* Film icon placeholder */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Film className="h-10 w-10 text-muted-foreground/30" />
+              </div>
+            </>
+          )}
           {/* Aspect ratio badge */}
-          <div className="absolute top-2 left-2">
+          <div className="absolute top-1.5 left-1.5">
             <span className="text-[10px] font-mono font-medium bg-background/80 backdrop-blur-sm text-muted-foreground px-1.5 py-0.5 rounded border border-border/50">
               {project.aspect_ratio}
             </span>
           </div>
           {/* Actions menu */}
-          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity" data-no-navigate>
+          <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity" data-no-navigate>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -151,9 +174,9 @@ export function ProjectCard({ project }: ProjectCardProps) {
         </div>
 
         {/* Card info */}
-        <div className="p-3 space-y-2">
+        <div className="p-2.5 space-y-1.5">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="font-medium text-sm leading-snug line-clamp-2 group-hover:text-primary transition-colors">
+            <h3 className="text-[13px] font-medium leading-tight line-clamp-2 group-hover:text-primary transition-colors">
               {project.name}
             </h3>
             <Badge
@@ -164,7 +187,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
             </Badge>
           </div>
 
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5">
             <span className="flex items-center gap-1">
               <Layers className="h-3 w-3" />
               {project.element_count ?? 0}
