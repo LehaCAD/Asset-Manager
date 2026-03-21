@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LogOut, User, Clapperboard } from "lucide-react";
+import { LogOut, User, Clapperboard, HardDrive } from "lucide-react";
 import { ChargeIcon } from "@/components/ui/charge-icon";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,22 +17,25 @@ import {
 import { ThemeToggle } from "./ThemeToggle";
 import { useAuthStore } from "@/lib/store/auth";
 import { useCreditsStore } from "@/lib/store/credits";
-import { formatCurrency } from "@/lib/utils/format";
+import { authApi } from "@/lib/api/auth";
+import { formatCurrency, formatStorage } from "@/lib/utils/format";
 
 export function Navbar() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const router = useRouter();
   
+  const setUser = useAuthStore((s) => s.setUser);
   const balance = useCreditsStore((s) => s.balance);
   const loadBalance = useCreditsStore((s) => s.loadBalance);
-  
-  // Загружаем баланс при монтировании
+
+  // Загружаем баланс и обновляем user data при монтировании
   useEffect(() => {
     if (user) {
       loadBalance();
+      authApi.getMe().then(setUser).catch(() => {});
     }
-  }, [user, loadBalance]);
+  }, [user?.id, loadBalance, setUser]);
 
   function handleLogout() {
     logout();
@@ -45,13 +48,13 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="flex h-14 items-center justify-between px-4">
+      <div className="flex h-12 items-center justify-between px-4">
         {/* Logo */}
         <Link
           href="/projects"
           className="flex items-center gap-2 shrink-0 hover:opacity-80 transition-opacity"
         >
-          <Clapperboard className="h-5 w-5 text-primary" />
+          <Clapperboard className="h-5 w-5 text-primary" strokeWidth={1.75} />
           <span className="font-semibold text-sm tracking-tight hidden sm:block">
             Раскадровка
           </span>
@@ -61,8 +64,8 @@ export function Navbar() {
         <div className="flex items-center gap-1 shrink-0">
           {/* Баланс */}
           {user && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/50 text-sm font-medium">
-              <div className="flex items-center gap-1 text-sm">
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-muted/50 text-[13px] font-medium">
+              <div className="flex items-center gap-1 text-[13px]">
                 <ChargeIcon size="md" />
                 <span>{formatCurrency(balance)}</span>
               </div>
@@ -82,7 +85,7 @@ export function Navbar() {
                 {user ? (
                   <span className="text-xs font-semibold">{initials}</span>
                 ) : (
-                  <User className="h-4 w-4" />
+                  <User className="h-4 w-4" strokeWidth={1.75} />
                 )}
               </Button>
             </DropdownMenuTrigger>
@@ -100,11 +103,41 @@ export function Navbar() {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
+              {user?.quota && (
+                <>
+                  <DropdownMenuLabel className="font-normal px-3 py-3">
+                    <div className="flex items-start gap-3 text-xs text-muted-foreground">
+                      <HardDrive className="h-3.5 w-3.5 shrink-0 mt-0.5" strokeWidth={1.75} />
+                      <div className="flex-1 min-w-0 flex flex-col gap-2">
+                        <div className="text-foreground text-xs whitespace-nowrap">
+                          {formatStorage(user.quota.storage_used_bytes ?? 0)}{" "}
+                          <span className="text-muted-foreground">/ {formatStorage(user.quota.storage_limit_bytes ?? 0)}</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              (user.quota.storage_used_bytes ?? 0) / (user.quota.storage_limit_bytes || 1) >= 0.9
+                                ? "bg-red-500"
+                                : (user.quota.storage_used_bytes ?? 0) / (user.quota.storage_limit_bytes || 1) >= 0.7
+                                  ? "bg-amber-500"
+                                  : "bg-emerald-500"
+                            }`}
+                            style={{
+                              width: `${Math.max(Math.min(Math.round(((user.quota.storage_used_bytes ?? 0) / (user.quota.storage_limit_bytes || 1)) * 100), 100), (user.quota.storage_used_bytes ?? 0) > 0 ? 4 : 0)}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                </>
+              )}
               <DropdownMenuItem
                 className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
                 onClick={handleLogout}
               >
-                <LogOut className="mr-2 h-4 w-4" />
+                <LogOut className="mr-2 h-4 w-4" strokeWidth={1.75} />
                 Выйти
               </DropdownMenuItem>
             </DropdownMenuContent>
