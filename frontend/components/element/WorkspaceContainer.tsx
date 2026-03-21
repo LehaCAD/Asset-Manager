@@ -20,7 +20,8 @@ import { DetailPanel } from '@/components/lightbox/DetailPanel';
 import { useKeyboard } from '@/lib/hooks/use-keyboard';
 import { scenesApi } from '@/lib/api/scenes';
 import { MoveToGroupDialog } from '@/components/element/MoveToGroupDialog';
-import { Upload, ChevronLeft } from 'lucide-react';
+import { Upload, ChevronLeft, FolderPlus } from 'lucide-react';
+import { CreateSceneDialog } from '@/components/scene/CreateSceneDialog';
 import {
   Dialog,
   DialogContent,
@@ -75,6 +76,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
     total_elements_affected: number;
   } | null>(null);
   const [isGroupDeleting, setIsGroupDeleting] = useState(false);
+  const [createGroupOpen, setCreateGroupOpen] = useState(false);
   const fallbackRefetchIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const disconnectDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -506,6 +508,15 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
               onFilterChange={setFilter}
               counts={filterCounts}
             />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCreateGroupOpen(true)}
+              className="gap-2"
+            >
+              <FolderPlus className="h-4 w-4" />
+              Создать группу
+            </Button>
             <DisplaySettingsPopover />
           </div>
         </div>
@@ -618,6 +629,16 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Create group dialog */}
+        <CreateSceneDialog
+          projectId={projectId}
+          open={createGroupOpen}
+          onOpenChange={(open) => {
+            setCreateGroupOpen(open);
+            if (!open) loadWorkspace(projectId, groupId);
+          }}
+        />
 
         {/* Lightbox Modal */}
         <LightboxModal

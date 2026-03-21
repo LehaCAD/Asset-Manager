@@ -94,32 +94,32 @@ export function GroupCard({
         </span>
       </div>
 
-      {/* Top-left: "Группа" badge */}
-      <div className="absolute top-2 left-2 z-30">
-        {isMultiSelectMode || isSelected ? (
-          <button
-            type="button"
-            role="checkbox"
-            aria-checked={isSelected}
-            aria-label={isSelected ? 'Снять выделение' : 'Выбрать'}
-            onPointerDown={handleControlPointerDown}
-            onClick={handleSelectClick}
-            className={cn(
-              'rounded-full flex items-center justify-center transition-all duration-150',
-              iconSizes.padding,
-              isSelected
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-white/20 text-white hover:bg-white/40',
-            )}
-          >
-            <Check className={iconSizes.md} />
-          </button>
-        ) : (
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-primary/60 bg-primary/10 px-2 py-0.5 rounded-full">
-            Группа
-          </span>
+      {/* Selection checkbox - always present, visible on hover */}
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={isSelected}
+        aria-label={isSelected ? 'Снять выделение' : 'Выбрать'}
+        onPointerDown={handleControlPointerDown}
+        onClick={handleSelectClick}
+        className={cn(
+          'absolute top-2 left-2 z-30 rounded-full flex items-center justify-center transition-all duration-150',
+          iconSizes.padding,
+          isMultiSelectMode || isSelected
+            ? 'opacity-100 pointer-events-auto'
+            : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto',
+          isSelected
+            ? 'bg-primary text-primary-foreground'
+            : 'bg-black/50 text-white hover:bg-black/70',
+          isMultiSelectMode && !isSelected && 'bg-white/40 hover:bg-white/60',
         )}
-      </div>
+      >
+        {isSelected ? (
+          <Check className={iconSizes.md} />
+        ) : (
+          <Check className={cn(iconSizes.md, 'opacity-0')} />
+        )}
+      </button>
 
       {/* Top-right: delete button on hover */}
       {onDelete && (
