@@ -199,7 +199,7 @@ class SceneAPITest(APITestCase):
         self.assertEqual(response.data['project_name'], 'Проект пользователя 1')
     
     @patch('apps.elements.tasks.process_uploaded_file.delay')
-    @patch('apps.scenes.views.save_to_staging')
+    @patch('apps.scenes.s3_utils.save_to_staging')
     def test_upload_file(self, mock_save_to_staging, mock_process_delay):
         mock_save_to_staging.return_value = '/tmp/test-upload.jpg'
         
@@ -233,7 +233,7 @@ class SceneAPITest(APITestCase):
         mock_process_delay.assert_called_once_with(element.id, '/tmp/test-upload.jpg')
     
     @patch('apps.elements.tasks.process_uploaded_file.delay')
-    @patch('apps.scenes.views.save_to_staging')
+    @patch('apps.scenes.s3_utils.save_to_staging')
     def test_upload_video_file(self, mock_save_to_staging, mock_process_delay):
         mock_save_to_staging.return_value = '/tmp/test-upload.mp4'
         

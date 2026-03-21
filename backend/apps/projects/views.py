@@ -1,4 +1,4 @@
-from rest_framework import viewsets, permissions
+from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -68,3 +68,41 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 Scene.objects.filter(id=item_id, project=project).update(order_index=index)
 
         return Response({'status': 'ok'})
+
+    @action(detail=True, methods=['post'])
+    def generate(self, request, pk=None):
+        """
+        Запустить AI генерацию элемента на уровне проекта (без группы).
+
+        POST /api/projects/{id}/generate/
+        """
+        project = self.get_object()
+        from apps.elements.services import create_generation
+        data, http_status = create_generation(
+            project=project, scene=None,
+            prompt=request.data.get('prompt'),
+            ai_model_id=request.data.get('ai_model_id'),
+            generation_config=request.data.get('generation_config', {}),
+            user=request.user,
+        )
+        return Response(data, status=http_status)
+
+    @action(detail=True, methods=['post'])
+    def upload(self, request, pk=None):
+        """
+        Загрузить файл на уровне проекта (без группы).
+
+        POST /api/projects/{id}/upload/
+        """
+        project = self.get_object()
+        if 'file' not in request.FILES:
+            return Response({'error': 'File is required'}, status=status.HTTP_400_BAD_REQUEST)
+        from apps.elements.services import create_upload
+        data, http_status = create_upload(
+            project=project, scene=None,
+            file=request.FILES['file'],
+            prompt_text=request.data.get('prompt_text', ''),
+            is_favorite=request.data.get('is_favorite', False),
+            ai_model_id=request.data.get('ai_model'),
+        )
+        return Response(data, status=http_status)

@@ -110,3 +110,54 @@ class ElementViewSet(viewsets.ModelViewSet):
 
         reorder_elements(element_ids)
         return Response({'status': 'ok'})
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def move(self, request):
+        """
+        Переместить элементы и/или группы в другую группу (или на root уровень).
+
+        POST /api/elements/move/
+
+        Принимает:
+        - element_ids: [1, 2, ...] — ID элементов для перемещения
+        - group_ids: [3, 4, ...] — ID групп для перемещения
+        - target_scene: ID целевой группы (null = root уровень проекта)
+        """
+        element_ids = request.data.get('element_ids', [])
+        group_ids = request.data.get('group_ids', [])
+        target_scene_id = request.data.get('target_scene')  # null = root
+
+        target_scene = None
+        if target_scene_id is not None:
+            from apps.scenes.models import Scene
+            try:
+                target_scene = Scene.objects.get(id=target_scene_id, project__user=request.user)
+            except Scene.DoesNotExist:
+                return Response(
+                    {'error': 'Целевая группа не найдена'},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+        if element_ids:
+            Element.objects.filter(
+                id__in=element_ids, project__user=request.user
+            ).update(scene_id=target_scene_id)
+
+        if group_ids:
+            from apps.scenes.models import Scene
+            groups = Scene.objects.filter(id__in=group_ids, project__user=request.user)
+            if target_scene and target_scene.parent is not None:
+                return Response(
+                    {'error': 'Нельзя переместить: превышена максимальная вложенность'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if target_scene:
+                groups_with_children = groups.filter(children__isnull=False).distinct()
+                if groups_with_children.exists():
+                    return Response(
+                        {'error': 'Нельзя переместить группу с подгруппами внутрь другой группы'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+            groups.update(parent_id=target_scene_id)
+
+        return Response({'status': 'ok'})

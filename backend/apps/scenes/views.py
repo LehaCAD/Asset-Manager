@@ -1,20 +1,12 @@
-from decimal import Decimal
-from uuid import uuid4
-
-from django.db import transaction
 from django.db.models import Count
 from rest_framework import viewsets, permissions, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.decorators import action
 
-from apps.credits.models import CreditsTransaction
-from apps.credits.services import CreditsService
-
 from .models import Scene
 from .serializers import SceneSerializer, ReorderSerializer
 from .services import reorder_scenes
-from .s3_utils import upload_file_to_s3, detect_element_type, validate_file_type, save_to_staging
 
 
 class IsProjectOwner(permissions.BasePermission):
@@ -98,246 +90,39 @@ class SceneViewSet(viewsets.ModelViewSet):
     def upload(self, request, pk=None):
         """
         Загрузить файл на S3 и создать Element.
-        
+
         POST /api/scenes/{id}/upload/
-        
-        Принимает:
-        - file: файл (multipart/form-data)
-        - prompt_text: текст промпта (опционально)
-        - is_favorite: флаг избранного (опционально, default=False)
-        
-        Возвращает:
-        - Данные созданного Element (ElementSerializer)
         """
         scene = self.get_object()
-        
-        # Проверка наличия файла
         if 'file' not in request.FILES:
-            return Response(
-                {'error': 'File is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        file = request.FILES['file']
-        
-        # Валидация типа файла
-        if not validate_file_type(file.name):
-            return Response(
-                {'error': 'Неподдерживаемый формат файла. Допустимые форматы: JPG, PNG, MP4'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Определение типа элемента по расширению
-        element_type = detect_element_type(file.name)
-        
-        # # Быстрый precheck: если лимит уже заполнен, не тратим время на upload в S3.
-        # user_quota = request.user.quota
-        # if scene.elements.count() >= user_quota.max_elements_per_scene:
-        #     return Response(
-        #         {'detail': f'Достигнут лимит элементов в сцене ({user_quota.max_elements_per_scene}). Обратитесь к администратору.'},
-        #         status=status.HTTP_403_FORBIDDEN
-        #     )
-        #
-        try:
-            staging_path = save_to_staging(file)
-        except Exception as e:
-            return Response(
-                {'error': f'Не удалось сохранить файл: {str(e)}'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-        try:
-            from apps.elements.models import Element
-            from apps.elements.serializers import ElementSerializer
-
-            element_data = {
-                'project': scene.project_id,
-                'scene': scene.id,
-                'element_type': element_type,
-                'order_index': 0,
-                'prompt_text': request.data.get('prompt_text', ''),
-                'is_favorite': request.data.get('is_favorite', False),
-                'status': Element.STATUS_PROCESSING,
-                'source_type': Element.SOURCE_UPLOADED,
-            }
-
-            ai_model_id = request.data.get('ai_model')
-            if ai_model_id:
-                element_data['ai_model'] = ai_model_id
-
-            with transaction.atomic():
-                locked_scene = Scene.objects.select_for_update().get(pk=scene.pk)
-                # user_quota = request.user.quota
-                current_elements_count = locked_scene.elements.count()
-                # if current_elements_count >= user_quota.max_elements_per_scene:
-                #     import os
-                #     os.unlink(staging_path)
-                #     return Response(
-                #         {'detail': f'Достигнут лимит элементов в сцене ({user_quota.max_elements_per_scene}). Обратитесь к администратору.'},
-                #         status=status.HTTP_403_FORBIDDEN
-                #     )
-                element_data['order_index'] = current_elements_count
-                serializer = ElementSerializer(data=element_data)
-                serializer.is_valid(raise_exception=True)
-                element = serializer.save()
-
-            from apps.elements.tasks import process_uploaded_file
-            process_uploaded_file.delay(element.id, staging_path)
-
-            return Response(
-                ElementSerializer(element).data,
-                status=status.HTTP_201_CREATED
-            )
-
-        except Exception as e:
-            import os
-            if os.path.exists(staging_path):
-                os.unlink(staging_path)
-            return Response(
-                {'error': f'Failed to upload file: {str(e)}'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({'error': 'File is required'}, status=status.HTTP_400_BAD_REQUEST)
+        from apps.elements.services import create_upload
+        data, http_status = create_upload(
+            project=scene.project, scene=scene,
+            file=request.FILES['file'],
+            prompt_text=request.data.get('prompt_text', ''),
+            is_favorite=request.data.get('is_favorite', False),
+            ai_model_id=request.data.get('ai_model'),
+        )
+        return Response(data, status=http_status)
     
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsProjectOwner])
     def generate(self, request, pk=None):
         """
         Запустить AI генерацию элемента.
-        
+
         POST /api/scenes/{id}/generate/
-        
-        Принимает:
-        - prompt: текст промпта (обязательно)
-        - ai_model_id: ID AI модели (обязательно)
-        - generation_config: параметры генерации, включая input_urls для img2vid (опционально, dict)
-        
-        Возвращает:
-        - Данные созданного Element с status=PENDING
         """
         scene = self.get_object()
-        
-        # Валидация входных данных
-        prompt = request.data.get('prompt')
-        ai_model_id = request.data.get('ai_model_id')
-        
-        if not prompt:
-            return Response(
-                {'error': 'Prompt is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        if not ai_model_id:
-            return Response(
-                {'error': 'AI model ID is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Проверка существования AI модели
-        from apps.ai_providers.models import AIModel
-        try:
-            ai_model = AIModel.objects.get(id=ai_model_id, is_active=True)
-        except AIModel.DoesNotExist:
-            return Response(
-                {'error': 'AI model not found or inactive'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Определение типа элемента по модели
-        element_type = ai_model.model_type  # IMAGE или VIDEO
-        
-        # Определение source_type: IMG2VID если модель VIDEO и в generation_config есть input_urls
-        from apps.elements.models import Element
-        generation_config = request.data.get('generation_config') or {}
-        input_urls = generation_config.get('input_urls')
-        if (
-            element_type == 'VIDEO'
-            and isinstance(input_urls, list)
-            and len(input_urls) > 0
-        ):
-            source_type = Element.SOURCE_IMG2VID
-        else:
-            source_type = Element.SOURCE_GENERATED
-        
-        try:
-            # Проверяем и списываем средства ДО создания элемента
-            operation_key = uuid4().hex
-            element = None
-            credits_service = CreditsService()
-            debit_result = credits_service.debit_for_generation(
-                user=request.user,
-                ai_model=ai_model,
-                generation_config=generation_config,
-                metadata={"operation_key": operation_key},
-            )
-            
-            if not debit_result.ok:
-                return Response(
-                    {'error': debit_result.error or 'Не удалось списать средства для генерации'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            # Создание Element с атомарной проверкой лимита
-            from apps.elements.serializers import ElementSerializer
-            
-            element_data = {
-                'project': scene.project_id,
-                'scene': scene.id,
-                'element_type': element_type,
-                'prompt_text': prompt,
-                'ai_model': ai_model_id,
-                'generation_config': generation_config,
-                'status': Element.STATUS_PENDING,
-                'source_type': source_type,
-            }
-            
-            with transaction.atomic():
-                locked_scene = Scene.objects.select_for_update().get(pk=scene.pk)
-                # user_quota = request.user.quota
-                current_elements_count = locked_scene.elements.count()
-                # if current_elements_count >= user_quota.max_elements_per_scene:
-                #     return Response(
-                #         {'detail': f'Достигнут лимит элементов в сцене ({user_quota.max_elements_per_scene}). Обратитесь к администратору.'},
-                #         status=status.HTTP_403_FORBIDDEN
-                #     )
-                element_data['order_index'] = current_elements_count
-                serializer = ElementSerializer(data=element_data)
-                serializer.is_valid(raise_exception=True)
-                element = serializer.save()
-                
-                # Обновляем элемент ссылкой на транзакцию списания для возможного возврата
-                # (сохраняем сумму в метаданных элемента для refund)
-                if debit_result.cost:
-                    element.generation_config = {
-                        **element.generation_config,
-                        '_debit_amount': str(debit_result.cost),
-                        '_debit_transaction': True,
-                    }
-                    element.save(update_fields=['generation_config'])
-            
-            # Запускаем асинхронную генерацию
-            from apps.elements.tasks import start_generation
-            start_generation.delay(element.id)
-            
-            return Response(
-                ElementSerializer(element).data,
-                status=status.HTTP_201_CREATED
-            )
-        
-        except Exception as e:
-            if 'debit_result' in locals() and debit_result.ok and debit_result.cost is not None:
-                credits_service.refund_for_generation(
-                    user=request.user,
-                    amount=debit_result.cost,
-                    element=element,
-                    reason=CreditsTransaction.REASON_GENERATION_REFUND,
-                    metadata={
-                        "source": "generation_setup_failure",
-                        "operation_key": operation_key,
-                    },
-                )
-            return Response(
-                {'error': f'Failed to start generation: {str(e)}'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        from apps.elements.services import create_generation
+        data, http_status = create_generation(
+            project=scene.project, scene=scene,
+            prompt=request.data.get('prompt'),
+            ai_model_id=request.data.get('ai_model_id'),
+            generation_config=request.data.get('generation_config', {}),
+            user=request.user,
+        )
+        return Response(data, status=http_status)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsProjectOwner])
     def set_headliner(self, request, pk=None):
