@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, Pencil, Trash2, Film, Calendar } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash2, Film, Layers, Zap, HardDrive } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +24,7 @@ import {
 import { ProjectSettingsDialog } from "./ProjectSettingsDialog";
 import { useProjectsStore } from "@/lib/store/projects";
 import { PROJECT_STATUSES } from "@/lib/utils/constants";
-import { formatDate, formatSceneCount } from "@/lib/utils/format";
+import { formatStorage, formatCurrency } from "@/lib/utils/format";
 import type { Project } from "@/lib/types";
 
 interface ProjectCardProps {
@@ -165,13 +165,21 @@ export function ProjectCard({ project }: ProjectCardProps) {
 
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
-              <Film className="h-3 w-3" />
-              {formatSceneCount(project.scene_count ?? 0)}
+              <Layers className="h-3 w-3" />
+              {project.element_count ?? 0}
             </span>
-            <span className="flex items-center gap-1">
-              <Calendar className="h-3 w-3" />
-              {formatDate(project.created_at)}
-            </span>
+            {project.total_spent && parseFloat(project.total_spent) > 0 && (
+              <span className="flex items-center gap-1">
+                <Zap className="h-3 w-3" />
+                {formatCurrency(project.total_spent)}
+              </span>
+            )}
+            {(project.storage_bytes ?? 0) > 0 && (
+              <span className="flex items-center gap-1">
+                <HardDrive className="h-3 w-3" />
+                {formatStorage(project.storage_bytes!)}
+              </span>
+            )}
           </div>
         </div>
       </div>
