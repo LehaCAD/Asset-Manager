@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, Pencil, Trash2, Film, Layers, Zap, HardDrive } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash2, Film, Layers, HardDrive } from "lucide-react";
+import { ChargeIcon } from "@/components/ui/charge-icon";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -170,7 +171,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
             </span>
             {project.total_spent && parseFloat(project.total_spent) > 0 && (
               <span className="flex items-center gap-1">
-                <Zap className="h-3 w-3 text-amber-500 fill-amber-500" />
+                <ChargeIcon size="sm" />
                 {formatCurrency(project.total_spent)}
               </span>
             )}

@@ -7,7 +7,8 @@ import { ModelSelector } from "@/components/generation/ModelSelector";
 import { ParametersForm } from "@/components/generation/ParametersForm";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { PanelLeftClose, PanelLeft, ChevronRight, AlertCircle, Zap } from "lucide-react";
+import { PanelLeftClose, PanelLeft, ChevronRight, AlertCircle } from "lucide-react";
+import { ChargeIcon } from "@/components/ui/charge-icon";
 
 interface ConfigPanelProps {
   className?: string;
@@ -146,7 +147,7 @@ export function ConfigPanel({ className }: ConfigPanelProps) {
                     "font-medium flex items-center gap-1",
                     canAfford ? "text-green-600" : "text-destructive"
                   )}>
-                    <Zap className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+                    <ChargeIcon size="sm" />
                     {parseFloat(estimateCost).toFixed(0)}
                   </span>
                 </div>

@@ -3,7 +3,8 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LogOut, User, Clapperboard, Zap } from "lucide-react";
+import { LogOut, User, Clapperboard } from "lucide-react";
+import { ChargeIcon } from "@/components/ui/charge-icon";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -62,7 +63,7 @@ export function Navbar() {
           {user && (
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/50 text-sm font-medium">
               <div className="flex items-center gap-1 text-sm">
-                <Zap className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+                <ChargeIcon size="md" />
                 <span>{formatCurrency(balance)}</span>
               </div>
             </div>

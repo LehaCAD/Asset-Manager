@@ -8,10 +8,10 @@ import {
   Pencil,
   Trash2,
   Layers,
-  Zap,
   ImageIcon,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ChargeIcon } from "@/components/ui/charge-icon";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
@@ -291,7 +291,7 @@ export function SceneCard({ scene, projectId, index, aspectClass = "aspect-video
             </span>
             {scene.total_spent && parseFloat(scene.total_spent) > 0 && (
               <span className="flex items-center gap-1">
-                <Zap className="h-3 w-3 text-amber-500 fill-amber-500" />
+                <ChargeIcon size="sm" />
                 {formatCurrency(scene.total_spent)}
               </span>
             )}
