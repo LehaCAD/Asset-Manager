@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDropzone } from 'react-dropzone';
 import { useSceneWorkspaceStore } from '@/lib/store/scene-workspace';
@@ -86,6 +86,11 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   const toggleFavorite = useSceneWorkspaceStore((s) => s.toggleFavorite);
   const setHeadliner = useSceneWorkspaceStore((s) => s.setHeadliner);
   const deleteElement = useSceneWorkspaceStore((s) => s.deleteElement);
+
+  // Reset store synchronously before paint to prevent stale data flash
+  useLayoutEffect(() => {
+    resetWorkspace();
+  }, [projectId, groupId, resetWorkspace]);
 
   // Load workspace data
   useEffect(() => {
@@ -507,14 +512,18 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
 
         {/* Zone 3: Grid area - scrollable */}
         <div className="flex-1 overflow-auto p-4 relative min-h-0">
-          {hasContent ? (
+          {isLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+            </div>
+          ) : hasContent ? (
             <ElementGrid
               onRequestDelete={openDeleteDialog}
               groups={groups}
               onGroupClick={handleGroupClick}
               onGroupDelete={handleRequestGroupDelete}
             />
-          ) : isLoading ? null : (
+          ) : (
             <EmptyState onUploadClick={open} isDragActive={isDragActive} />
           )}
         </div>
