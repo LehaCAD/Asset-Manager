@@ -8,6 +8,7 @@ import {
   Pencil,
   Trash2,
   Layers,
+  HardDrive,
   ImageIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -37,7 +38,7 @@ import { Label } from "@/components/ui/label";
 import { useScenesStore } from "@/lib/store/scenes";
 import { scenesApi } from "@/lib/api/scenes";
 import { SCENE_STATUSES } from "@/lib/utils/constants";
-import { formatElementCount, formatCurrency } from "@/lib/utils/format";
+import { formatElementCount, formatCurrency, formatStorage } from "@/lib/utils/format";
 import type { Scene } from "@/lib/types";
 
 interface SceneCardProps {
@@ -145,11 +146,34 @@ export function SceneCard({ scene, projectId, index, aspectClass = "aspect-video
         ref={setNodeRef}
         style={style}
         onClick={handleCardClick}
-        className="group relative bg-card border border-border rounded-xl overflow-hidden cursor-pointer hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 transition-all duration-200"
+        className="group relative bg-card border border-border rounded-md overflow-hidden cursor-pointer hover:border-primary/40 hover:shadow-md hover:shadow-primary/5 transition-all duration-150"
       >
-        {/* Thumbnail */}
+        {/* Thumbnail area */}
         <div className={cn("bg-muted relative overflow-hidden", aspectClass)}>
-          {scene.headliner_url ? (
+          {scene.preview_thumbnails && scene.preview_thumbnails.length > 0 ? (
+            /* 2x2 preview grid */
+            <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-px">
+              {[0, 1, 2, 3].map((i) => {
+                const url = scene.preview_thumbnails![i];
+                return url ? (
+                  <img
+                    key={i}
+                    src={url}
+                    alt=""
+                    loading="lazy"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div
+                    key={i}
+                    className="w-full h-full bg-muted-foreground/5 flex items-center justify-center"
+                  >
+                    <ImageIcon className="h-3.5 w-3.5 text-muted-foreground/20" />
+                  </div>
+                );
+              })}
+            </div>
+          ) : scene.headliner_url ? (
             isVideo ? (
               <video
                 ref={videoRef}
@@ -189,7 +213,7 @@ export function SceneCard({ scene, projectId, index, aspectClass = "aspect-video
           )}
 
           {/* Order badge */}
-          <div className="absolute top-2 left-2">
+          <div className="absolute top-1.5 left-1.5">
             <span className="text-[10px] font-mono font-semibold bg-background/80 backdrop-blur-sm text-muted-foreground px-1.5 py-0.5 rounded border border-border/50">
               #{index + 1}
             </span>
@@ -200,15 +224,15 @@ export function SceneCard({ scene, projectId, index, aspectClass = "aspect-video
             {...attributes}
             {...listeners}
             data-no-navigate
-            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity touch-none"
+            className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity touch-none"
           >
-            <div className="h-7 w-7 bg-background/80 backdrop-blur-sm rounded border border-border/50 flex items-center justify-center cursor-grab active:cursor-grabbing shadow-sm">
-              <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
+            <div className="h-6 w-6 bg-background/80 backdrop-blur-sm rounded border border-border/50 flex items-center justify-center cursor-grab active:cursor-grabbing shadow-sm">
+              <GripVertical className="h-3 w-3 text-muted-foreground" />
             </div>
           </div>
 
           {/* Status badge overlay */}
-          <div className="absolute bottom-2 left-2">
+          <div className="absolute bottom-1.5 left-1.5">
             <span
               className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
                 STATUS_COLORS[scene.status] ?? "bg-secondary text-secondary-foreground"
@@ -216,15 +240,14 @@ export function SceneCard({ scene, projectId, index, aspectClass = "aspect-video
             >
               {statusConfig?.label ?? scene.status}
             </span>
-            
           </div>
         </div>
 
-        {/* Info */}
-        <div className="p-3">
-          {/* Верхняя строка: название + меню */}
+        {/* Footer — compact info */}
+        <div className="p-2.5">
+          {/* Title row + menu */}
           <div className="flex items-center justify-between gap-2">
-            <h3 className="font-medium text-sm leading-snug truncate group-hover:text-primary transition-colors min-w-0 flex-1">
+            <h3 className="text-[13px] font-medium leading-tight truncate group-hover:text-primary transition-colors duration-150 min-w-0 flex-1">
               {scene.name}
             </h3>
             <div data-no-navigate>
@@ -233,12 +256,12 @@ export function SceneCard({ scene, projectId, index, aspectClass = "aspect-video
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 -mr-1"
+                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 -mr-1"
                     aria-label="Действия"
                     onPointerDown={blockCardNavigation}
                     onClick={blockCardNavigation}
                   >
-                    <MoreHorizontal className="h-3.5 w-3.5" />
+                    <MoreHorizontal className="h-3 w-3" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
@@ -283,8 +306,8 @@ export function SceneCard({ scene, projectId, index, aspectClass = "aspect-video
               </DropdownMenu>
             </div>
           </div>
-          {/* Нижняя строка: количество элементов + потрачено */}
-          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+          {/* Meta row */}
+          <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5">
             <span className="flex items-center gap-1">
               <Layers className="h-3 w-3" />
               {formatElementCount(scene.element_count ?? scene.elements_count ?? 0)}
@@ -295,9 +318,14 @@ export function SceneCard({ scene, projectId, index, aspectClass = "aspect-video
                 {formatCurrency(scene.total_spent)}
               </span>
             )}
+            {(scene.storage_bytes ?? 0) > 0 && (
+              <span className="flex items-center gap-1">
+                <HardDrive className="h-3 w-3" />
+                {formatStorage(scene.storage_bytes!)}
+              </span>
+            )}
           </div>
         </div>
-        
       </div>
 
       {/* Edit dialog */}
