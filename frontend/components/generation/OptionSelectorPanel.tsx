@@ -10,6 +10,7 @@ interface OptionSelectorPanelProps {
   onClose: () => void;
   title: string;
   options: ParameterOption[];
+  featuredOptions?: ParameterOption[];
   selectedValue: unknown;
   onSelect: (requestKey: string, value: unknown) => void;
   requestKey: string;
@@ -21,6 +22,7 @@ export function OptionSelectorPanel({
   onClose,
   title,
   options,
+  featuredOptions,
   selectedValue,
   onSelect,
   requestKey,
@@ -54,6 +56,33 @@ export function OptionSelectorPanel({
 
   if (!isOpen) return null;
 
+  const isAspectRatio = uiSemantic === "aspect_ratio";
+  const hasFeatured = featuredOptions && featuredOptions.length > 0;
+  const showGroups = isAspectRatio && hasFeatured;
+
+  const renderOptionButton = (option: ParameterOption) => {
+    const isSelected = option.value === selectedValue;
+    return (
+      <button
+        key={String(option.value)}
+        onClick={() => handleSelect(option.value)}
+        className={cn(
+          "flex flex-col items-center justify-center gap-1 p-3 rounded-md text-center transition-all duration-150",
+          "border",
+          isAspectRatio && "h-[72px]",
+          isSelected
+            ? "bg-primary text-primary-foreground border-primary shadow-sm"
+            : "bg-card border-border text-muted-foreground hover:text-foreground hover:border-primary/40"
+        )}
+      >
+        {isAspectRatio && (
+          <AspectRatioIcon value={String(option.value)} />
+        )}
+        <span className="text-xs font-medium">{option.label}</span>
+      </button>
+    );
+  };
+
   return (
     <div
       ref={panelRef}
@@ -76,40 +105,40 @@ export function OptionSelectorPanel({
         </button>
       </div>
 
-      {/* Scrollable options grid */}
-      <div
-        className="flex-1 overflow-y-auto p-3 scrollbar-thin"
-      >
-        <div className="grid grid-cols-3 gap-1.5">
-          {options.length === 0 ? (
-            <p className="col-span-3 text-sm text-muted-foreground text-center py-8">
-              Нет доступных опций
-            </p>
-          ) : (
-            options.map((option) => {
-              const isSelected = option.value === selectedValue;
-              return (
-                <button
-                  key={String(option.value)}
-                  onClick={() => handleSelect(option.value)}
-                  className={cn(
-                    "flex flex-col items-center justify-center gap-1 p-3 rounded-md text-center transition-all duration-150",
-                    "border",
-                    uiSemantic === "aspect_ratio" && "h-[72px]",
-                    isSelected
-                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                      : "bg-card border-border text-muted-foreground hover:text-foreground hover:border-primary/40"
-                  )}
-                >
-                  {uiSemantic === "aspect_ratio" && (
-                    <AspectRatioIcon value={String(option.value)} />
-                  )}
-                  <span className="text-xs font-medium">{option.label}</span>
-                </button>
-              );
-            })
-          )}
-        </div>
+      {/* Scrollable options */}
+      <div className="flex-1 overflow-y-auto p-3 scrollbar-thin space-y-4">
+        {options.length === 0 && !hasFeatured ? (
+          <p className="text-sm text-muted-foreground text-center py-8">
+            Нет доступных опций
+          </p>
+        ) : showGroups ? (
+          <>
+            {/* Популярные */}
+            <div className="space-y-2">
+              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-1">
+                Популярные
+              </h3>
+              <div className="grid grid-cols-3 gap-1.5">
+                {featuredOptions!.map(renderOptionButton)}
+              </div>
+            </div>
+            {/* Расширенные */}
+            {options.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-1">
+                  Расширенные
+                </h3>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {options.map(renderOptionButton)}
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="grid grid-cols-3 gap-1.5">
+            {options.map(renderOptionButton)}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -59,6 +59,7 @@ export function ParametersForm({ schema, values, onChange }: ParametersFormProps
           onClose={handleCloseCustom}
           title={activeCustomParam.label}
           options={getOverflowOptions(activeCustomParam)}
+          featuredOptions={getFeaturedOptions(activeCustomParam)}
           selectedValue={values[activeCustomParam.request_key]}
           onSelect={handleCustomSelect}
           requestKey={activeCustomParam.request_key}
