@@ -70,7 +70,7 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
   const [isCopied, setIsCopied] = useState(false);
   const [commentText, setCommentText] = useState("");
 
-  const { availableModels, selectModel, setPrompt, setParameter } = useGenerationStore();
+  const { retryFromElement } = useGenerationStore();
 
   // Sync prompt text when element changes
   useEffect(() => {
@@ -127,27 +127,7 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
   };
 
   const handleRepeat = () => {
-    // Find matching model
-    const model = availableModels.find((m) => m.id === element.ai_model);
-    if (!model) {
-      toast.error("Модель недоступна");
-      return;
-    }
-
-    selectModel(model);
-    setPrompt(element.prompt_text ?? "");
-
-    // Restore parameters from generation_config
-    if (element.generation_config) {
-      for (const [key, value] of Object.entries(element.generation_config)) {
-        if (!HIDDEN_CONFIG_KEYS.has(key)) {
-          setParameter(key, value);
-        }
-      }
-    }
-
-    toast.success("Параметры загружены");
-    onClose?.();
+    retryFromElement(element);
   };
 
   return (
