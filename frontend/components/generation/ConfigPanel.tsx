@@ -73,7 +73,7 @@ export function ConfigPanel({ className }: ConfigPanelProps) {
           {/* Model selector trigger - header with collapse button */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <label className="text-[13px] font-semibold">Модель</label>
+              <label className="text-sm font-medium">Модель</label>
               <Button
                 variant="ghost"
                 size="icon"
@@ -131,7 +131,7 @@ export function ConfigPanel({ className }: ConfigPanelProps) {
           {selectedModel && (
             <div className="space-y-2 mt-4">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-[13px] font-semibold">Стоимость</span>
+                <span className="text-sm font-medium">Стоимость</span>
                 {isEstimateLoading ? (
                   <span className="text-muted-foreground">...</span>
                 ) : estimateError && !estimateCost ? (
