@@ -178,7 +178,7 @@ export function PromptBar({ projectId, sceneId, groupId, className }: PromptBarP
     // Show cost toast and reload balance
     const { estimateCost } = useCreditsStore.getState();
     if (estimateCost && parseFloat(estimateCost) > 0) {
-      toast.success(`⚡ Списано: ${formatCurrency(estimateCost)}`, { duration: 5000 });
+      toast.success(`Списано: ${formatCurrency(estimateCost)}`, { duration: 5000 });
     }
     useCreditsStore.getState().loadBalance();
     // Reset textarea height after generation
