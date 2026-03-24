@@ -113,14 +113,14 @@ export function Navbar() {
                           {formatStorage(user.quota.storage_used_bytes ?? 0)}{" "}
                           <span className="text-muted-foreground">/ {formatStorage(user.quota.storage_limit_bytes ?? 0)}</span>
                         </div>
-                        <div className="w-full h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+                        <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
                           <div
                             className={`h-full rounded-full transition-all ${
                               (user.quota.storage_used_bytes ?? 0) / (user.quota.storage_limit_bytes || 1) >= 0.9
-                                ? "bg-red-500"
+                                ? "bg-error"
                                 : (user.quota.storage_used_bytes ?? 0) / (user.quota.storage_limit_bytes || 1) >= 0.7
-                                  ? "bg-amber-500"
-                                  : "bg-emerald-500"
+                                  ? "bg-warning"
+                                  : "bg-success"
                             }`}
                             style={{
                               width: `${Math.max(Math.min(Math.round(((user.quota.storage_used_bytes ?? 0) / (user.quota.storage_limit_bytes || 1)) * 100), 100), (user.quota.storage_used_bytes ?? 0) > 0 ? 4 : 0)}%`,
