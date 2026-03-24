@@ -19,7 +19,7 @@ export function ChargeIcon({ size = "sm", className }: ChargeIconProps) {
     <Coins
       className={cn(
         SIZES[size],
-        "text-amber-400 fill-amber-400",
+        "text-charge fill-charge",
         className
       )}
       strokeWidth={2}

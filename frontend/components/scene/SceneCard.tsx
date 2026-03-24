@@ -52,8 +52,8 @@ interface SceneCardProps {
 const STATUS_COLORS: Record<string, string> = {
   DRAFT: "bg-secondary text-secondary-foreground",
   IN_PROGRESS: "bg-primary/15 text-primary",
-  REVIEW: "bg-yellow-500/15 text-yellow-600 dark:text-yellow-400",
-  APPROVED: "bg-green-500/15 text-green-600 dark:text-green-400",
+  REVIEW: "bg-warning/15 text-warning",
+  APPROVED: "bg-success/15 text-success",
 };
 
 export function SceneCard({ scene, projectId, index, aspectClass = "aspect-video", fitClass = "object-cover" }: SceneCardProps) {
