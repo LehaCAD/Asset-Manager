@@ -70,7 +70,7 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
   const [isCopied, setIsCopied] = useState(false);
   const [commentText, setCommentText] = useState("");
 
-  const { retryFromElement } = useGenerationStore();
+  const { retryFromElement, availableModels } = useGenerationStore();
 
   // Sync prompt text when element changes
   useEffect(() => {
@@ -80,13 +80,29 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
   const hasPromptChanged = promptText !== (element.prompt_text ?? "");
   const isGenerated = element.source_type === "GENERATED" || element.source_type === "IMG2VID";
 
+  // Build label map from model's parameters_schema
+  const labelMap = useMemo(() => {
+    const model = availableModels.find((m) => m.id === element.ai_model);
+    if (!model?.parameters_schema) return {};
+    const map: Record<string, string> = {};
+    for (const param of model.parameters_schema) {
+      map[param.request_key] = param.label;
+    }
+    return map;
+  }, [availableModels, element.ai_model]);
+
   // Filter generation_config to user-visible params
   const configParams = useMemo(() => {
     if (!element.generation_config || !isGenerated) return [];
     return Object.entries(element.generation_config)
       .filter(([key]) => !HIDDEN_CONFIG_KEYS.has(key))
-      .map(([key, value]) => ({ key, value: String(value) }));
-  }, [element.generation_config, isGenerated]);
+      .filter(([, value]) => {
+        if (typeof value === "string" && value.startsWith("http")) return false;
+        if (Array.isArray(value)) return false;
+        return true;
+      })
+      .map(([key, value]) => ({ key, label: labelMap[key] || key, value: String(value) }));
+  }, [element.generation_config, isGenerated, labelMap]);
 
   // Cost from generation_config
   const generationCost = element.generation_cost
@@ -152,9 +168,9 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
           <h3 className="text-sm font-medium text-muted-foreground mb-2">Параметры</h3>
           <Separator className="mb-3" />
           <dl className="space-y-1.5 text-sm">
-            {configParams.map(({ key, value }) => (
+            {configParams.map(({ key, label, value }) => (
               <div key={key} className="flex justify-between gap-2">
-                <dt className="text-muted-foreground truncate">{key}:</dt>
+                <dt className="text-muted-foreground truncate">{label}:</dt>
                 <dd className="font-medium text-right truncate max-w-[140px]" title={value}>
                   {value}
                 </dd>
