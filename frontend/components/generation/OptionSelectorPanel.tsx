@@ -118,7 +118,7 @@ export function OptionSelectorPanel({
         ) : showGroups ? (
           <>
             <div className="space-y-2">
-              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-1">
+              <h3 className="text-xs font-medium text-muted-foreground tracking-wider px-1">
                 Популярные
               </h3>
               <div className="grid grid-cols-3 gap-1.5">
@@ -126,7 +126,7 @@ export function OptionSelectorPanel({
               </div>
             </div>
             <div className="space-y-2">
-              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-1">
+              <h3 className="text-xs font-medium text-muted-foreground tracking-wider px-1">
                 Расширенные
               </h3>
               <div className="grid grid-cols-3 gap-1.5">

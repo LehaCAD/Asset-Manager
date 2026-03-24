@@ -166,7 +166,7 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
         ? "h-8 px-5"
         : "h-8 px-3";
 
-    const selectedClass = "bg-primary/15 text-primary border-primary/50";
+    const selectedClass = "bg-primary text-primary-foreground border-primary shadow-sm";
     const unselectedClass = "bg-card/50 border-border text-muted-foreground hover:text-foreground hover:border-primary/30";
 
     return (
