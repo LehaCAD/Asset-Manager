@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { scenesApi } from "@/lib/api/scenes";
 import { elementsApi } from "@/lib/api/elements";
+import { projectsApi } from "@/lib/api/projects";
 import { toast } from "sonner";
 import type {
   Scene,
@@ -111,7 +112,8 @@ function captureVideoFrame(file: File): Promise<string> {
 
 // ── Upload queue (module-level, not in React) ──────────────────────────
 interface QueuedUpload {
-  sceneId: number;
+  sceneId: number; // 0 means project root
+  projectId: number;
   file: File;
   tempId: number;
   objectUrl: string;
@@ -131,9 +133,16 @@ async function processUploadQueue() {
     currentUploadController = controller;
 
     try {
-      const element = await scenesApi.upload(item.sceneId, item.file, {
-        signal: controller.signal,
-      });
+      let element;
+      if (item.sceneId > 0) {
+        element = await scenesApi.upload(item.sceneId, item.file, {
+          signal: controller.signal,
+        });
+      } else {
+        element = await projectsApi.uploadToProject(item.projectId, item.file, {
+          signal: controller.signal,
+        });
+      }
       useSceneWorkspaceStore.getState()._replaceOptimistic(item.tempId, element);
       // Blob URL revocation is handled by the store (updateElement/removeElement)
     } catch (error) {
@@ -204,7 +213,7 @@ interface SceneWorkspaceState {
   deleteElement: (elementId: number, options?: { silent?: boolean }) => Promise<void>;
   deleteSelected: () => Promise<void>;
   reorderElements: (ids: number[]) => Promise<void>;
-  enqueueUploads: (sceneId: number, files: File[]) => void;
+  enqueueUploads: (sceneId: number, files: File[], projectId?: number) => void;
   cancelUploads: () => void;
   resetWorkspace: () => void;
 
@@ -455,14 +464,38 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
   deleteElements: async (elementIds: number[], options?: { silent?: boolean }) => {
     if (elementIds.length === 0) return;
 
+    // Optimistic elements (negative IDs) — remove locally, no API call
+    const localIds = elementIds.filter((id) => id < 0);
+    const remoteIds = elementIds.filter((id) => id >= 0);
+
+    if (localIds.length > 0 && remoteIds.length === 0) {
+      // All local — just remove from state
+      const idsSet = new Set(localIds);
+      const nextSelected = new Set(get().selectedIds);
+      localIds.forEach((id) => nextSelected.delete(id));
+      set({
+        elements: get().elements.filter((e) => !idsSet.has(e.id)),
+        selectedIds: nextSelected,
+        isMultiSelectMode: nextSelected.size > 0,
+      });
+      if (!options?.silent) toast.success(localIds.length === 1 ? "Элемент удалён" : `Удалено: ${localIds.length}`);
+      return;
+    }
+
+    // For mixed: remove local ones from the list, proceed with remote
+    if (localIds.length > 0) {
+      const idsSet = new Set(localIds);
+      set({ elements: get().elements.filter((e) => !idsSet.has(e.id)) });
+    }
+
     const { scene, elements, selectedIds } = get();
-    const idsSet = new Set(elementIds);
+    const idsSet = new Set(remoteIds);
     const prevElements = elements;
     const prevSelectedIds = selectedIds;
     const prevScene = scene;
 
     const nextSelected = new Set(selectedIds);
-    elementIds.forEach((id) => nextSelected.delete(id));
+    remoteIds.forEach((id) => nextSelected.delete(id));
 
     const shouldClearHeadliner = scene?.headliner !== null && scene?.headliner !== undefined
       ? idsSet.has(scene.headliner)
@@ -476,18 +509,18 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
     });
 
     const results = await Promise.allSettled(
-      elementIds.map((id) => elementsApi.delete(id))
+      remoteIds.map((id) => elementsApi.delete(id))
     );
 
     const failedIds = results
-      .map((result, index) => ({ result, id: elementIds[index] }))
+      .map((result, index) => ({ result, id: remoteIds[index] }))
       .filter(({ result }) => result.status === "rejected")
       .map(({ id }) => id);
 
     if (failedIds.length === 0) {
       if (!options?.silent) {
         toast.success(
-          elementIds.length === 1 ? "Элемент удалён" : `Удалено: ${elementIds.length}`
+          remoteIds.length === 1 ? "Элемент удалён" : `Удалено: ${remoteIds.length}`
         );
       }
       return;
@@ -508,11 +541,11 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
           : state.scene,
     }));
 
-    if (failedIds.length === elementIds.length) {
+    if (failedIds.length === remoteIds.length) {
       toast.error("Не удалось удалить элементы");
     } else {
       toast.error(
-        `Удалено ${elementIds.length - failedIds.length} из ${elementIds.length}`
+        `Удалено ${remoteIds.length - failedIds.length} из ${remoteIds.length}`
       );
     }
   },
@@ -555,7 +588,7 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
     }
   },
 
-  enqueueUploads: (sceneId: number, files: File[]) => {
+  enqueueUploads: (sceneId: number, files: File[], projectId?: number) => {
     let currentOrderMax = get().elements.reduce(
       (max, el) => Math.max(max, el.order_index),
       -1
@@ -589,7 +622,7 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
       };
 
       get().addElement(optimistic);
-      uploadQueue.push({ sceneId, file, tempId, objectUrl });
+      uploadQueue.push({ sceneId, projectId: projectId ?? get().projectId ?? 0, file, tempId, objectUrl });
 
       if (isVideo) {
         const tid = tempId;
@@ -685,13 +718,17 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
   },
 
   toggleSelectAll: () => {
-    const { selectedIds, getFilteredElements } = get();
+    const { selectedIds, getFilteredElements, groups } = get();
     const filtered = getFilteredElements();
-    if (filtered.length === 0) return;
-    if (selectedIds.size === filtered.length) {
+    const totalCount = filtered.length + groups.length;
+    if (totalCount === 0) return;
+    if (selectedIds.size === totalCount) {
       set({ selectedIds: new Set(), isMultiSelectMode: false });
     } else {
-      const ids = new Set(filtered.map((e) => e.id));
+      const ids = new Set([
+        ...filtered.map((e) => e.id),
+        ...groups.map((g) => g.id),
+      ]);
       set({ selectedIds: ids, isMultiSelectMode: true });
     }
   },
