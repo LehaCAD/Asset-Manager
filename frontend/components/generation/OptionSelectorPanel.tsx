@@ -8,6 +8,9 @@ import { AspectRatioIcon } from "./ParametersForm";
 /** Common aspect ratios — used to split overflow into "Популярные" / "Расширенные" */
 const POPULAR_RATIOS = new Set(["16:9", "9:16", "1:1", "4:3", "3:4", "3:2", "2:3", "4:5", "5:4"]);
 
+const selectedClass = "bg-primary text-primary-foreground border-primary shadow-sm";
+const unselectedClass = "bg-card/50 border-border text-muted-foreground hover:text-foreground hover:border-primary/30";
+
 interface OptionSelectorPanelProps {
   isOpen: boolean;
   onClose: () => void;
@@ -71,18 +74,15 @@ export function OptionSelectorPanel({
         key={String(option.value)}
         onClick={() => handleSelect(option.value)}
         className={cn(
-          "flex flex-col items-center justify-center gap-1 p-3 rounded-md text-center transition-all duration-150",
-          "border",
-          isAspectRatio && "h-14",
-          isSelected
-            ? "bg-primary text-primary-foreground border-primary shadow-sm"
-            : "bg-card border-border text-muted-foreground hover:text-foreground hover:border-primary/40"
+          "rounded-md text-[11px] font-normal transition-all duration-150 border",
+          "flex flex-col items-center justify-center gap-1 h-14",
+          isSelected ? selectedClass : unselectedClass,
         )}
       >
         {isAspectRatio && (
           <AspectRatioIcon value={String(option.value)} />
         )}
-        <span className="text-xs font-normal">{option.label}</span>
+        <span>{option.label}</span>
       </button>
     );
   };
@@ -91,15 +91,15 @@ export function OptionSelectorPanel({
     <div
       ref={panelRef}
       className={cn(
-        "absolute left-full top-0 z-50 w-80",
-        "bg-card border border-border shadow-2xl rounded-md",
+        "absolute left-full top-0 z-50 w-60",
+        "bg-surface border border-border shadow-2xl rounded-md",
         "flex flex-col"
       )}
       style={{ maxHeight: 'calc(100vh - 280px)' }}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
-        <h2 className="text-sm font-semibold text-foreground truncate">{title}</h2>
+        <h2 className="text-sm font-medium text-foreground truncate">{title}</h2>
         <button
           type="button"
           onClick={onClose}
@@ -110,7 +110,7 @@ export function OptionSelectorPanel({
       </div>
 
       {/* Scrollable options */}
-      <div className="flex-1 overflow-y-auto p-3 scrollbar-thin space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 scrollbar-thin space-y-4">
         {options.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">
             Нет доступных опций
@@ -118,7 +118,7 @@ export function OptionSelectorPanel({
         ) : showGroups ? (
           <>
             <div className="space-y-2">
-              <h3 className="text-xs font-medium text-muted-foreground tracking-wider px-1">
+              <h3 className="text-xs font-normal text-muted-foreground tracking-wider">
                 Популярные
               </h3>
               <div className="grid grid-cols-3 gap-1.5">
@@ -126,7 +126,7 @@ export function OptionSelectorPanel({
               </div>
             </div>
             <div className="space-y-2">
-              <h3 className="text-xs font-medium text-muted-foreground tracking-wider px-1">
+              <h3 className="text-xs font-normal text-muted-foreground tracking-wider">
                 Расширенные
               </h3>
               <div className="grid grid-cols-3 gap-1.5">
