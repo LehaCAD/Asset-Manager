@@ -9,7 +9,10 @@
 
 ### 1.1 Новые CSS-переменные в `globals.css`
 
-Добавить в `:root` (light) и `.dark`:
+Добавить в `:root` (light) и `.dark`.
+
+**Overlay-токены одинаковые в обеих темах** — они всегда на фоне медиа-контента.
+**Статусные токены** различаются: в light теме менее насыщенные, чтобы не кричать на белом фоне.
 
 ```
 /* Статусы */
@@ -17,18 +20,21 @@
 --success-foreground:   oklch(...)
 --warning:              oklch(...)   /* янтарный */
 --warning-foreground:   oklch(...)
---error:                oklch(...)   /* красный — алиас destructive */
---error-foreground:     oklch(...)
+--error:                var(--destructive)   /* алиас destructive */
+--error-foreground:     oklch(...)           /* белый на красном */
 
 /* Специальные */
 --favorite:             oklch(...)   /* жёлтый — звёздочка */
 --charge:               oklch(...)   /* янтарный — иконка валюты */
 
-/* Overlay (поверх изображений) */
+/* Overlay (поверх изображений — одинаковые для light и dark, т.к. всегда на фоне медиа) */
 --overlay:              oklch(0 0 0 / 0.5)
---overlay-heavy:        oklch(0 0 0 / 0.7)
+--overlay-medium:       oklch(0 0 0 / 0.6)
+--overlay-heavy:        oklch(0 0 0 / 0.75)
 --overlay-light:        oklch(1 0 0 / 0.12)
 --overlay-light-hover:  oklch(1 0 0 / 0.2)
+--overlay-selection:    oklch(1 0 0 / 0.4)
+--overlay-selection-hover: oklch(1 0 0 / 0.6)
 --overlay-text:         oklch(1 0 0 / 0.85)
 --overlay-text-muted:   oklch(1 0 0 / 0.6)
 ```
@@ -45,9 +51,12 @@
 --color-favorite:           var(--favorite);
 --color-charge:             var(--charge);
 --color-overlay:            var(--overlay);
+--color-overlay-medium:     var(--overlay-medium);
 --color-overlay-heavy:      var(--overlay-heavy);
 --color-overlay-light:      var(--overlay-light);
 --color-overlay-light-hover:var(--overlay-light-hover);
+--color-overlay-selection:  var(--overlay-selection);
+--color-overlay-selection-hover: var(--overlay-selection-hover);
 --color-overlay-text:       var(--overlay-text);
 --color-overlay-text-muted: var(--overlay-text-muted);
 ```
@@ -61,13 +70,18 @@
 | `green-600`, `green-500` (success) | `text-success` | ConfigPanel, Navbar, SceneCard |
 | `amber-600`, `amber-500` (warning) | `text-warning` | ConfigPanel, Navbar |
 | `amber-400` (charge icon) | `text-charge fill-charge` | ChargeIcon |
-| `black/50` (overlay) | `bg-overlay` | ElementCard, GroupCard, LightboxModal |
-| `black/70`, `black/80` (heavy overlay) | `bg-overlay-heavy` | ElementCard, GroupCard |
-| `black/40` (light overlay) | `bg-overlay` | LightboxModal nav buttons |
+| `text-white` (на overlay) | `text-overlay-text` | ElementCard, GroupCard, Filmstrip, LightboxModal, ElementSelectionCard |
+| `black/40`, `black/45`, `black/50` (overlay) | `bg-overlay` | ElementCard, GroupCard, LightboxModal, ElementSelectionCard |
+| `black/60` (medium overlay) | `bg-overlay-medium` | ElementCard (submitting), LightboxModal (fav btn), Filmstrip |
+| `black/70`, `black/75`, `black/80` (heavy overlay) | `bg-overlay-heavy` | ElementCard, GroupCard |
+| `black/10`, `black/20`, `black/30` (subtle overlay) | `bg-overlay-light` / `bg-overlay-light-hover` | ElementSelectionCard, PromptThumbnail, Filmstrip |
 | `white/70`, `white/80` (overlay text) | `text-overlay-text` | GroupCard, ElementCard |
-| `white/40`, `white/20` (muted overlay text) | `text-overlay-text-muted` | ElementCard |
+| `white/50`, `white/40`, `white/20`, `white/60` (muted overlay text) | `text-overlay-text-muted` | ElementCard |
+| `white/40 hover:white/60` (selection checkbox) | `bg-overlay-selection hover:bg-overlay-selection-hover` | ElementCard, GroupCard |
+| `white/25`, `white/35` (overlay bg) | `bg-overlay-light-hover` | ElementCard |
 | `white/[0.15]`, `white/[0.04]` (borders) | `border-overlay-light` | PromptBar |
 | `#6C5CE7` | `primary` (already exists) | PromptBar |
+| `bg-white text-black` (retry CTA) | оставить как есть (контрастная CTA на overlay) | ElementCard |
 
 ---
 
@@ -162,7 +176,24 @@
 
 ### 2.6 Filmstrip
 
-Проверить на хардкоды, применить те же overlay-токены.
+**Замены:**
+- `bg-black/60` → `bg-overlay-medium`
+- `text-white` → `text-overlay-text`
+- `text-yellow-400` → `text-favorite`
+- `bg-black/0 group-hover:bg-black/20` → `bg-transparent group-hover:bg-overlay-light-hover`
+
+### 2.7 ElementSelectionCard
+
+**Замены:**
+- `bg-black/10`, `bg-black/45` → `bg-overlay-light`, `bg-overlay`
+- `text-white` → `text-overlay-text`
+- `text-yellow-400` → `text-favorite`
+- `text-white/70` → `text-overlay-text-muted`
+
+### 2.8 PromptThumbnail
+
+**Замены:**
+- `bg-black/0 group-hover:bg-black/30` → `bg-transparent group-hover:bg-overlay-light-hover`
 
 ---
 
@@ -201,6 +232,7 @@
 - Поведение collapsible панели
 - DnD, bulk actions, selection logic
 - DetailPanel — уже чистый
+- shadcn/ui примитивы (dialog.tsx, sheet.tsx) — `bg-black/50` backdrop оставить как есть, не расходиться с upstream
 
 ---
 
@@ -212,6 +244,7 @@
 4. **GroupCard** — переделка структуры
 5. **ElementCard** — замена хардкодов
 6. **PromptBar** — замена хардкодов
-7. **LightboxModal** — замена хардкодов
-8. **Navbar, ChargeIcon, SceneCard** — мелкие замены
-9. Визуальная верификация через Playwright
+7. **LightboxModal + Filmstrip** — замена хардкодов
+8. **ElementSelectionCard, PromptThumbnail** — замена хардкодов
+9. **Navbar, ChargeIcon, SceneCard** — мелкие замены
+10. Визуальная верификация через Playwright (скриншоты ключевых экранов)
