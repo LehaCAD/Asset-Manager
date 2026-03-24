@@ -472,12 +472,24 @@ export const useGenerationStore = create<GenerationState>()((set, get) => ({
     get().selectModel(model);
     get().setPrompt(element.prompt_text ?? "");
 
-    // Restore parameters, skip internal keys and URL values
+    // Restore parameters and image inputs from generation_config
     if (element.generation_config) {
       for (const [key, value] of Object.entries(element.generation_config)) {
         if (key.startsWith("_")) continue;
-        if (typeof value === "string" && value.startsWith("http")) continue;
-        if (Array.isArray(value) && value.every((v) => typeof v === "string" && v.startsWith("http"))) continue;
+
+        // URL array → restore as image input
+        if (Array.isArray(value) && value.length > 0 && value.every((v) => typeof v === "string" && v.startsWith("http"))) {
+          const files = value.map((url: string) => ({ displayUrl: url, apiUrl: url }));
+          get().setImageInput(key, files);
+          continue;
+        }
+
+        // Single URL → restore as image input
+        if (typeof value === "string" && value.startsWith("http")) {
+          get().setImageInput(key, [{ displayUrl: value, apiUrl: value }]);
+          continue;
+        }
+
         get().setParameter(key, value);
       }
     }

@@ -131,35 +131,34 @@ export function ConfigPanel({ className }: ConfigPanelProps) {
           {/* Стоимость генерации */}
           {selectedModel && (
             <div className="rounded-lg p-3 space-y-2">
-              {isEstimateLoading ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span>Расчет стоимости...</span>
-                </div>
-              ) : estimateError && !estimateCost ? (
-                <div className="flex items-start gap-2 text-sm text-amber-600">
-                  <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-                  <span>{estimateError}</span>
-                </div>
-              ) : estimateCost ? (
-                <>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Стоимость</span>
-                    <span className={cn(
-                      "font-medium flex items-center gap-1",
-                      canAfford ? "text-green-600" : "text-destructive"
-                    )}>
-                      <ChargeIcon size="sm" />
-                      {(() => {
-                        const n = parseFloat(estimateCost);
-                        return n % 1 === 0 ? n.toFixed(0) : n.toFixed(1);
-                      })()}
-                    </span>
-                  </div>
-                  {!canAfford && (
-                    <p className="text-xs text-destructive">Недостаточно средств</p>
-                  )}
-                </>
-              ) : null}
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Стоимость</span>
+                {isEstimateLoading ? (
+                  <span className="text-muted-foreground">...</span>
+                ) : estimateError && !estimateCost ? (
+                  <span className="flex items-center gap-1 text-amber-600">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span className="text-xs">Ошибка</span>
+                  </span>
+                ) : estimateCost ? (
+                  <span className={cn(
+                    "font-medium flex items-center gap-1",
+                    canAfford ? "text-green-600" : "text-destructive"
+                  )}>
+                    <ChargeIcon size="sm" />
+                    {(() => {
+                      const n = parseFloat(estimateCost);
+                      return n % 1 === 0 ? n.toFixed(0) : n.toFixed(1);
+                    })()}
+                  </span>
+                ) : null}
+              </div>
+              {estimateError && !estimateCost && (
+                <p className="text-xs text-amber-600">{estimateError}</p>
+              )}
+              {!isEstimateLoading && estimateCost && !canAfford && (
+                <p className="text-xs text-destructive">Недостаточно средств</p>
+              )}
             </div>
           )}
         </div>

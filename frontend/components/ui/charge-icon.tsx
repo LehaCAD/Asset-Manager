@@ -20,7 +20,6 @@ export function ChargeIcon({ size = "sm", className }: ChargeIconProps) {
       className={cn(
         SIZES[size],
         "text-amber-400 fill-amber-400",
-        "drop-shadow-[0_0_3px_rgba(251,191,36,0.5)]",
         className
       )}
       strokeWidth={2}
