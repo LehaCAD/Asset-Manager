@@ -136,14 +136,14 @@ export function ConfigPanel({ className }: ConfigPanelProps) {
                 {isEstimateLoading ? (
                   <span className="text-muted-foreground">...</span>
                 ) : estimateError && !estimateCost ? (
-                  <span className="flex items-center gap-1 text-amber-600">
+                  <span className="flex items-center gap-1 text-warning">
                     <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                     <span className="text-xs">Ошибка</span>
                   </span>
                 ) : estimateCost ? (
                   <span className={cn(
                     "font-medium flex items-center gap-1",
-                    canAfford ? "text-green-600" : "text-destructive"
+                    canAfford ? "text-success" : "text-destructive"
                   )}>
                     <ChargeIcon size="sm" />
                     {(() => {
@@ -154,7 +154,7 @@ export function ConfigPanel({ className }: ConfigPanelProps) {
                 ) : null}
               </div>
               {estimateError && !estimateCost && (
-                <p className="text-xs text-amber-600">{estimateError}</p>
+                <p className="text-xs text-warning">{estimateError}</p>
               )}
               {!isEstimateLoading && estimateCost && !canAfford && (
                 <p className="text-xs text-destructive">Недостаточно средств</p>

@@ -167,8 +167,8 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
                 className={cn(
                   "rounded-md text-xs font-medium transition-all duration-150 border",
                   isAspectRatio
-                    ? "flex flex-col items-center justify-center gap-1 h-[72px]"
-                    : "h-9 px-3",
+                    ? "flex flex-col items-center justify-center gap-1 h-[52px]"
+                    : "h-8 px-3",
                   isSelected
                     ? "bg-primary text-primary-foreground border-primary shadow-sm"
                     : "bg-card border-border text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-card/80"
@@ -186,14 +186,14 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
               className={cn(
                 "rounded-md text-xs font-medium transition-all duration-150 border",
                 isAspectRatio
-                  ? "flex flex-col items-center justify-center gap-1 h-[72px]"
-                  : "h-9 px-3",
+                  ? "flex flex-col items-center justify-center gap-1 h-[52px]"
+                  : "h-8 px-3",
                 selectedOverflowOption
                   ? "bg-primary text-primary-foreground border-primary shadow-sm"
                   : "bg-card border-border text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-card/80"
               )}
             >
-              {selectedOverflowOption?.label ?? (isAspectRatio ? "Расширенные" : "Другое")}
+              {selectedOverflowOption?.label ?? "Другое"}
             </button>
           )}
         </div>
