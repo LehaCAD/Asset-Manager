@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import {
   X,
   Download,
+  ExternalLink,
   Trash2,
   Star,
   Video,
@@ -24,6 +25,11 @@ import {
   AlertCircle,
 } from "lucide-react";
 import type { Element, ElementFilter } from "@/lib/types";
+
+// URL helpers for display hierarchy
+function getPreviewUrl(element: Element): string {
+  return element.preview_url?.trim() || element.thumbnail_url?.trim() || element.file_url?.trim() || '';
+}
 
 interface ImageBounds {
   top: number;
@@ -187,6 +193,8 @@ export function LightboxModal({
   const isVideo = currentElement?.element_type === "VIDEO";
   const isFavorite = currentElement?.is_favorite ?? false;
   const hasFileUrl = !!currentElement?.file_url?.trim();
+  const previewUrl = currentElement ? getPreviewUrl(currentElement) : '';
+  const hasPreviewUrl = !!previewUrl;
 
   return (
     <div
@@ -271,7 +279,7 @@ export function LightboxModal({
             ) : currentElement ? (
               <>
                 {/* Media or status placeholder */}
-                {currentElement.status === "COMPLETED" && hasFileUrl ? (
+                {currentElement.status === "COMPLETED" && (hasFileUrl || hasPreviewUrl) ? (
                   // Completed — show media
                   isVideo ? (
                     <video
@@ -287,7 +295,7 @@ export function LightboxModal({
                   ) : (
                     <img
                       ref={mediaRef as React.RefObject<HTMLImageElement>}
-                      src={currentElement.file_url}
+                      src={previewUrl}
                       alt=""
                       onLoad={updateBounds}
                       className="max-w-full max-h-full object-contain rounded-lg"
@@ -322,7 +330,7 @@ export function LightboxModal({
                 )}
 
                 {/* Icons positioned relative to actual media bounds */}
-                {bounds.width > 0 && currentElement.status === "COMPLETED" && hasFileUrl && (
+                {bounds.width > 0 && currentElement.status === "COMPLETED" && (hasFileUrl || hasPreviewUrl) && (
                   <div
                     className="absolute pointer-events-none"
                     style={{
@@ -427,6 +435,33 @@ export function LightboxModal({
                   <p>Скачать файл</p>
                 </TooltipContent>
               </Tooltip>
+
+              {/* "View original" button — shown for images when preview_url differs from file_url */}
+              {!isVideo && hasFileUrl && currentElement.preview_url?.trim() && currentElement.preview_url.trim() !== currentElement.file_url.trim() && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      asChild
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <a
+                        href={currentElement.file_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center"
+                      >
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Оригинал
+                      </a>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Открыть оригинал в новой вкладке</p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
             </div>
           )}
         </div>

@@ -132,23 +132,12 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
     const unsubscribe = wsManager.on((event: WSEvent) => {
       if (event.type === "element_status_changed") {
         if (event.status === "COMPLETED") {
-          const completedUpdates: Partial<{
-            status: "COMPLETED";
-            file_url: string;
-            thumbnail_url: string;
-          }> = {
+          updateElement(event.element_id, {
             status: "COMPLETED",
-          };
-          if (typeof event.file_url === "string" && event.file_url.length > 0) {
-            completedUpdates.file_url = event.file_url;
-          }
-          if (
-            typeof event.thumbnail_url === "string" &&
-            event.thumbnail_url.length > 0
-          ) {
-            completedUpdates.thumbnail_url = event.thumbnail_url;
-          }
-          updateElement(event.element_id, completedUpdates);
+            ...(event.file_url && { file_url: event.file_url }),
+            ...(event.thumbnail_url && { thumbnail_url: event.thumbnail_url }),
+            ...(event.preview_url && { preview_url: event.preview_url }),
+          });
         } else if (event.status === "FAILED") {
           const err = (event.error_message ?? "").toLowerCase();
           const isCreditsError =
@@ -165,7 +154,12 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
             void useCreditsStore.getState().loadBalance();
           }
         } else {
-          updateElement(event.element_id, { status: event.status });
+          updateElement(event.element_id, {
+            status: event.status,
+            ...(event.file_url && { file_url: event.file_url }),
+            ...(event.thumbnail_url && { thumbnail_url: event.thumbnail_url }),
+            ...(event.preview_url && { preview_url: event.preview_url }),
+          });
         }
       }
     });
@@ -449,6 +443,7 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
             <DetailPanel
               element={currentElementForLightbox}
               onUpdateElement={updateElement}
+              onClose={closeLightbox}
             />
           )}
         </LightboxModal>
