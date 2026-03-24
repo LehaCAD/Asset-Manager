@@ -249,9 +249,7 @@ export function PromptBar({ projectId, sceneId, groupId, className }: PromptBarP
     <div className={cn("p-4", className)}>
       <div
         className={cn(
-          "relative flex items-start gap-3 rounded-xl bg-card p-3 px-4",
-          "shadow-lg shadow-black/20",
-          "transition-shadow focus-within:shadow-primary/10"
+          "relative flex items-start gap-3 rounded-xl border border-border/30 p-3 px-4"
         )}
       >
           {/* Add-кнопка */}
