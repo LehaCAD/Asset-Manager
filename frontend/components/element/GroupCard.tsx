@@ -65,16 +65,15 @@ export function GroupCard({
         'transition-all duration-150',
         'hover:shadow-md hover:shadow-primary/5',
         isSelected && 'ring-2 ring-primary border-primary',
-        aspectClass,
         className,
       )}
       style={style}
       onClick={handleCardClick}
     >
-      {/* Preview area - full card */}
-      <div className="absolute inset-0">
+      {/* Preview area */}
+      <div className={cn('relative overflow-hidden bg-muted', aspectClass)}>
         {group.preview_thumbnails && group.preview_thumbnails.length > 0 ? (
-          <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-0.5">
+          <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-0.5">
             {[0, 1, 2, 3].map((i) => {
               const url = group.preview_thumbnails?.[i];
               return (
@@ -89,20 +88,70 @@ export function GroupCard({
             })}
           </div>
         ) : (
-          /* Empty state: subtle gradient with folder icon */
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/5 to-primary/10">
             <Folder className="w-10 h-10 text-primary/30 group-hover:hidden" strokeWidth={1.5} />
             <FolderOpen className="w-10 h-10 text-primary/40 hidden group-hover:block" strokeWidth={1.5} />
           </div>
         )}
+
+        {/* Selection checkbox — overlay on preview */}
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={isSelected}
+          aria-label={isSelected ? 'Снять выделение' : 'Выбрать'}
+          onPointerDown={handleControlPointerDown}
+          onClick={handleSelectClick}
+          className={cn(
+            'absolute top-2 left-2 z-30 rounded-full flex items-center justify-center transition-all duration-150',
+            iconSizes.padding,
+            isMultiSelectMode || isSelected
+              ? 'opacity-100 pointer-events-auto'
+              : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto',
+            isSelected
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-overlay text-overlay-text hover:bg-overlay-heavy',
+            isMultiSelectMode && !isSelected && 'bg-overlay-selection hover:bg-overlay-selection-hover',
+          )}
+        >
+          {isSelected ? (
+            <Check className={iconSizes.md} />
+          ) : (
+            <Check className={cn(iconSizes.md, 'opacity-0')} />
+          )}
+        </button>
+
+        {/* Delete button — overlay on preview */}
+        {onDelete && (
+          <button
+            type="button"
+            aria-label="Удалить группу"
+            title="Удалить группу"
+            onPointerDown={handleControlPointerDown}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(group.id);
+            }}
+            className={cn(
+              'absolute top-2 right-2 z-30 rounded-full bg-overlay text-overlay-text hover:bg-destructive transition-colors',
+              'opacity-0 group-hover:opacity-100',
+              iconSizes.padding,
+            )}
+          >
+            <Trash2 className={iconSizes.sm} />
+          </button>
+        )}
       </div>
 
-      {/* Gradient overlay footer at bottom */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent p-2 pt-6 z-10">
-        <span className={cn('text-white font-medium line-clamp-1 drop-shadow-sm', textSizes.title)}>
-          {group.name}
-        </span>
-        <div className={cn('flex items-center gap-2 text-white/70 mt-0.5', textSizes.meta)}>
+      {/* Info section (like ProjectCard) */}
+      <div className="p-2.5 space-y-1">
+        <div className="flex items-center gap-1.5">
+          <Folder className="h-3.5 w-3.5 text-primary/60 shrink-0" />
+          <span className={cn('font-medium line-clamp-1 group-hover:text-primary transition-colors', textSizes.title)}>
+            {group.name}
+          </span>
+        </div>
+        <div className={cn('flex items-center gap-2 text-muted-foreground', textSizes.meta)}>
           <span className="flex items-center gap-0.5">
             <Layers className="h-3 w-3" />
             {elementCount}
@@ -121,54 +170,6 @@ export function GroupCard({
           )}
         </div>
       </div>
-
-      {/* Selection checkbox - always present, visible on hover */}
-      <button
-        type="button"
-        role="checkbox"
-        aria-checked={isSelected}
-        aria-label={isSelected ? 'Снять выделение' : 'Выбрать'}
-        onPointerDown={handleControlPointerDown}
-        onClick={handleSelectClick}
-        className={cn(
-          'absolute top-2 left-2 z-30 rounded-full flex items-center justify-center transition-all duration-150',
-          iconSizes.padding,
-          isMultiSelectMode || isSelected
-            ? 'opacity-100 pointer-events-auto'
-            : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto',
-          isSelected
-            ? 'bg-primary text-primary-foreground'
-            : 'bg-black/50 text-white hover:bg-black/70',
-          isMultiSelectMode && !isSelected && 'bg-white/40 hover:bg-white/60',
-        )}
-      >
-        {isSelected ? (
-          <Check className={iconSizes.md} />
-        ) : (
-          <Check className={cn(iconSizes.md, 'opacity-0')} />
-        )}
-      </button>
-
-      {/* Top-right: delete button on hover */}
-      {onDelete && (
-        <button
-          type="button"
-          aria-label="Удалить группу"
-          title="Удалить группу"
-          onPointerDown={handleControlPointerDown}
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(group.id);
-          }}
-          className={cn(
-            'absolute top-2 right-2 z-30 rounded-full bg-black/40 text-white hover:bg-destructive transition-colors',
-            'opacity-0 group-hover:opacity-100',
-            iconSizes.padding,
-          )}
-        >
-          <Trash2 className={iconSizes.sm} />
-        </button>
-      )}
     </div>
   );
 }
