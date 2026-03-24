@@ -283,12 +283,12 @@ export function PromptBar({ projectId, sceneId, groupId, className }: PromptBarP
                 onClick={() => handleOpenSelector(imageInputs[0].key)}
                 className={cn(
                   "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border",
-                  "border-dashed border-white/[0.15] bg-white/[0.04] hover:bg-white/[0.08] hover:border-[#6C5CE7]/40",
-                  "transition-colors focus:outline-none focus:ring-2 focus:ring-[#6C5CE7]/40"
+                  "border-dashed border-border/50 bg-transparent hover:bg-muted/20 hover:border-primary/40",
+                  "transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40"
                 )}
                 aria-label="Добавить изображение"
               >
-                <Plus className="h-5 w-5 text-white/40" />
+                <Plus className="h-5 w-5 text-muted-foreground" />
               </button>
             ) : (
               <DropdownMenu>
@@ -297,8 +297,8 @@ export function PromptBar({ projectId, sceneId, groupId, className }: PromptBarP
                     type="button"
                     className={cn(
                       "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border",
-                      "border-dashed border-white/[0.15] bg-white/[0.04] hover:bg-white/[0.08] hover:border-[#6C5CE7]/40",
-                      "transition-colors focus:outline-none focus:ring-2 focus:ring-[#6C5CE7]/40"
+                      "border-dashed border-border/50 bg-transparent hover:bg-muted/20 hover:border-primary/40",
+                      "transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40"
                     )}
                     aria-label="Добавить изображение"
                   >
