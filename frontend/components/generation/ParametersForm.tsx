@@ -154,26 +154,24 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
     const isAspectRatio = param.ui_semantic === "aspect_ratio";
     const isResolution = param.ui_semantic === "resolution";
 
-    // Layout: aspect_ratio → 4-col grid, resolution → equal grid, others → flex wrap
+    // Layout: aspect_ratio → 4-col grid, others → flex wrap
     const containerClass = isAspectRatio
       ? "grid grid-cols-4 gap-1.5"
-      : isResolution
-        ? "grid grid-cols-3 gap-1.5"
-        : "flex flex-wrap gap-1.5";
+      : "flex flex-wrap gap-1.5";
 
     // Sizing: aspect_ratio → tall with icon, resolution → medium, others → compact
     const buttonSizeClass = isAspectRatio
       ? "flex flex-col items-center justify-center gap-0.5 h-[48px]"
       : isResolution
-        ? "h-9 px-3"
-        : "h-7 px-2.5";
+        ? "h-8 px-4"
+        : "h-7 px-3";
 
     const selectedClass = "bg-primary/15 text-primary border-primary/50";
     const unselectedClass = "bg-card/50 border-border text-muted-foreground hover:text-foreground hover:border-primary/30";
 
     return (
-      <div className="space-y-1.5">
-        <label className="text-xs font-semibold text-foreground">{label}</label>
+      <div className="space-y-2">
+        <label className="text-[13px] font-semibold text-foreground">{label}</label>
         <div className={containerClass}>
           {featuredOptions.map((opt) => {
             const isSelected = currentValue === opt.value;
@@ -215,8 +213,8 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
     const currentValue = value as string | number | undefined;
 
     return (
-      <div className="space-y-1.5">
-        <label className="text-xs font-semibold text-foreground">{label}</label>
+      <div className="space-y-2">
+        <label className="text-[13px] font-semibold text-foreground">{label}</label>
         <Select
           value={
             currentValue === undefined || currentValue === null
@@ -248,7 +246,7 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
 
     return (
       <div className="flex items-center justify-between py-0.5">
-        <label className="text-xs font-semibold text-foreground">{label}</label>
+        <label className="text-[13px] font-semibold text-foreground">{label}</label>
         <Switch
           checked={boolValue ?? false}
           onCheckedChange={(checked) => onChange(request_key, checked)}
