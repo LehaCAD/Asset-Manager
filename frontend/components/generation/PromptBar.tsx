@@ -16,7 +16,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/utils/format";
-import { Sparkles, Loader2, Plus } from "lucide-react";
+import { Sparkles, Loader2, ImagePlus } from "lucide-react";
 import type { Element, ModalSelectionByScene } from "@/lib/types";
 import { isGroupsSchema } from "@/lib/types";
 
@@ -249,8 +249,9 @@ export function PromptBar({ projectId, sceneId, groupId, className }: PromptBarP
     <div className={cn("p-4", className)}>
       <div
         className={cn(
-          "relative flex items-start gap-3 rounded-md border border-border bg-card/50 p-3",
-          "transition-shadow focus-within:border-primary/40 focus-within:ring-1 focus-within:ring-ring/20"
+          "relative flex items-start gap-3 rounded-xl border border-border/30 bg-card p-3 px-4",
+          "shadow-lg shadow-black/20",
+          "transition-shadow focus-within:border-primary/40 focus-within:shadow-primary/10"
         )}
       >
           {/* Add-кнопка */}
@@ -267,13 +268,13 @@ export function PromptBar({ projectId, sceneId, groupId, className }: PromptBarP
                 <button
                   type="button"
                   className={cn(
-                    "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border",
-                    "border-dashed border-border/40 bg-foreground/[0.04] hover:bg-foreground/[0.08] hover:border-primary/40",
+                    "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
+                    "border border-border/20 bg-muted/30 hover:bg-muted/50 hover:border-border/40",
                     "transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
                   )}
                   aria-label="Добавить изображение"
                 >
-                  <Plus className="h-5 w-5 text-muted-foreground" />
+                  <ImagePlus className="h-4.5 w-4.5 text-muted-foreground" />
                 </button>
               </ModeSelector>
             ) : // Simple format (array)
@@ -282,13 +283,13 @@ export function PromptBar({ projectId, sceneId, groupId, className }: PromptBarP
                 type="button"
                 onClick={() => handleOpenSelector(imageInputs[0].key)}
                 className={cn(
-                  "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border",
-                  "border-dashed border-border/50 bg-transparent hover:bg-muted/20 hover:border-primary/40",
+                  "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
+                  "border border-border/20 bg-muted/30 hover:bg-muted/50 hover:border-border/40",
                   "transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40"
                 )}
                 aria-label="Добавить изображение"
               >
-                <Plus className="h-5 w-5 text-muted-foreground" />
+                <ImagePlus className="h-4.5 w-4.5 text-muted-foreground" />
               </button>
             ) : (
               <DropdownMenu>
@@ -302,7 +303,7 @@ export function PromptBar({ projectId, sceneId, groupId, className }: PromptBarP
                     )}
                     aria-label="Добавить изображение"
                   >
-                    <Plus className="h-5 w-5 text-muted-foreground" />
+                    <ImagePlus className="h-4.5 w-4.5 text-muted-foreground" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
@@ -325,12 +326,12 @@ export function PromptBar({ projectId, sceneId, groupId, className }: PromptBarP
               type="button"
               disabled
               className={cn(
-                "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border",
-                "border-dashed border-border/30 bg-foreground/[0.02] opacity-50 cursor-not-allowed"
+                "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
+                "border border-border/10 bg-muted/20 opacity-50 cursor-not-allowed"
               )}
               aria-label="Изображения недоступны"
             >
-              <Plus className="h-5 w-5 text-muted-foreground/50" />
+              <ImagePlus className="h-4.5 w-4.5 text-muted-foreground/50" />
             </button>
           )}
 
@@ -373,19 +374,26 @@ export function PromptBar({ projectId, sceneId, groupId, className }: PromptBarP
           </div>
 
           {/* Кнопка Создать */}
-          <div className="flex justify-end">
-            <Button
+          <div className="flex items-center shrink-0">
+            <button
+              type="button"
               onClick={handleGenerate}
               disabled={!canGenerate() || isGenerating || isEstimateLoading || !!estimateError || !canAfford}
-              className="h-10"
+              className={cn(
+                "flex items-center gap-2 h-10 px-5 rounded-lg text-sm font-semibold text-white",
+                "bg-gradient-to-r from-primary to-[oklch(0.72_0.17_281)] shadow-md shadow-primary/30",
+                "hover:shadow-lg hover:shadow-primary/40 hover:brightness-110",
+                "transition-all duration-200",
+                "disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:brightness-100"
+              )}
             >
               {isGenerating ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Sparkles className="h-4 w-4 mr-2" />
+                <Sparkles className="h-4 w-4" />
               )}
               Создать
-            </Button>
+            </button>
           </div>
       </div>
 
