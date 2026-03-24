@@ -207,8 +207,8 @@ export function ElementCard({
               : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto",
           isSelected
             ? "bg-primary text-primary-foreground"
-            : "bg-black/50 text-white hover:bg-black/70",
-          isMultiSelectMode && !isSelected && "bg-white/40 hover:bg-white/60"
+            : "bg-overlay text-overlay-text hover:bg-overlay-heavy",
+          isMultiSelectMode && !isSelected && "bg-overlay-selection hover:bg-overlay-selection-hover"
         )}
       >
         {isSelected ? (
@@ -227,7 +227,7 @@ export function ElementCard({
         {/* Element type icon */}
         <div
           className={cn(
-            "rounded-full bg-black/50 text-white",
+            "rounded-full bg-overlay text-overlay-text",
             iconSizes.padding
           )}
           title={isVideo ? "Видео" : "Изображение"}
@@ -248,8 +248,8 @@ export function ElementCard({
             "rounded-full transition-colors",
             iconSizes.padding,
             element.is_favorite
-              ? "bg-black/50 text-yellow-400 hover:bg-black/70"
-              : "bg-black/50 text-white hover:bg-black/70"
+              ? "bg-overlay text-favorite hover:bg-overlay-heavy"
+              : "bg-overlay text-overlay-text hover:bg-overlay-heavy"
           )}
           aria-label={element.is_favorite ? "Убрать из избранного" : "Добавить в избранное"}
           title={element.is_favorite ? "Убрать из избранного" : "Добавить в избранное"}
@@ -267,7 +267,7 @@ export function ElementCard({
       {!isFailed && (
         <div
           className={cn(
-            "absolute inset-0 z-20 bg-black/50",
+            "absolute inset-0 z-20 bg-overlay",
             "opacity-0 group-hover:opacity-100 transition-opacity duration-150",
             "flex flex-col justify-between p-2"
           )}
@@ -282,11 +282,11 @@ export function ElementCard({
                 onPointerDown={handleControlPointerDown}
                 onClick={handleOpenLightboxClick}
                 className={cn(
-                  "rounded-full bg-white/20 hover:bg-white/40 transition-colors pointer-events-auto",
+                  "rounded-full bg-overlay-button hover:bg-overlay-button-hover transition-colors pointer-events-auto",
                   iconSizes.padding
                 )}
               >
-                <Play className={cn(iconSizes.lg, "text-white fill-white")} />
+                <Play className={cn(iconSizes.lg, "text-overlay-text fill-white")} />
               </button>
             </div>
           )}
@@ -300,7 +300,7 @@ export function ElementCard({
                 onPointerDown={handleControlPointerDown}
                 onClick={handleDownloadClick}
                 className={cn(
-                  "rounded-full bg-white/20 hover:bg-white/35 transition-colors text-white",
+                  "rounded-full bg-overlay-button hover:bg-overlay-button-hover transition-colors text-overlay-text",
                   iconSizes.padding
                 )}
               >
@@ -313,7 +313,7 @@ export function ElementCard({
                 onPointerDown={handleControlPointerDown}
                 onClick={(e) => e.stopPropagation()}
                 className={cn(
-                  "rounded-full bg-white/10 text-white/40 cursor-not-allowed",
+                  "rounded-full bg-overlay-light text-overlay-text-muted cursor-not-allowed",
                   iconSizes.padding
                 )}
               >
@@ -327,7 +327,7 @@ export function ElementCard({
               onPointerDown={handleControlPointerDown}
               onClick={handleDeleteClick}
               className={cn(
-                "rounded-full bg-white/20 hover:bg-red-500/50 transition-colors text-white",
+                "rounded-full bg-overlay-button hover:bg-error/50 transition-colors text-overlay-text",
                 iconSizes.padding
               )}
             >
@@ -340,17 +340,17 @@ export function ElementCard({
       {isFailed && (
         <div
           className={cn(
-            "absolute inset-0 z-20 bg-black/80",
+            "absolute inset-0 z-20 bg-overlay-heavy",
             "opacity-0 group-hover:opacity-100 transition-opacity duration-150",
             "flex flex-col items-center justify-center gap-3 p-3"
           )}
         >
           <div className="flex items-center gap-1.5">
-            <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
-            <span className="text-xs font-medium text-red-400">Ошибка генерации</span>
+            <div className="w-1.5 h-1.5 rounded-full bg-error" />
+            <span className="text-xs font-medium text-error">Ошибка генерации</span>
           </div>
           {element.error_message && (
-            <span className="text-[10px] text-white/50 text-center line-clamp-2 max-w-[90%]">
+            <span className="text-[10px] text-overlay-text-muted text-center line-clamp-2 max-w-[90%]">
               {element.error_message}
             </span>
           )}
@@ -367,7 +367,7 @@ export function ElementCard({
             type="button"
             onPointerDown={handleControlPointerDown}
             onClick={handleDeleteClick}
-            className="flex items-center gap-1.5 rounded-md bg-white/15 text-white/60 px-4 py-1.5 text-[11px] hover:bg-white/25 transition-colors"
+            className="flex items-center gap-1.5 rounded-md bg-overlay-button text-overlay-text-muted px-4 py-1.5 text-[11px] hover:bg-overlay-button-hover transition-colors"
           >
             <Trash2 className="w-3 h-3" />
             Удалить
@@ -377,50 +377,50 @@ export function ElementCard({
 
       {/* Status overlay */}
       {isSubmitting && (
-        <div className="absolute inset-0 z-30 bg-black/60 flex flex-col items-center justify-center pointer-events-none">
-          <Loader2 className={cn(iconSizes.lg, "text-white animate-spin mb-1")} />
-          <span className="text-[10px] text-white/80 font-medium">Отправка...</span>
-          {elapsed && <span className="text-[10px] text-white/50">{elapsed}</span>}
+        <div className="absolute inset-0 z-30 bg-overlay-heavy flex flex-col items-center justify-center pointer-events-none">
+          <Loader2 className={cn(iconSizes.lg, "text-overlay-text animate-spin mb-1")} />
+          <span className="text-[10px] text-overlay-text font-medium">Отправка...</span>
+          {elapsed && <span className="text-[10px] text-overlay-text-muted">{elapsed}</span>}
         </div>
       )}
       {!isSubmitting && isProcessing && (
-        <div className="absolute inset-0 z-30 bg-black/50 flex flex-col items-center justify-center pointer-events-none gap-1">
-          <Loader2 className={cn(iconSizes.lg, "text-white animate-spin")} />
-          <span className="text-[10px] text-white/80 font-medium truncate max-w-[90%] text-center">
+        <div className="absolute inset-0 z-30 bg-overlay flex flex-col items-center justify-center pointer-events-none gap-1">
+          <Loader2 className={cn(iconSizes.lg, "text-overlay-text animate-spin")} />
+          <span className="text-[10px] text-overlay-text font-medium truncate max-w-[90%] text-center">
             {element.status === "PENDING" ? "Ожидание..." : `Генерация${element.ai_model_name ? `: ${element.ai_model_name}` : ""}`}
           </span>
-          {elapsed && <span className="text-[10px] text-white/50">{elapsed}</span>}
+          {elapsed && <span className="text-[10px] text-overlay-text-muted">{elapsed}</span>}
         </div>
       )}
       {isFailed && (
         <div className="absolute inset-0 z-30 flex flex-col pointer-events-none">
           {/* Top area — muted error icon */}
-          <div className="flex-1 bg-red-500/10 flex flex-col items-center justify-center gap-1.5">
-            <AlertCircle className={cn(iconSizes.lg, "text-red-500/25")} />
-            <span className="text-[10px] text-white/20">Генерация не удалась</span>
+          <div className="flex-1 bg-error/10 flex flex-col items-center justify-center gap-1.5">
+            <AlertCircle className={cn(iconSizes.lg, "text-error/25")} />
+            <span className="text-[10px] text-overlay-text-muted">Генерация не удалась</span>
           </div>
           {/* Bottom info bar */}
-          <div className="bg-red-500/20 px-2.5 py-2 flex items-center justify-between gap-2 pointer-events-auto">
+          <div className="bg-error/20 px-2.5 py-2 flex items-center justify-between gap-2 pointer-events-auto">
             <div className="flex flex-col gap-0.5 min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
-                <span className="text-[10px] font-semibold text-red-400">Ошибка</span>
+                <div className="w-1.5 h-1.5 rounded-full bg-error shrink-0" />
+                <span className="text-[10px] font-semibold text-error">Ошибка</span>
                 {element.ai_model_name && (
                   <>
-                    <span className="text-[10px] text-white/30">·</span>
-                    <span className="text-[10px] text-white/40 truncate">{element.ai_model_name}</span>
+                    <span className="text-[10px] text-overlay-text-muted">·</span>
+                    <span className="text-[10px] text-overlay-text-muted truncate">{element.ai_model_name}</span>
                   </>
                 )}
               </div>
               {element.error_message && (
-                <span className="text-[9px] text-white/40 truncate">{element.error_message}</span>
+                <span className="text-[9px] text-overlay-text-muted truncate">{element.error_message}</span>
               )}
             </div>
             <button
               type="button"
               onPointerDown={handleControlPointerDown}
               onClick={handleRetryClick}
-              className="flex items-center gap-1 rounded px-2 py-1 bg-white/15 text-[10px] text-white/70 font-medium hover:bg-white/25 transition-colors shrink-0"
+              className="flex items-center gap-1 rounded px-2 py-1 bg-overlay-button text-[10px] text-overlay-text font-medium hover:bg-overlay-button-hover transition-colors shrink-0"
             >
               <RotateCcw className="w-2.5 h-2.5" />
               Повторить
