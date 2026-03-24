@@ -170,8 +170,8 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
     const unselectedClass = "bg-card/50 border-border text-muted-foreground hover:text-foreground hover:border-primary/30";
 
     return (
-      <div className="space-y-4">
-        <label className="text-sm font-medium">{label}</label>
+      <div>
+        <label className="text-sm font-medium block mb-4">{label}</label>
         <div className={containerClass}>
           {featuredOptions.map((opt) => {
             const isSelected = currentValue === opt.value;
@@ -187,7 +187,7 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
                 )}
               >
                 {isAspectRatio && <AspectRatioIcon value={String(opt.value)} />}
-                <span className={isAspectRatio ? "text-[11px]" : ""}>{opt.label}</span>
+                <span className={""}>{opt.label}</span>
               </button>
             );
           })}
@@ -201,7 +201,7 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
                 selectedOverflowOption ? selectedClass : unselectedClass,
               )}
             >
-              <span className={isAspectRatio ? "text-[11px]" : ""}>{selectedOverflowOption?.label ?? "Другое"}</span>
+              <span className={""}>{selectedOverflowOption?.label ?? "Другое"}</span>
             </button>
           )}
         </div>
@@ -213,8 +213,8 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
     const currentValue = value as string | number | undefined;
 
     return (
-      <div className="space-y-4">
-        <label className="text-sm font-medium">{label}</label>
+      <div>
+        <label className="text-sm font-medium block mb-4">{label}</label>
         <Select
           value={
             currentValue === undefined || currentValue === null
