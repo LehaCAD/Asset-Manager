@@ -269,12 +269,12 @@ export function PromptBar({ projectId, sceneId, groupId, className }: PromptBarP
                   type="button"
                   className={cn(
                     "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
-                    "border border-border/20 bg-muted/30 hover:bg-muted/50 hover:border-border/40",
+                    "border border-primary/30 bg-primary/10 hover:bg-primary/20 hover:border-primary/50",
                     "transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
                   )}
                   aria-label="Добавить изображение"
                 >
-                  <ImagePlus className="h-4.5 w-4.5 text-muted-foreground" />
+                  <ImagePlus className="h-5 w-5 text-primary" />
                 </button>
               </ModeSelector>
             ) : // Simple format (array)
@@ -289,7 +289,7 @@ export function PromptBar({ projectId, sceneId, groupId, className }: PromptBarP
                 )}
                 aria-label="Добавить изображение"
               >
-                <ImagePlus className="h-4.5 w-4.5 text-muted-foreground" />
+                <ImagePlus className="h-5 w-5 text-primary" />
               </button>
             ) : (
               <DropdownMenu>
@@ -303,7 +303,7 @@ export function PromptBar({ projectId, sceneId, groupId, className }: PromptBarP
                     )}
                     aria-label="Добавить изображение"
                   >
-                    <ImagePlus className="h-4.5 w-4.5 text-muted-foreground" />
+                    <ImagePlus className="h-5 w-5 text-primary" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
