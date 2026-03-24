@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import type { ParameterOption } from "@/lib/types";
 import { AspectRatioIcon } from "./ParametersForm";
@@ -20,6 +21,8 @@ interface OptionSelectorPanelProps {
   onSelect: (requestKey: string, value: unknown) => void;
   requestKey: string;
   uiSemantic?: string;
+  /** Ref to the trigger button — used to position the portal panel */
+  triggerRef?: React.RefObject<HTMLElement | null>;
 }
 
 export function OptionSelectorPanel({
@@ -31,12 +34,26 @@ export function OptionSelectorPanel({
   onSelect,
   requestKey,
   uiSemantic,
+  triggerRef,
 }: OptionSelectorPanelProps) {
   const handleSelect = (value: unknown) => {
     onSelect(requestKey, value);
   };
 
   const panelRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+
+  // Calculate position from trigger button
+  const updatePosition = useCallback(() => {
+    if (!triggerRef?.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setPos({ top: rect.top, left: rect.right + 8 });
+  }, [triggerRef]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    updatePosition();
+  }, [isOpen, updatePosition]);
 
   // Handle click outside to close
   useEffect(() => {
@@ -87,15 +104,19 @@ export function OptionSelectorPanel({
     );
   };
 
-  return (
+  const panel = (
     <div
       ref={panelRef}
       className={cn(
-        "absolute left-full top-0 z-50 w-60",
+        "fixed z-[100] w-60",
         "bg-surface border border-border shadow-2xl rounded-md",
         "flex flex-col"
       )}
-      style={{ maxHeight: 'calc(100vh - 280px)' }}
+      style={{
+        top: pos.top,
+        left: pos.left,
+        maxHeight: 'calc(100vh - 120px)',
+      }}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
@@ -142,4 +163,6 @@ export function OptionSelectorPanel({
       </div>
     </div>
   );
+
+  return createPortal(panel, document.body);
 }

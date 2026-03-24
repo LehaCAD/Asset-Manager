@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +23,7 @@ interface ParametersFormProps {
 export function ParametersForm({ schema, values, onChange }: ParametersFormProps) {
   const [customPanelOpen, setCustomPanelOpen] = useState(false);
   const [activeCustomParam, setActiveCustomParam] = useState<ParameterSchemaItem | null>(null);
+  const triggerButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const visibleSchema = schema.filter((param) => param.visible !== false);
 
@@ -50,6 +51,7 @@ export function ParametersForm({ schema, values, onChange }: ParametersFormProps
           value={values[param.request_key]}
           onChange={onChange}
           onOpenCustom={handleOpenCustom}
+          overflowTriggerRef={param.show_other_button ? triggerButtonRef : undefined}
         />
       ))}
 
@@ -63,6 +65,7 @@ export function ParametersForm({ schema, values, onChange }: ParametersFormProps
           onSelect={handleCustomSelect}
           requestKey={activeCustomParam.request_key}
           uiSemantic={activeCustomParam.ui_semantic}
+          triggerRef={triggerButtonRef}
         />
       )}
     </div>
@@ -74,6 +77,7 @@ interface ParameterFieldProps {
   value: unknown;
   onChange: (requestKey: string, value: unknown) => void;
   onOpenCustom: (param: ParameterSchemaItem) => void;
+  overflowTriggerRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
 function getOverflowOptions(param: ParameterSchemaItem): ParameterOption[] {
@@ -133,7 +137,7 @@ export function AspectRatioIcon({ value }: { value: string }) {
   );
 }
 
-function ParameterField({ param, value, onChange, onOpenCustom }: ParameterFieldProps) {
+function ParameterField({ param, value, onChange, onOpenCustom, overflowTriggerRef }: ParameterFieldProps) {
   const {
     request_key,
     label,
@@ -193,6 +197,7 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
           })}
           {hasOverflow && (
             <button
+              ref={overflowTriggerRef}
               type="button"
               onClick={() => onOpenCustom(param)}
               className={cn(
