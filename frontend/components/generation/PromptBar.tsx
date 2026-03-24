@@ -269,7 +269,7 @@ export function PromptBar({ projectId, sceneId, groupId, className }: PromptBarP
                   type="button"
                   className={cn(
                     "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
-                    "border border-primary/30 bg-primary/10 hover:bg-primary/20 hover:border-primary/50",
+                    "border border-border bg-secondary hover:bg-secondary/80 hover:border-primary/50",
                     "transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
                   )}
                   aria-label="Добавить изображение"
