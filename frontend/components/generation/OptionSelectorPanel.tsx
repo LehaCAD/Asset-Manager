@@ -5,12 +5,14 @@ import { cn } from "@/lib/utils";
 import type { ParameterOption } from "@/lib/types";
 import { AspectRatioIcon } from "./ParametersForm";
 
+/** Common aspect ratios — used to split overflow into "Популярные" / "Расширенные" */
+const POPULAR_RATIOS = new Set(["16:9", "9:16", "1:1", "4:3", "3:4", "3:2", "2:3", "4:5", "5:4"]);
+
 interface OptionSelectorPanelProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
   options: ParameterOption[];
-  featuredOptions?: ParameterOption[];
   selectedValue: unknown;
   onSelect: (requestKey: string, value: unknown) => void;
   requestKey: string;
@@ -22,7 +24,6 @@ export function OptionSelectorPanel({
   onClose,
   title,
   options,
-  featuredOptions,
   selectedValue,
   onSelect,
   requestKey,
@@ -57,8 +58,11 @@ export function OptionSelectorPanel({
   if (!isOpen) return null;
 
   const isAspectRatio = uiSemantic === "aspect_ratio";
-  const hasFeatured = featuredOptions && featuredOptions.length > 0;
-  const showGroups = isAspectRatio && hasFeatured;
+
+  // Split overflow options into popular / extended for aspect_ratio
+  const popular = isAspectRatio ? options.filter((o) => POPULAR_RATIOS.has(String(o.value))) : [];
+  const extended = isAspectRatio ? options.filter((o) => !POPULAR_RATIOS.has(String(o.value))) : [];
+  const showGroups = isAspectRatio && popular.length > 0 && extended.length > 0;
 
   const renderOptionButton = (option: ParameterOption) => {
     const isSelected = option.value === selectedValue;
@@ -107,32 +111,28 @@ export function OptionSelectorPanel({
 
       {/* Scrollable options */}
       <div className="flex-1 overflow-y-auto p-3 scrollbar-thin space-y-4">
-        {options.length === 0 && !hasFeatured ? (
+        {options.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">
             Нет доступных опций
           </p>
         ) : showGroups ? (
           <>
-            {/* Популярные */}
             <div className="space-y-2">
               <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-1">
                 Популярные
               </h3>
               <div className="grid grid-cols-3 gap-1.5">
-                {featuredOptions!.map(renderOptionButton)}
+                {popular.map(renderOptionButton)}
               </div>
             </div>
-            {/* Расширенные */}
-            {options.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-1">
-                  Расширенные
-                </h3>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {options.map(renderOptionButton)}
-                </div>
+            <div className="space-y-2">
+              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-1">
+                Расширенные
+              </h3>
+              <div className="grid grid-cols-3 gap-1.5">
+                {extended.map(renderOptionButton)}
               </div>
-            )}
+            </div>
           </>
         ) : (
           <div className="grid grid-cols-3 gap-1.5">
