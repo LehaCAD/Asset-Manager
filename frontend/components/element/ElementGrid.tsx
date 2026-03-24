@@ -3,6 +3,7 @@
 import { useMemo, useEffect } from "react";
 import { useSceneWorkspaceStore } from "@/lib/store/scene-workspace";
 import { useDisplayStore } from "@/lib/store/project-display";
+import { useGenerationStore } from "@/lib/store/generation";
 import { ElementCard } from "@/components/element/ElementCard";
 import { ElementCardSkeleton } from "@/components/element/ElementCardSkeleton";
 import { GroupCard } from "@/components/element/GroupCard";
@@ -37,6 +38,8 @@ export function ElementGrid({ className, onRequestDelete, groups = [], onGroupCl
 
   const { preferences, hydratePreferences } = useDisplayStore();
 
+  const retryFromElement = useGenerationStore((s) => s.retryFromElement);
+
   // Hydrate display preferences on mount
   useEffect(() => {
     hydratePreferences();
@@ -55,8 +58,12 @@ export function ElementGrid({ className, onRequestDelete, groups = [], onGroupCl
       onOpenLightbox: openLightbox,
       onToggleFavorite: toggleFavorite,
       onDelete: (id: number) => onRequestDelete([id]),
+      onRetry: (id: number) => {
+        const element = getFilteredElements().find((e) => e.id === id);
+        if (element) retryFromElement(element);
+      },
     }),
-    [selectElement, openLightbox, toggleFavorite, onRequestDelete]
+    [selectElement, openLightbox, toggleFavorite, onRequestDelete, retryFromElement, getFilteredElements]
   );
 
   // Sorted groups
