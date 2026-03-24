@@ -45,11 +45,11 @@ export function OptionSelectorPanel({
 
   // Position: top-left corner at intersection of navbar bottom and config panel right edge
   const updatePosition = useCallback(() => {
-    // Find the config panel (parent with border-r) to get its right edge
+    const navbar = document.querySelector('header');
     const configPanel = triggerRef?.current?.closest('[class*="border-r"]');
-    const navbarHeight = 48; // h-12
-    const left = configPanel ? configPanel.getBoundingClientRect().right : 288;
-    setPos({ top: navbarHeight, left });
+    const top = navbar ? navbar.getBoundingClientRect().bottom : 49;
+    const left = configPanel ? configPanel.getBoundingClientRect().right : 289;
+    setPos({ top, left });
   }, [triggerRef]);
 
   useEffect(() => {
