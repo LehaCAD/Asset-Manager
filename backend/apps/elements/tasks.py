@@ -316,7 +316,7 @@ def check_generation_status(self, element_id: int) -> dict:
             applied, s3_url = finalize_generation_success(element_id=element_id, source_url=source_url)
             if applied:
                 updated_element = Element.objects.get(id=element_id)
-                notify_element_status(updated_element, 'COMPLETED', file_url=s3_url)
+                notify_element_status(updated_element, 'COMPLETED', file_url=s3_url, preview_url=updated_element.preview_url)
 
             return {
                 'element_id': element_id,
@@ -459,11 +459,13 @@ def process_uploaded_file(self, element_id: int, staging_path: str) -> dict:
 def generate_upload_thumbnail(self, element_id: int) -> dict:
     """
     Асинхронная генерация thumbnail для загруженного видео.
+    Produces both small (thumbnail_url) and medium (preview_url) sizes.
     """
     tmp_path = None
     try:
         import tempfile as _tempfile
         import os as _os
+        from apps.common.thumbnail_utils import generate_thumbnails
 
         element = Element.objects.select_related('project', 'scene').get(id=element_id)
 
@@ -480,24 +482,20 @@ def generate_upload_thumbnail(self, element_id: int) -> dict:
                     tmp.write(chunk)
             tmp_path = tmp.name
 
-        thumbnail_url = generate_video_thumbnail_from_path(
-            tmp_path,
-            project_id=element.project_id,
-            scene_id=element.scene_id,
-        )
-        if not thumbnail_url:
-            raise ValueError("Не удалось сгенерировать thumbnail для видео")
+        thumbs = generate_thumbnails(tmp_path, element.element_type, element.project_id, element.scene_id)
 
-        element.thumbnail_url = thumbnail_url
-        element.save(update_fields=['thumbnail_url', 'updated_at'])
+        element.thumbnail_url = thumbs.get('thumbnail_url') or ''
+        element.preview_url = thumbs.get('preview_url') or ''
+        element.save(update_fields=['thumbnail_url', 'preview_url', 'updated_at'])
 
         # Используем существующий websocket event для актуализации карточки
-        notify_element_status(element, 'COMPLETED', file_url=element.file_url)
+        notify_element_status(element, 'COMPLETED', file_url=element.file_url, preview_url=element.preview_url)
 
         return {
             'element_id': element_id,
             'status': 'completed',
-            'thumbnail_url': thumbnail_url,
+            'thumbnail_url': element.thumbnail_url,
+            'preview_url': element.preview_url,
         }
     except Retry:
         raise

@@ -150,22 +150,38 @@ def finalize_generation_success(element_id: int, source_url: str) -> tuple[bool,
     Returns:
         (applied, file_url) where applied=False means another worker already finalized.
     """
+    from apps.common.thumbnail_utils import generate_thumbnails
+
     element = Element.objects.select_related("project", "scene").get(id=element_id)
-    file_url, file_size = _download_and_upload_result(
-        source_url=source_url,
-        project_id=element.project_id,
-        scene_id=element.scene_id,
-    )
+
+    tmp_path = None
+    try:
+        file_url, file_size, tmp_path = _download_and_upload_result(
+            source_url=source_url,
+            project_id=element.project_id,
+            scene_id=element.scene_id,
+        )
+
+        # Generate thumbnails from temp file (before cleanup)
+        thumbs = generate_thumbnails(
+            tmp_path, element.element_type, element.project_id, element.scene_id,
+        )
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
 
     update_payload: dict[str, Any] = {
         "status": Element.STATUS_COMPLETED,
         "file_url": file_url,
         "file_size": file_size,
         "error_message": "",
+        "thumbnail_url": thumbs.get('thumbnail_url') or file_url,  # fallback to original
+        "preview_url": thumbs.get('preview_url', ''),
         "updated_at": timezone.now(),
     }
-    if element.element_type == Element.ELEMENT_TYPE_IMAGE:
-        update_payload["thumbnail_url"] = file_url
 
     updated = Element.objects.filter(
         id=element_id,
@@ -188,33 +204,29 @@ def finalize_generation_failure(element_id: int, error_message: str) -> bool:
     return updated > 0
 
 
-def _download_and_upload_result(source_url: str, project_id: int, scene_id: int) -> tuple[str, int]:
-    """Stream file from provider to temp file and upload to S3. Returns (file_url, file_size)."""
+def _download_and_upload_result(source_url: str, project_id: int, scene_id: int) -> tuple[str, int, str]:
+    """
+    Stream file from provider to temp file and upload to S3.
+
+    Returns (file_url, file_size, tmp_path).
+    Caller is responsible for deleting tmp_path after use.
+    """
     parsed_path = urlparse(source_url).path.lower()
     suffix = ".mp4" if parsed_path.endswith(".mp4") else ".jpg"
-    tmp_path = ""
-    file_size = 0
 
-    try:
-        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp_file:
-            tmp_path = tmp_file.name
-            with requests.get(source_url, timeout=120, stream=True) as response:
-                response.raise_for_status()
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        tmp_file.write(chunk)
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp_file:
+        tmp_path = tmp_file.name
+        with requests.get(source_url, timeout=120, stream=True) as response:
+            response.raise_for_status()
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    tmp_file.write(chunk)
 
-        file_size = os.path.getsize(tmp_path)
+    file_size = os.path.getsize(tmp_path)
 
-        file_url = upload_staging_to_s3(
-            staging_path=tmp_path,
-            project_id=project_id,
-            scene_id=scene_id,
-        )
-        return file_url, file_size
-    finally:
-        if tmp_path and os.path.exists(tmp_path):
-            try:
-                os.unlink(tmp_path)
-            except OSError as exc:
-                logger.warning("Не удалось удалить временный файл %s: %s", tmp_path, exc)
+    file_url = upload_staging_to_s3(
+        staging_path=tmp_path,
+        project_id=project_id,
+        scene_id=scene_id,
+    )
+    return file_url, file_size, tmp_path
