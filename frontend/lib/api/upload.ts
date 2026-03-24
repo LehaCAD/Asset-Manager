@@ -40,12 +40,10 @@ export const uploadApi = {
 
   async complete(
     elementId: number,
-    phase: "thumbnail" | "final",
-    fileSizeHint?: number
+    phase: "thumbnail" | "final"
   ): Promise<Element> {
     const res = await apiClient.post(`/api/elements/${elementId}/complete/`, {
       phase,
-      ...(fileSizeHint ? { file_size: fileSizeHint } : {}),
     });
     return res.data;
   },

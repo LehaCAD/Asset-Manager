@@ -60,7 +60,7 @@ export async function clientUploadFile(
     putToS3(presigned_urls.original, file, content_types.original, opts.signal),
   ]);
 
-  const finalElement = await uploadApi.complete(element_id, "final", file.size);
+  const finalElement = await uploadApi.complete(element_id, "final");
   return finalElement;
 }
 

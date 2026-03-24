@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { scenesApi } from "@/lib/api/scenes";
 import { elementsApi } from "@/lib/api/elements";
 import { projectsApi } from "@/lib/api/projects";
+import { clientUploadFile } from "@/lib/utils/client-upload";
 import { toast } from "sonner";
 import type {
   Scene,
@@ -42,10 +43,11 @@ function isAbortLikeError(error: unknown): boolean {
   return error.name === "CanceledError" || message.includes("aborted") || message.includes("canceled");
 }
 
-// ── Client-side video frame capture ─────────────────────────────────────
-// Extracts a single frame from a video File using a hidden <video> + canvas.
-// Returns a small data-URL JPEG (~320px max side). The temporary video element
-// and its blob URL are cleaned up immediately; nothing stays in the DOM.
+/**
+ * Quick video frame capture for optimistic preview (data URL, 320px).
+ * Separate from client-resize.ts which produces upload-ready JPEG blobs (256px + 800px).
+ * This runs instantly when files are queued; client-resize runs during actual upload.
+ */
 function captureVideoFrame(file: File): Promise<string> {
   return new Promise((resolve) => {
     if (typeof document === "undefined") {
@@ -134,14 +136,29 @@ async function processUploadQueue() {
 
     try {
       let element;
-      if (item.sceneId > 0) {
-        element = await scenesApi.upload(item.sceneId, item.file, {
-          signal: controller.signal,
-        });
-      } else {
-        element = await projectsApi.uploadToProject(item.projectId, item.file, {
-          signal: controller.signal,
-        });
+      try {
+        // New presigned upload flow
+        element = await clientUploadFile(
+          item.file,
+          {
+            sceneId: item.sceneId > 0 ? item.sceneId : undefined,
+            projectId: item.projectId,
+            signal: controller.signal,
+          },
+          (thumbElement) => {
+            // Replace optimistic element as soon as thumbnail is ready
+            useSceneWorkspaceStore.getState()._replaceOptimistic(item.tempId, thumbElement);
+          },
+        );
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          throw error; // Don't fallback on cancel
+        }
+        // Fallback to old FormData flow
+        console.warn("Client upload failed, falling back to server upload:", error);
+        element = item.sceneId > 0
+          ? await scenesApi.upload(item.sceneId, item.file, { signal: controller.signal })
+          : await projectsApi.uploadToProject(item.projectId, item.file, { signal: controller.signal });
       }
       useSceneWorkspaceStore.getState()._replaceOptimistic(item.tempId, element);
       // Blob URL revocation is handled by the store (updateElement/removeElement)
