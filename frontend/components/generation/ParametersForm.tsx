@@ -42,7 +42,7 @@ export function ParametersForm({ schema, values, onChange }: ParametersFormProps
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-5">
       {visibleSchema.map((param) => (
         <ParameterField
           key={param.request_key}
@@ -171,7 +171,7 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
 
     return (
       <div>
-        <label className="text-sm font-medium block mb-4">{label}</label>
+        <label className="text-sm font-medium block mb-2">{label}</label>
         <div className={containerClass}>
           {featuredOptions.map((opt) => {
             const isSelected = currentValue === opt.value;
@@ -214,7 +214,7 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
 
     return (
       <div>
-        <label className="text-sm font-medium block mb-4">{label}</label>
+        <label className="text-sm font-medium block mb-2">{label}</label>
         <Select
           value={
             currentValue === undefined || currentValue === null
