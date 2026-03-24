@@ -80,15 +80,27 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
   const hasPromptChanged = promptText !== (element.prompt_text ?? "");
   const isGenerated = element.source_type === "GENERATED" || element.source_type === "IMG2VID";
 
-  // Build label map from model's parameters_schema
-  const labelMap = useMemo(() => {
+  // Build label + value label maps from model's parameters_schema
+  const { labelMap, valueLabelMap } = useMemo(() => {
     const model = availableModels.find((m) => m.id === element.ai_model);
-    if (!model?.parameters_schema) return {};
-    const map: Record<string, string> = {};
+    if (!model?.parameters_schema) return { labelMap: {}, valueLabelMap: {} };
+    const lMap: Record<string, string> = {};
+    const vMap: Record<string, Record<string, string>> = {};
     for (const param of model.parameters_schema) {
-      map[param.request_key] = param.label;
+      lMap[param.request_key] = param.label;
+      const allOptions = [
+        ...(param.options ?? []),
+        ...(param.featured_options ?? []),
+        ...(param.overflow_options ?? []),
+      ];
+      if (allOptions.length > 0) {
+        vMap[param.request_key] = {};
+        for (const opt of allOptions) {
+          vMap[param.request_key][String(opt.value)] = opt.label;
+        }
+      }
     }
-    return map;
+    return { labelMap: lMap, valueLabelMap: vMap };
   }, [availableModels, element.ai_model]);
 
   // Filter generation_config to user-visible params
@@ -101,7 +113,12 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
         if (Array.isArray(value)) return false;
         return true;
       })
-      .map(([key, value]) => ({ key, label: labelMap[key] || key, value: String(value) }));
+      .map(([key, value]) => {
+        const raw = String(value);
+        const displayValue = valueLabelMap[key]?.[raw]
+          ?? (raw === "true" ? "Да" : raw === "false" ? "Нет" : raw);
+        return { key, label: labelMap[key] || key, value: displayValue };
+      });
   }, [element.generation_config, isGenerated, labelMap]);
 
   // Cost from generation_config
