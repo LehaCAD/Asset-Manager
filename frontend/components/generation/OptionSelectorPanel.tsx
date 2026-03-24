@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import type { ParameterOption } from "@/lib/types";
+import { AspectRatioIcon } from "./ParametersForm";
 
 interface OptionSelectorPanelProps {
   isOpen: boolean;
@@ -12,6 +13,7 @@ interface OptionSelectorPanelProps {
   selectedValue: unknown;
   onSelect: (requestKey: string, value: unknown) => void;
   requestKey: string;
+  uiSemantic?: string;
 }
 
 export function OptionSelectorPanel({
@@ -22,6 +24,7 @@ export function OptionSelectorPanel({
   selectedValue,
   onSelect,
   requestKey,
+  uiSemantic,
 }: OptionSelectorPanelProps) {
   const handleSelect = (value: unknown) => {
     onSelect(requestKey, value);
@@ -92,11 +95,15 @@ export function OptionSelectorPanel({
                   className={cn(
                     "flex flex-col items-center justify-center gap-1 p-3 rounded-md text-center transition-all duration-150",
                     "border",
+                    uiSemantic === "aspect_ratio" && "h-[72px]",
                     isSelected
                       ? "bg-primary text-primary-foreground border-primary shadow-sm"
                       : "bg-card border-border text-muted-foreground hover:text-foreground hover:border-primary/40"
                   )}
                 >
+                  {uiSemantic === "aspect_ratio" && (
+                    <AspectRatioIcon value={String(option.value)} />
+                  )}
                   <span className="text-xs font-medium">{option.label}</span>
                 </button>
               );

@@ -62,6 +62,7 @@ export function ParametersForm({ schema, values, onChange }: ParametersFormProps
           selectedValue={values[activeCustomParam.request_key]}
           onSelect={handleCustomSelect}
           requestKey={activeCustomParam.request_key}
+          uiSemantic={activeCustomParam.ui_semantic}
         />
       )}
     </div>
@@ -111,6 +112,27 @@ function getEffectiveControl(param: ParameterSchemaItem): string {
   }
 }
 
+/** Proportional rectangle outline for aspect ratio buttons. Border only, no fill. */
+export function AspectRatioIcon({ value }: { value: string }) {
+  const parts = value.split(":");
+  if (parts.length !== 2) return null;
+  const w = parseInt(parts[0], 10);
+  const h = parseInt(parts[1], 10);
+  if (!w || !h) return null;
+
+  const maxSize = 24;
+  const ratio = w / h;
+  const width = Math.max(ratio >= 1 ? maxSize : Math.round(maxSize * ratio), 6);
+  const height = Math.max(ratio <= 1 ? maxSize : Math.round(maxSize / ratio), 4);
+
+  return (
+    <span
+      className="inline-block rounded-[2px] border-[1.5px] border-current"
+      style={{ width: `${width}px`, height: `${height}px` }}
+    />
+  );
+}
+
 function ParameterField({ param, value, onChange, onOpenCustom }: ParameterFieldProps) {
   const {
     request_key,
@@ -129,11 +151,12 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
     const overflowOptions = getOverflowOptions(param);
     const hasOverflow = (show_other_button ?? false) && overflowOptions.length > 0;
     const selectedOverflowOption = overflowOptions.find((opt) => opt.value === currentValue);
+    const isAspectRatio = param.ui_semantic === "aspect_ratio";
 
     return (
       <div className="space-y-2">
         <label className="text-sm font-medium">{label}</label>
-        <div className="flex flex-wrap gap-1.5">
+        <div className={isAspectRatio ? "grid grid-cols-3 gap-2" : "flex flex-wrap gap-1.5"}>
           {featuredOptions.map((opt) => {
             const isSelected = currentValue === opt.value;
             return (
@@ -142,13 +165,16 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
                 type="button"
                 onClick={() => onChange(request_key, opt.value)}
                 className={cn(
-                  "h-9 px-3 rounded-md text-xs font-medium transition-all duration-150",
-                  "border",
+                  "rounded-md text-xs font-medium transition-all duration-150 border",
+                  isAspectRatio
+                    ? "flex flex-col items-center justify-center gap-1 h-[72px]"
+                    : "h-9 px-3",
                   isSelected
                     ? "bg-primary text-primary-foreground border-primary shadow-sm"
                     : "bg-card border-border text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-card/80"
                 )}
               >
+                {isAspectRatio && <AspectRatioIcon value={String(opt.value)} />}
                 {opt.label}
               </button>
             );
@@ -158,14 +184,16 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
               type="button"
               onClick={() => onOpenCustom(param)}
               className={cn(
-                "h-9 px-3 rounded-md text-xs font-medium transition-all duration-150",
-                "border",
+                "rounded-md text-xs font-medium transition-all duration-150 border",
+                isAspectRatio
+                  ? "flex flex-col items-center justify-center gap-1 h-[72px]"
+                  : "h-9 px-3",
                 selectedOverflowOption
                   ? "bg-primary text-primary-foreground border-primary shadow-sm"
                   : "bg-card border-border text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-card/80"
               )}
             >
-              {selectedOverflowOption?.label ?? "Другое"}
+              {selectedOverflowOption?.label ?? (isAspectRatio ? "Расширенные" : "Другое")}
             </button>
           )}
         </div>
