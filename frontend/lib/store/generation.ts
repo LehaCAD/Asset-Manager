@@ -375,14 +375,18 @@ export const useGenerationStore = create<GenerationState>()((set, get) => ({
       useCreditsStore.getState().loadBalance();
       return result;
     } catch (error) {
-      // Request-level fail: discard optimistic item and show error
-      useSceneWorkspaceStore.getState().discardOptimisticGeneration(optimisticId);
+      // Request-level fail: keep optimistic card as FAILED instead of discarding
+      const errorMsg = error instanceof Error ? error.message : "Не удалось запустить генерацию";
+      useSceneWorkspaceStore.getState().updateElement(optimisticId, {
+        status: "FAILED" as const,
+        error_message: errorMsg,
+        ai_model_name: get().selectedModel?.name ?? "",
+      });
 
       const result: GenerationSubmitResult = {
         ok: false,
         state: "rejected",
-        errorMessage:
-          error instanceof Error ? error.message : "Не удалось запустить генерацию",
+        errorMessage: errorMsg,
         optimisticId,
       };
       set({
