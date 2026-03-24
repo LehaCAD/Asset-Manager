@@ -7,6 +7,7 @@ import { useSceneWorkspaceStore } from "@/lib/store/scene-workspace";
 import { useCreditsStore } from "@/lib/store/credits";
 import type {
   AIModel,
+  Element,
   GeneratePayload,
   GenerationSubmitResult,
   GenerationSubmitState,
@@ -58,6 +59,7 @@ interface GenerationState {
   generate: (projectId: number, groupId?: number) => Promise<GenerationSubmitResult>;
   canGenerate: () => boolean;
   clearSubmitResult: () => void;
+  retryFromElement: (element: Element) => void;
 
   // Internal
   _requestEstimate: () => void;
@@ -449,6 +451,38 @@ export const useGenerationStore = create<GenerationState>()((set, get) => ({
       submitState: "idle",
       lastSubmitResult: null,
     });
+  },
+
+  retryFromElement: (element) => {
+    if (get().isGenerating) {
+      toast.error("Генерация уже выполняется");
+      return;
+    }
+
+    const model = get().availableModels.find((m) => m.id === element.ai_model);
+    if (!model) {
+      toast.error("Модель недоступна");
+      return;
+    }
+
+    get().selectModel(model);
+    get().setPrompt(element.prompt_text ?? "");
+
+    // Restore parameters, skip internal keys and URL values
+    if (element.generation_config) {
+      for (const [key, value] of Object.entries(element.generation_config)) {
+        if (key.startsWith("_")) continue;
+        if (typeof value === "string" && value.startsWith("http")) continue;
+        if (Array.isArray(value) && value.every((v) => typeof v === "string" && v.startsWith("http"))) continue;
+        get().setParameter(key, value);
+      }
+    }
+
+    // Close lightbox if open
+    const { closeLightbox, lightboxOpen } = useSceneWorkspaceStore.getState();
+    if (lightboxOpen) closeLightbox();
+
+    toast.success("Параметры загружены");
   },
 
   toggleConfigPanel: () =>
