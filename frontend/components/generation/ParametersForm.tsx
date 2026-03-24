@@ -159,18 +159,18 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
       ? "grid grid-cols-4 gap-1.5"
       : "flex flex-wrap gap-1.5";
 
-    // Sizing: aspect_ratio → square-ish with icon, resolution → medium pills, others → compact pills
+    // Sizing: aspect_ratio → tall with icon, resolution → medium pills, others → compact pills
     const buttonSizeClass = isAspectRatio
-      ? "flex flex-col items-center justify-center gap-0.5 h-11"
+      ? "flex flex-col items-center justify-center gap-1 h-14"
       : isResolution
-        ? "h-8 px-4"
-        : "h-7 px-2";
+        ? "h-9 px-5"
+        : "h-8 px-3";
 
     const selectedClass = "bg-primary/15 text-primary border-primary/50";
     const unselectedClass = "bg-card/50 border-border text-muted-foreground hover:text-foreground hover:border-primary/30";
 
     return (
-      <div className="space-y-2.5">
+      <div className="space-y-3">
         <label className="text-sm font-medium">{label}</label>
         <div className={containerClass}>
           {featuredOptions.map((opt) => {
@@ -187,7 +187,7 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
                 )}
               >
                 {isAspectRatio && <AspectRatioIcon value={String(opt.value)} />}
-                <span className={isAspectRatio ? "text-[10px]" : ""}>{opt.label}</span>
+                <span className={isAspectRatio ? "text-[11px]" : ""}>{opt.label}</span>
               </button>
             );
           })}
@@ -201,7 +201,7 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
                 selectedOverflowOption ? selectedClass : unselectedClass,
               )}
             >
-              <span className={isAspectRatio ? "text-[10px]" : ""}>{selectedOverflowOption?.label ?? "Другое"}</span>
+              <span className={isAspectRatio ? "text-[11px]" : ""}>{selectedOverflowOption?.label ?? "Другое"}</span>
             </button>
           )}
         </div>
@@ -213,7 +213,7 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
     const currentValue = value as string | number | undefined;
 
     return (
-      <div className="space-y-2">
+      <div className="space-y-3">
         <label className="text-sm font-medium">{label}</label>
         <Select
           value={
