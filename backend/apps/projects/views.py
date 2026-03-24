@@ -107,7 +107,6 @@ class ProjectViewSet(viewsets.ModelViewSet):
         from apps.scenes.s3_utils import validate_file_type, detect_element_type
 
         filename = request.data.get('filename', '')
-        file_size = request.data.get('file_size', 0)
 
         if not validate_file_type(filename):
             return Response(

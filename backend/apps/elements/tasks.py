@@ -12,12 +12,9 @@ from .services import substitute_variables, collect_unresolved_placeholders, bui
 import os
 from decimal import Decimal
 
-from apps.scenes.s3_utils import (
-    generate_video_thumbnail_from_path,
-    upload_staging_to_s3,
-)
+from apps.scenes.s3_utils import upload_staging_to_s3
+from apps.common.thumbnail_utils import generate_thumbnails
 from apps.common.generation import (
-    extract_result_url,
     finalize_generation_failure,
     finalize_generation_success,
     is_public_callback_url,
@@ -81,31 +78,6 @@ def test_task(message: str) -> str:
     
     return result
 
-
-@shared_task
-def example_async_task(name: str, count: int = 1) -> dict:
-    """
-    Пример асинхронной задачи с параметрами.
-    
-    Args:
-        name: Имя для обработки
-        count: Количество повторений
-    
-    Returns:
-        Результат обработки
-    """
-    results = []
-    
-    for i in range(count):
-        time.sleep(1)
-        results.append(f"{name} - iteration {i + 1}")
-    
-    return {
-        'name': name,
-        'count': count,
-        'results': results,
-        'status': 'completed'
-    }
 
 
 @shared_task(bind=True, max_retries=3)
@@ -413,19 +385,10 @@ def process_uploaded_file(self, element_id: int, staging_path: str) -> dict:
         element.file_size = file_size
         element.status = Element.STATUS_COMPLETED
 
-        if element.element_type == Element.ELEMENT_TYPE_IMAGE:
-            element.thumbnail_url = file_url
-            element.save(update_fields=['file_url', 'file_size', 'thumbnail_url', 'status', 'updated_at'])
-        elif element.element_type == Element.ELEMENT_TYPE_VIDEO:
-            thumbnail_url = generate_video_thumbnail_from_path(
-                staging_path,
-                project_id=element.project_id,
-                scene_id=element.scene_id,
-            )
-            element.thumbnail_url = thumbnail_url or ''
-            element.save(update_fields=['file_url', 'file_size', 'thumbnail_url', 'status', 'updated_at'])
-        else:
-            element.save(update_fields=['file_url', 'file_size', 'status', 'updated_at'])
+        thumbs = generate_thumbnails(staging_path, element.element_type, element.project_id, element.scene_id)
+        element.thumbnail_url = thumbs.get('thumbnail_url') or file_url
+        element.preview_url = thumbs.get('preview_url') or ''
+        element.save(update_fields=['file_url', 'file_size', 'thumbnail_url', 'preview_url', 'status', 'updated_at'])
 
         notify_element_status(element, 'COMPLETED', file_url=file_url)
 
@@ -454,66 +417,6 @@ def process_uploaded_file(self, element_id: int, staging_path: str) -> dict:
         except Exception:
             pass
 
-
-@shared_task(bind=True, max_retries=3)
-def generate_upload_thumbnail(self, element_id: int) -> dict:
-    """
-    Асинхронная генерация thumbnail для загруженного видео.
-    Produces both small (thumbnail_url) and medium (preview_url) sizes.
-    """
-    tmp_path = None
-    try:
-        import tempfile as _tempfile
-        import os as _os
-        from apps.common.thumbnail_utils import generate_thumbnails
-
-        element = Element.objects.select_related('project', 'scene').get(id=element_id)
-
-        if element.element_type != Element.ELEMENT_TYPE_VIDEO:
-            return {'element_id': element_id, 'status': 'skipped', 'reason': 'not_video'}
-
-        if not element.file_url:
-            raise ValueError("У элемента отсутствует file_url для генерации превью")
-
-        with _tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
-            with requests.get(element.file_url, timeout=120, stream=True) as r:
-                r.raise_for_status()
-                for chunk in r.iter_content(chunk_size=8192):
-                    tmp.write(chunk)
-            tmp_path = tmp.name
-
-        thumbs = generate_thumbnails(tmp_path, element.element_type, element.project_id, element.scene_id)
-
-        element.thumbnail_url = thumbs.get('thumbnail_url') or ''
-        element.preview_url = thumbs.get('preview_url') or ''
-        element.save(update_fields=['thumbnail_url', 'preview_url', 'updated_at'])
-
-        # Используем существующий websocket event для актуализации карточки
-        notify_element_status(element, 'COMPLETED', file_url=element.file_url, preview_url=element.preview_url)
-
-        return {
-            'element_id': element_id,
-            'status': 'completed',
-            'thumbnail_url': element.thumbnail_url,
-            'preview_url': element.preview_url,
-        }
-    except Retry:
-        raise
-    except Exception as e:
-        logger.exception("Ошибка генерации thumbnail для Element #%s: %s", element_id, e)
-        if isinstance(e, (requests.RequestException, requests.Timeout)):
-            raise self.retry(exc=e, countdown=30)
-        return {
-            'element_id': element_id,
-            'status': 'failed',
-            'error': str(e),
-        }
-    finally:
-        try:
-            if tmp_path and _os.path.exists(tmp_path):
-                _os.unlink(tmp_path)
-        except Exception:
-            pass
 
 
 def _refund_for_failure(element: Element, reason: str = "provider_error") -> None:

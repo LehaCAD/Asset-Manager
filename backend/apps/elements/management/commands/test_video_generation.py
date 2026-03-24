@@ -9,7 +9,6 @@ from apps.scenes.models import Scene
 from apps.elements.models import Element
 from apps.ai_providers.models import AIModel
 from apps.elements.tasks import start_generation
-from apps.scenes.s3_utils import upload_file_to_s3
 
 User = get_user_model()
 
