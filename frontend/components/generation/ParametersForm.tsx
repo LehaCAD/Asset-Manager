@@ -159,18 +159,18 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
       ? "grid grid-cols-4 gap-1.5"
       : "flex flex-wrap gap-1.5";
 
-    // Sizing: aspect_ratio → tall with icon, resolution → medium pills, others → compact pills
+    // Sizing: aspect_ratio → tall with icon, all pills → same h-8, differ by padding
     const buttonSizeClass = isAspectRatio
       ? "flex flex-col items-center justify-center gap-1 h-14"
       : isResolution
-        ? "h-9 px-5"
+        ? "h-8 px-5"
         : "h-8 px-3";
 
     const selectedClass = "bg-primary/15 text-primary border-primary/50";
     const unselectedClass = "bg-card/50 border-border text-muted-foreground hover:text-foreground hover:border-primary/30";
 
     return (
-      <div className="space-y-3">
+      <div className="space-y-4">
         <label className="text-sm font-medium">{label}</label>
         <div className={containerClass}>
           {featuredOptions.map((opt) => {
@@ -213,7 +213,7 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
     const currentValue = value as string | number | undefined;
 
     return (
-      <div className="space-y-3">
+      <div className="space-y-4">
         <label className="text-sm font-medium">{label}</label>
         <Select
           value={
