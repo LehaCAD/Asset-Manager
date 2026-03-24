@@ -249,9 +249,9 @@ export function PromptBar({ projectId, sceneId, groupId, className }: PromptBarP
     <div className={cn("p-4", className)}>
       <div
         className={cn(
-          "relative flex items-start gap-3 rounded-xl border border-border/30 bg-card p-3 px-4",
+          "relative flex items-start gap-3 rounded-xl bg-card p-3 px-4",
           "shadow-lg shadow-black/20",
-          "transition-shadow focus-within:border-primary/40 focus-within:shadow-primary/10"
+          "transition-shadow focus-within:shadow-primary/10"
         )}
       >
           {/* Add-кнопка */}
@@ -284,7 +284,7 @@ export function PromptBar({ projectId, sceneId, groupId, className }: PromptBarP
                 onClick={() => handleOpenSelector(imageInputs[0].key)}
                 className={cn(
                   "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
-                  "border border-border/20 bg-muted/30 hover:bg-muted/50 hover:border-border/40",
+                  "border border-border bg-secondary hover:bg-secondary/80 hover:border-primary/50",
                   "transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40"
                 )}
                 aria-label="Добавить изображение"
@@ -297,8 +297,8 @@ export function PromptBar({ projectId, sceneId, groupId, className }: PromptBarP
                   <button
                     type="button"
                     className={cn(
-                      "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border",
-                      "border-dashed border-border/50 bg-transparent hover:bg-muted/20 hover:border-primary/40",
+                      "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
+                      "border border-border bg-secondary hover:bg-secondary/80 hover:border-primary/50",
                       "transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40"
                     )}
                     aria-label="Добавить изображение"
