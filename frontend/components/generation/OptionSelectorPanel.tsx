@@ -43,11 +43,13 @@ export function OptionSelectorPanel({
   const panelRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ top: 0, left: 0 });
 
-  // Calculate position from trigger button
+  // Position: top-left corner at intersection of navbar bottom and config panel right edge
   const updatePosition = useCallback(() => {
-    if (!triggerRef?.current) return;
-    const rect = triggerRef.current.getBoundingClientRect();
-    setPos({ top: rect.top, left: rect.right + 8 });
+    // Find the config panel (parent with border-r) to get its right edge
+    const configPanel = triggerRef?.current?.closest('[class*="border-r"]');
+    const navbarHeight = 48; // h-12
+    const left = configPanel ? configPanel.getBoundingClientRect().right : 288;
+    setPos({ top: navbarHeight, left });
   }, [triggerRef]);
 
   useEffect(() => {
