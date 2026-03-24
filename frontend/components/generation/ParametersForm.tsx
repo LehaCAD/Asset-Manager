@@ -181,7 +181,7 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
                 type="button"
                 onClick={() => onChange(request_key, opt.value)}
                 className={cn(
-                  "rounded-md text-xs font-medium transition-all duration-150 border",
+                  "rounded-md text-xs font-normal transition-all duration-150 border",
                   buttonSizeClass,
                   isSelected ? selectedClass : unselectedClass,
                 )}
@@ -196,7 +196,7 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
               type="button"
               onClick={() => onOpenCustom(param)}
               className={cn(
-                "rounded-md text-xs font-medium transition-all duration-150 border",
+                "rounded-md text-xs font-normal transition-all duration-150 border",
                 buttonSizeClass,
                 selectedOverflowOption ? selectedClass : unselectedClass,
               )}

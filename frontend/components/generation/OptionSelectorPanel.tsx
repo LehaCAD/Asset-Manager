@@ -82,7 +82,7 @@ export function OptionSelectorPanel({
         {isAspectRatio && (
           <AspectRatioIcon value={String(option.value)} />
         )}
-        <span className="text-xs font-medium">{option.label}</span>
+        <span className="text-xs font-normal">{option.label}</span>
       </button>
     );
   };
