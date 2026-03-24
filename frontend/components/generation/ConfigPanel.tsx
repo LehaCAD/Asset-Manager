@@ -63,13 +63,13 @@ export function ConfigPanel({ className }: ConfigPanelProps) {
   return (
     <div
       className={cn(
-        "relative flex flex-col border-r bg-background transition-all duration-200 h-full",
+        "relative flex flex-col border-r bg-surface transition-all duration-200 h-full",
         configPanelOpen ? "w-72" : "w-12",
         className
       )}
     >
       {configPanelOpen && (
-        <div className="flex flex-1 flex-col gap-4 p-4 overflow-y-auto">
+        <div className="flex flex-1 flex-col gap-0 p-4 overflow-y-auto">
           {/* Model selector trigger - header with collapse button */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -88,7 +88,7 @@ export function ConfigPanel({ className }: ConfigPanelProps) {
               onClick={handleModelClick}
               className={cn(
                 "w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors",
-                "bg-muted/50 hover:bg-muted border-0",
+                "bg-card hover:bg-card/80 border border-border",
                 modelSelectorOpen && "ring-2 ring-primary bg-primary/5"
               )}
             >
@@ -116,21 +116,21 @@ export function ConfigPanel({ className }: ConfigPanelProps) {
             </button>
           </div>
 
-          {/* Parameters form - card style */}
+          {/* Parameters form */}
           {hasParameters && (
-            <div className="bg-muted/30 rounded-lg p-3 space-y-4">
-              <h3 className="text-sm font-medium px-1">Параметры</h3>
+            <>
+              <div className="h-px bg-border my-3" />
               <ParametersForm
                 schema={selectedModel?.parameters_schema ?? []}
                 values={parameters}
                 onChange={setParameter}
               />
-            </div>
+            </>
           )}
-          
+
           {/* Стоимость генерации */}
           {selectedModel && (
-            <div className="rounded-lg p-3 space-y-2">
+            <div className="space-y-2 pt-3 mt-3 border-t border-border">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Стоимость</span>
                 {isEstimateLoading ? (

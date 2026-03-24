@@ -42,15 +42,17 @@ export function ParametersForm({ schema, values, onChange }: ParametersFormProps
   };
 
   return (
-    <div className="space-y-4">
-      {visibleSchema.map((param) => (
-        <ParameterField
-          key={param.request_key}
-          param={param}
-          value={values[param.request_key]}
-          onChange={onChange}
-          onOpenCustom={handleOpenCustom}
-        />
+    <div className="space-y-0">
+      {visibleSchema.map((param, index) => (
+        <div key={param.request_key}>
+          {index > 0 && <div className="h-px bg-border my-2.5" />}
+          <ParameterField
+            param={param}
+            value={values[param.request_key]}
+            onChange={onChange}
+            onOpenCustom={handleOpenCustom}
+          />
+        </div>
       ))}
 
       {activeCustomParam && (
@@ -154,9 +156,9 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
     const isAspectRatio = param.ui_semantic === "aspect_ratio";
 
     return (
-      <div className="space-y-2">
-        <label className="text-sm font-medium">{label}</label>
-        <div className={isAspectRatio ? "grid grid-cols-3 gap-2" : "flex flex-wrap gap-1.5"}>
+      <div className="space-y-1.5">
+        <label className="text-xs font-semibold text-foreground">{label}</label>
+        <div className={isAspectRatio ? "grid grid-cols-3 gap-1.5" : "flex flex-wrap gap-1.5"}>
           {featuredOptions.map((opt) => {
             const isSelected = currentValue === opt.value;
             return (
@@ -167,15 +169,15 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
                 className={cn(
                   "rounded-md text-xs font-medium transition-all duration-150 border",
                   isAspectRatio
-                    ? "flex flex-col items-center justify-center gap-1 h-[52px]"
-                    : "h-8 px-3",
+                    ? "flex flex-col items-center justify-center gap-0.5 h-[48px]"
+                    : "h-7 px-2.5",
                   isSelected
-                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                    : "bg-card border-border text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-card/80"
+                    ? "bg-primary/15 text-primary border-primary/50"
+                    : "bg-card/50 border-border text-muted-foreground hover:text-foreground hover:border-primary/30"
                 )}
               >
                 {isAspectRatio && <AspectRatioIcon value={String(opt.value)} />}
-                {opt.label}
+                <span className={isAspectRatio ? "text-[10px]" : ""}>{opt.label}</span>
               </button>
             );
           })}
@@ -186,14 +188,14 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
               className={cn(
                 "rounded-md text-xs font-medium transition-all duration-150 border",
                 isAspectRatio
-                  ? "flex flex-col items-center justify-center gap-1 h-[52px]"
-                  : "h-8 px-3",
+                  ? "flex flex-col items-center justify-center gap-0.5 h-[48px]"
+                  : "h-7 px-2.5",
                 selectedOverflowOption
-                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                  : "bg-card border-border text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-card/80"
+                  ? "bg-primary/15 text-primary border-primary/50"
+                  : "bg-card/50 border-border text-muted-foreground hover:text-foreground hover:border-primary/30"
               )}
             >
-              {selectedOverflowOption?.label ?? "Другое"}
+              <span className={isAspectRatio ? "text-[10px]" : ""}>{selectedOverflowOption?.label ?? "Другое"}</span>
             </button>
           )}
         </div>
@@ -205,8 +207,8 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
     const currentValue = value as string | number | undefined;
 
     return (
-      <div className="space-y-2">
-        <label className="text-sm font-medium">{label}</label>
+      <div className="space-y-1.5">
+        <label className="text-xs font-semibold text-foreground">{label}</label>
         <Select
           value={
             currentValue === undefined || currentValue === null
@@ -237,8 +239,8 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
     const boolValue = value as boolean | undefined;
 
     return (
-      <div className="flex items-center justify-between py-1">
-        <label className="text-sm font-medium">{label}</label>
+      <div className="flex items-center justify-between py-0.5">
+        <label className="text-xs font-semibold text-foreground">{label}</label>
         <Switch
           checked={boolValue ?? false}
           onCheckedChange={(checked) => onChange(request_key, checked)}
