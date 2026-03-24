@@ -20,6 +20,8 @@ import {
   Image,
   Play,
   FilterX,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 import type { Element, ElementFilter } from "@/lib/types";
 
@@ -268,30 +270,59 @@ export function LightboxModal({
               </div>
             ) : currentElement ? (
               <>
-                {/* Media - positioned by browser */}
-                {isVideo ? (
-                  <video
-                    ref={mediaRef as React.RefObject<HTMLVideoElement>}
-                    src={currentElement.file_url}
-                    controls
-                    autoPlay
-                    muted
-                    playsInline
-                    onLoadedMetadata={updateBounds}
-                    className="max-w-full max-h-full object-contain rounded-lg"
-                  />
+                {/* Media or status placeholder */}
+                {currentElement.status === "COMPLETED" && hasFileUrl ? (
+                  // Completed — show media
+                  isVideo ? (
+                    <video
+                      ref={mediaRef as React.RefObject<HTMLVideoElement>}
+                      src={currentElement.file_url}
+                      controls
+                      autoPlay
+                      muted
+                      playsInline
+                      onLoadedMetadata={updateBounds}
+                      className="max-w-full max-h-full object-contain rounded-lg"
+                    />
+                  ) : (
+                    <img
+                      ref={mediaRef as React.RefObject<HTMLImageElement>}
+                      src={currentElement.file_url}
+                      alt=""
+                      onLoad={updateBounds}
+                      className="max-w-full max-h-full object-contain rounded-lg"
+                    />
+                  )
+                ) : currentElement.status === "PENDING" || currentElement.status === "PROCESSING" ? (
+                  // In progress — placeholder
+                  <div className="flex flex-col items-center justify-center text-muted-foreground gap-3">
+                    <Loader2 className="h-12 w-12 animate-spin opacity-60" />
+                    <p className="text-sm font-medium">
+                      {currentElement.status === "PENDING" ? "Ожидание генерации..." : "Генерация видео..."}
+                    </p>
+                    {currentElement.ai_model_name && (
+                      <p className="text-xs text-muted-foreground/60">{currentElement.ai_model_name}</p>
+                    )}
+                  </div>
+                ) : currentElement.status === "FAILED" ? (
+                  // Failed — error placeholder
+                  <div className="flex flex-col items-center justify-center text-destructive gap-3">
+                    <AlertCircle className="h-12 w-12 opacity-60" />
+                    <p className="text-sm font-medium">Ошибка генерации</p>
+                    {currentElement.error_message && (
+                      <p className="text-xs text-muted-foreground max-w-md text-center">{currentElement.error_message}</p>
+                    )}
+                  </div>
                 ) : (
-                  <img
-                    ref={mediaRef as React.RefObject<HTMLImageElement>}
-                    src={currentElement.file_url}
-                    alt=""
-                    onLoad={updateBounds}
-                    className="max-w-full max-h-full object-contain rounded-lg"
-                  />
+                  // Completed but no file
+                  <div className="flex flex-col items-center justify-center text-muted-foreground gap-2">
+                    {isVideo ? <Video className="h-12 w-12 opacity-40" /> : <Image className="h-12 w-12 opacity-40" />}
+                    <p className="text-sm">Файл недоступен</p>
+                  </div>
                 )}
 
                 {/* Icons positioned relative to actual media bounds */}
-                {bounds.width > 0 && (
+                {bounds.width > 0 && currentElement.status === "COMPLETED" && hasFileUrl && (
                   <div
                     className="absolute pointer-events-none"
                     style={{
@@ -304,7 +335,7 @@ export function LightboxModal({
                     {/* Type and favorite icons - top right, like ElementCard */}
                     <div className="absolute top-2 right-2 flex items-center gap-1">
                       {/* Type icon */}
-                      <div className="rounded-full bg-black/60 text-white p-1.5">
+                      <div className="rounded-full bg-overlay-medium text-overlay-text p-1.5">
                         {isVideo ? (
                           <Video className="w-3.5 h-3.5" />
                         ) : (
@@ -320,14 +351,14 @@ export function LightboxModal({
                           e.stopPropagation();
                           if (currentElement) onToggleFavorite(currentElement.id);
                         }}
-                        className="rounded-full bg-black/60 p-1.5 hover:bg-black/80 transition-colors cursor-pointer pointer-events-auto focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                        className="rounded-full bg-overlay-medium p-1.5 hover:bg-overlay-heavy transition-colors cursor-pointer pointer-events-auto focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
                       >
                         <Star
                           className={cn(
                             "w-3.5 h-3.5",
                             isFavorite
-                              ? "text-yellow-400 fill-current"
-                              : "text-white/70"
+                              ? "text-favorite fill-current"
+                              : "text-overlay-text-muted"
                           )}
                         />
                       </button>
@@ -336,8 +367,8 @@ export function LightboxModal({
                     {/* Play button for video - center */}
                     {isVideo && (
                       <div className="absolute inset-0 flex items-center justify-center pointer-events-auto">
-                        <div className="rounded-full bg-black/40 p-4 hover:bg-black/60 transition-colors">
-                          <Play className="w-10 h-10 text-white fill-white" />
+                        <div className="rounded-full bg-overlay p-4 hover:bg-overlay-medium transition-colors">
+                          <Play className="w-10 h-10 text-overlay-text fill-current" />
                         </div>
                       </div>
                     )}

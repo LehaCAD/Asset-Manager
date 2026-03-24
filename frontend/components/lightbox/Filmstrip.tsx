@@ -69,26 +69,26 @@ export function Filmstrip({ elements, currentElementId, onSelect }: FilmstripPro
               {/* Type and favorite icons - top right, like ElementCard */}
               <div className="absolute top-1 right-1 flex items-center gap-0.5">
                 {/* Type icon */}
-                <div className="rounded-full bg-black/60 p-0.5">
+                <div className="rounded-full bg-overlay-medium p-0.5">
                   {isVideo ? (
-                    <Video className="w-2.5 h-2.5 text-white" />
+                    <Video className="w-2.5 h-2.5 text-overlay-text" />
                   ) : (
-                    <Image className="w-2.5 h-2.5 text-white" />
+                    <Image className="w-2.5 h-2.5 text-overlay-text" />
                   )}
                 </div>
 
                 {/* Favorite icon */}
                 {el.is_favorite && (
-                  <div className="rounded-full bg-black/60 p-0.5">
-                    <Star className="w-2.5 h-2.5 text-yellow-400 fill-current" />
+                  <div className="rounded-full bg-overlay-medium p-0.5">
+                    <Star className="w-2.5 h-2.5 text-favorite fill-current" />
                   </div>
                 )}
               </div>
 
               {/* Hover overlay for better visibility */}
               <div className={cn(
-                "absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors",
-                isActive && "bg-black/0"
+                "absolute inset-0 bg-transparent group-hover:bg-overlay-light-hover transition-colors",
+                isActive && "bg-transparent"
               )} />
             </button>
           );
