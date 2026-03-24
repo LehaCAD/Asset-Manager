@@ -60,7 +60,7 @@ export function GroupCard({
     <div
       className={cn(
         'group relative rounded-md overflow-hidden cursor-pointer',
-        'border border-border hover:border-primary/50',
+        'border border-border hover:border-primary/40',
         'bg-card',
         'transition-all duration-150',
         'hover:shadow-md hover:shadow-primary/5',
