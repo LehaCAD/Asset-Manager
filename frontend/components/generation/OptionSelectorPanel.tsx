@@ -73,7 +73,7 @@ export function OptionSelectorPanel({
         className={cn(
           "flex flex-col items-center justify-center gap-1 p-3 rounded-md text-center transition-all duration-150",
           "border",
-          isAspectRatio && "h-[72px]",
+          isAspectRatio && "h-14",
           isSelected
             ? "bg-primary text-primary-foreground border-primary shadow-sm"
             : "bg-card border-border text-muted-foreground hover:text-foreground hover:border-primary/40"

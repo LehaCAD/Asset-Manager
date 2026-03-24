@@ -201,6 +201,7 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
                 selectedOverflowOption ? selectedClass : unselectedClass,
               )}
             >
+              {isAspectRatio && selectedOverflowOption && <AspectRatioIcon value={String(selectedOverflowOption.value)} />}
               <span className={""}>{selectedOverflowOption?.label ?? "Другое"}</span>
             </button>
           )}
