@@ -81,7 +81,7 @@ export function ElementSelectionCard({
       {!disabled && (
         <div
           className={cn(
-            "absolute inset-0 bg-black/10 pointer-events-none",
+            "absolute inset-0 bg-overlay-light pointer-events-none",
             "opacity-0 group-hover:opacity-100 transition-opacity duration-150"
           )}
         />
@@ -91,7 +91,7 @@ export function ElementSelectionCard({
       <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5">
         {/* Element type icon */}
         <div
-          className="rounded-full bg-black/45 text-white p-2"
+          className="rounded-full bg-overlay text-overlay-text p-2"
           title={isVideo ? "Видео" : "Изображение"}
         >
           {isVideo ? (
@@ -104,8 +104,8 @@ export function ElementSelectionCard({
         {/* Favorite star - read only */}
         <div
           className={cn(
-            "rounded-full bg-black/45 p-2",
-            element.is_favorite ? "text-yellow-400" : "text-white/70"
+            "rounded-full bg-overlay p-2",
+            element.is_favorite ? "text-favorite" : "text-overlay-text-muted"
           )}
           title={element.is_favorite ? "В избранном" : "Не в избранном"}
         >
