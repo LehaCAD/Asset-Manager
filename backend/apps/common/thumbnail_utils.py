@@ -75,7 +75,10 @@ def _generate_video_thumbnails(
     frame_fd.close()
     try:
         subprocess.run(
-            ['ffmpeg', '-i', video_path, '-vframes', '1', '-f', 'image2', '-y', frame_path],
+            [
+                'ffmpeg', '-ss', '1', '-i', video_path,
+                '-vframes', '1', '-q:v', '2', '-f', 'image2', '-y', frame_path,
+            ],
             check=True, capture_output=True,
         )
 

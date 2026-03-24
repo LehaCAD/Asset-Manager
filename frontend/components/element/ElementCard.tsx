@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
-import type { WorkspaceElement, DisplayCardSize, DisplayAspectRatio, DisplayFitMode } from "@/lib/types";
+import type { WorkspaceElement, DisplayCardSize, DisplayAspectRatio, DisplayFitMode, UploadPhase } from "@/lib/types";
 import { ASPECT_RATIO_CLASSES, FIT_MODE_CLASSES, CARD_ICON_SIZES } from "@/lib/utils/constants";
 import {
   Star,
@@ -14,6 +14,44 @@ import {
   Video,
   RotateCcw,
 } from "lucide-react";
+
+const PHASE_LABELS: Record<string, string> = {
+  resize: "Подготовка...",
+  presign: "Подключение...",
+  upload_thumb: "Миниатюра...",
+  upload_full: "Загрузка...",
+  completing: "Сохранение...",
+};
+
+/** Progress overlay for uploads and generation finalization. */
+function UploadProgressOverlay({
+  phase,
+  progress,
+  iconSize,
+}: {
+  phase?: UploadPhase;
+  progress: number;
+  iconSize: string;
+}) {
+  const rounded = Math.round(progress);
+  const label = PHASE_LABELS[phase ?? ""] ?? "Сохранение...";
+
+  return (
+    <div className="absolute inset-0 z-30 bg-overlay flex flex-col items-center justify-center pointer-events-none gap-2">
+      <Loader2 className={cn(iconSize, "text-overlay-text animate-spin")} />
+      <span className="text-[10px] text-overlay-text font-medium">{label}</span>
+      <div className="w-[70%] h-1 rounded-full bg-white/20 overflow-hidden">
+        <div
+          className="h-full bg-white/80 rounded-full transition-all duration-500 ease-out"
+          style={{ width: `${rounded}%` }}
+        />
+      </div>
+      <span className="text-[10px] text-overlay-text-muted tabular-nums">
+        {rounded}%
+      </span>
+    </div>
+  );
+}
 
 export interface ElementCardProps {
   element: WorkspaceElement;
@@ -50,14 +88,19 @@ export function ElementCard({
   fitMode = "fill",
 }: ElementCardProps) {
   const isProcessing = element.status === "PENDING" || element.status === "PROCESSING";
+  const hasUploadProgress = element.client_upload_phase != null && (element.client_upload_progress ?? 0) < 100;
+  const isUploading = element.status === "UPLOADING" || hasUploadProgress;
   const isFailed = element.status === "FAILED";
   const isSubmitting =
     element.client_optimistic_kind === "generation" &&
     element.client_generation_submit_state === "submitting";
   const isVideo = element.element_type === "VIDEO";
-  const videoThumbnailSrc = element.thumbnail_url?.trim() || null;
+  const videoThumbnailSrc = element.preview_url?.trim() || element.thumbnail_url?.trim() || null;
   const videoFileSrc = element.file_url?.trim() || null;
-  const mediaSrc = (isVideo ? videoThumbnailSrc || videoFileSrc : element.file_url)?.trim() || null;
+  // Grid cards: preview_url (medium 800px) → thumbnail_url (small 256px) → file_url (original)
+  const mediaSrc = (isVideo
+    ? videoThumbnailSrc || videoFileSrc
+    : element.preview_url?.trim() || element.thumbnail_url?.trim() || element.file_url)?.trim() || null;
 
   // Получаем размеры иконок для текущего size
   const iconSizes = CARD_ICON_SIZES[size];
@@ -67,7 +110,7 @@ export function ElementCard({
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (!isProcessing && !isSubmitting) {
+    if (!isProcessing && !isSubmitting && !isUploading) {
       setElapsed("");
       if (intervalRef.current) clearInterval(intervalRef.current);
       return;
@@ -84,7 +127,7 @@ export function ElementCard({
     tick();
     intervalRef.current = setInterval(tick, 5000);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [isProcessing, isSubmitting, element.created_at]);
+  }, [isProcessing, isSubmitting, isUploading, element.created_at]);
 
   const handleCardClick = (e: React.MouseEvent) => {
     if (e.ctrlKey || e.metaKey) {
@@ -346,7 +389,7 @@ export function ElementCard({
         >
           <div className="flex items-center gap-1.5">
             <div className="w-1.5 h-1.5 rounded-full bg-error" />
-            <span className="text-xs font-medium text-error">Ошибка генерации</span>
+            <span className="text-xs font-medium text-error">{element.source_type === "UPLOADED" ? "Ошибка загрузки" : "Ошибка генерации"}</span>
           </div>
           {element.error_message && (
             <span className="text-[10px] text-overlay-text-muted text-center line-clamp-2 max-w-[90%]">
@@ -382,11 +425,22 @@ export function ElementCard({
           {elapsed && <span className="text-[10px] text-overlay-text-muted">{elapsed}</span>}
         </div>
       )}
-      {!isSubmitting && isProcessing && (
+      {!isSubmitting && isUploading && (
+        <UploadProgressOverlay
+          phase={element.client_upload_phase}
+          progress={element.client_upload_progress ?? 0}
+          iconSize={iconSizes.lg}
+        />
+      )}
+      {!isSubmitting && !isUploading && isProcessing && (
         <div className="absolute inset-0 z-30 bg-overlay flex flex-col items-center justify-center pointer-events-none gap-1">
           <Loader2 className={cn(iconSizes.lg, "text-overlay-text animate-spin")} />
           <span className="text-[10px] text-overlay-text font-medium truncate max-w-[90%] text-center">
-            {element.status === "PENDING" ? "Ожидание..." : `Генерация${element.ai_model_name ? `: ${element.ai_model_name}` : ""}`}
+            {element.status === "PENDING"
+              ? "Ожидание..."
+              : element.source_type === "UPLOADED"
+                ? "Обработка..."
+                : `Генерация${element.ai_model_name ? `: ${element.ai_model_name}` : ""}`}
           </span>
           {elapsed && <span className="text-[10px] text-overlay-text-muted">{elapsed}</span>}
         </div>
@@ -396,7 +450,7 @@ export function ElementCard({
           {/* Top area — muted error icon */}
           <div className="flex-1 bg-error/10 flex flex-col items-center justify-center gap-1.5">
             <AlertCircle className={cn(iconSizes.lg, "text-error/25")} />
-            <span className="text-[10px] text-overlay-text-muted">Генерация не удалась</span>
+            <span className="text-[10px] text-overlay-text-muted">{element.source_type === "UPLOADED" ? "Загрузка не удалась" : "Генерация не удалась"}</span>
           </div>
           {/* Bottom info bar */}
           <div className="bg-error/20 px-2.5 py-2 flex items-center justify-between gap-2 pointer-events-auto">

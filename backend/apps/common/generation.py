@@ -152,20 +152,29 @@ def finalize_generation_success(element_id: int, source_url: str) -> tuple[bool,
     """
     from apps.common.thumbnail_utils import generate_thumbnails
 
+    from apps.elements.tasks import notify_element_status
+
     element = Element.objects.select_related("project", "scene").get(id=element_id)
 
     tmp_path = None
     try:
+        # Step 1: Download from provider + upload to S3 (real progress via boto3)
+        notify_element_status(element, 'PROCESSING', upload_progress=0)
         file_url, file_size, tmp_path = _download_and_upload_result(
             source_url=source_url,
             project_id=element.project_id,
             scene_id=element.scene_id,
+            on_progress=lambda pct: notify_element_status(
+                element, 'PROCESSING', upload_progress=int(pct * 0.8),  # 0-80%
+            ),
         )
 
-        # Generate thumbnails from temp file (before cleanup)
+        # Step 2: Generate thumbnails from temp file (before cleanup)
+        notify_element_status(element, 'PROCESSING', upload_progress=80)
         thumbs = generate_thumbnails(
             tmp_path, element.element_type, element.project_id, element.scene_id,
         )
+        notify_element_status(element, 'PROCESSING', upload_progress=95)
     finally:
         if tmp_path and os.path.exists(tmp_path):
             try:
@@ -204,7 +213,7 @@ def finalize_generation_failure(element_id: int, error_message: str) -> bool:
     return updated > 0
 
 
-def _download_and_upload_result(source_url: str, project_id: int, scene_id: int) -> tuple[str, int, str]:
+def _download_and_upload_result(source_url: str, project_id: int, scene_id: int, on_progress=None) -> tuple[str, int, str]:
     """
     Stream file from provider to temp file and upload to S3.
 
@@ -228,5 +237,6 @@ def _download_and_upload_result(source_url: str, project_id: int, scene_id: int)
         staging_path=tmp_path,
         project_id=project_id,
         scene_id=scene_id,
+        on_progress=on_progress,
     )
     return file_url, file_size, tmp_path

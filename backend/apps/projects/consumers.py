@@ -50,7 +50,7 @@ class ProjectConsumer(AsyncJsonWebsocketConsumer):
 
     async def element_status_changed(self, event):
         """Обработчик события изменения статуса элемента."""
-        await self.send_json({
+        payload = {
             'type': 'element_status_changed',
             'element_id': event['element_id'],
             'status': event['status'],
@@ -58,7 +58,10 @@ class ProjectConsumer(AsyncJsonWebsocketConsumer):
             'thumbnail_url': event.get('thumbnail_url', ''),
             'preview_url': event.get('preview_url', ''),
             'error_message': event.get('error_message', ''),
-        })
+        }
+        if 'upload_progress' in event:
+            payload['upload_progress'] = event['upload_progress']
+        await self.send_json(payload)
 
     async def new_comment(self, event):
         """Обработчик события нового комментария (V2)."""

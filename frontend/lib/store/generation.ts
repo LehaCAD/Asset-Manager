@@ -332,6 +332,7 @@ export const useGenerationStore = create<GenerationState>()((set, get) => ({
         sceneId: groupId ?? 0,
         promptText: get().prompt,
         aiModelId: get().selectedModel!.id,
+        aiModelName: get().selectedModel!.name,
         generationConfig,
         elementType: get().selectedModel!.model_type === "VIDEO" ? "VIDEO" : "IMAGE",
       });

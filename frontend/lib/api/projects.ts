@@ -73,7 +73,7 @@ export const projectsApi = {
   async uploadToProject(
     projectId: number,
     file: File,
-    options?: { prompt_text?: string; is_favorite?: boolean; signal?: AbortSignal }
+    options?: { prompt_text?: string; is_favorite?: boolean; signal?: AbortSignal; onUploadProgress?: (percent: number) => void }
   ): Promise<Element> {
     try {
       const formData = new FormData();
@@ -87,6 +87,9 @@ export const projectsApi = {
           timeout: LONG_API_TIMEOUT_MS,
           headers: { "Content-Type": "multipart/form-data" },
           signal: options?.signal,
+          onUploadProgress: options?.onUploadProgress
+            ? (e) => { if (e.total) options.onUploadProgress!((e.loaded / e.total) * 100); }
+            : undefined,
         }
       );
       return data;

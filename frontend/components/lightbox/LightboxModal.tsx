@@ -4,11 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LightboxNavigation } from "@/components/lightbox/LightboxNavigation";
 import { Filmstrip } from "@/components/lightbox/Filmstrip";
 import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { ElementFilters } from "@/components/element/ElementFilters";
 import { cn } from "@/lib/utils";
 import {
@@ -20,6 +15,9 @@ import {
   Video,
   Image,
   Play,
+  Pause,
+  Volume2,
+  VolumeX,
   FilterX,
   Loader2,
   AlertCircle,
@@ -95,6 +93,144 @@ export interface LightboxModalProps {
   onFilterChange?: (filter: ElementFilter) => void;
   filterCounts?: { all: number; favorites: number; images: number; videos: number };
   children?: React.ReactNode;
+}
+
+// --- Video controls overlay (rendered inside bounds div) ---
+function VideoControls({
+  mediaRef,
+}: {
+  mediaRef: React.RefObject<HTMLVideoElement>;
+}) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [showControls, setShowControls] = useState(true);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleHide = useCallback(() => {
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    setShowControls(true);
+    hideTimerRef.current = setTimeout(() => {
+      if (mediaRef.current && !mediaRef.current.paused) setShowControls(false);
+    }, 2500);
+  }, [mediaRef]);
+
+  useEffect(() => {
+    return () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); };
+  }, []);
+
+  // Attach video event listeners
+  useEffect(() => {
+    const v = mediaRef.current;
+    if (!v) return;
+
+    const onPlay = () => { setIsPlaying(true); scheduleHide(); };
+    const onPause = () => { setIsPlaying(false); setShowControls(true); };
+    const onTimeUpdate = () => {
+      if (v.duration) setProgress(v.currentTime / v.duration);
+    };
+    const onEnded = () => { setIsPlaying(false); setProgress(0); setShowControls(true); };
+    const onLoaded = () => { setDuration(v.duration); };
+
+    v.addEventListener("play", onPlay);
+    v.addEventListener("pause", onPause);
+    v.addEventListener("timeupdate", onTimeUpdate);
+    v.addEventListener("ended", onEnded);
+    v.addEventListener("loadedmetadata", onLoaded);
+    if (v.duration) setDuration(v.duration);
+
+    return () => {
+      v.removeEventListener("play", onPlay);
+      v.removeEventListener("pause", onPause);
+      v.removeEventListener("timeupdate", onTimeUpdate);
+      v.removeEventListener("ended", onEnded);
+      v.removeEventListener("loadedmetadata", onLoaded);
+    };
+  }, [mediaRef, scheduleHide]);
+
+  const handlePlay = useCallback(() => {
+    const v = mediaRef.current;
+    if (!v) return;
+    if (v.paused) { v.play(); } else { v.pause(); }
+  }, [mediaRef]);
+
+  const handleSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const v = mediaRef.current;
+    if (!v || !v.duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    v.currentTime = ratio * v.duration;
+    setProgress(ratio);
+  }, [mediaRef]);
+
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${sec.toString().padStart(2, "0")}`;
+  };
+
+  return (
+    <>
+      {/* Click area for play/pause + mouse move for controls visibility */}
+      <div
+        className="absolute inset-0 cursor-pointer pointer-events-auto"
+        onClick={handlePlay}
+        onMouseMove={scheduleHide}
+      />
+
+      {/* Big play button when paused */}
+      {!isPlaying && (
+        <button
+          type="button"
+          onClick={handlePlay}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center h-16 w-16 rounded-full bg-black/50 backdrop-blur-sm pointer-events-auto"
+        >
+          <Play className="h-7 w-7 text-white ml-1" fill="white" />
+        </button>
+      )}
+
+      {/* Bottom controls bar */}
+      <div
+        className={cn(
+          "absolute bottom-0 left-0 right-0 transition-opacity duration-200 rounded-b-lg bg-gradient-to-t from-black/40 to-transparent pt-6 pointer-events-auto",
+          showControls || !isPlaying ? "opacity-100" : "opacity-0 pointer-events-none"
+        )}
+        onMouseMove={scheduleHide}
+      >
+        <div
+          className="h-1 mx-3 mb-1 rounded-full bg-white/20 cursor-pointer"
+          onClick={handleSeek}
+        >
+          <div
+            className="h-full rounded-full bg-primary transition-[width] duration-100"
+            style={{ width: `${progress * 100}%` }}
+          />
+        </div>
+        <div className="flex items-center gap-2 px-3 pb-2">
+          <button type="button" onClick={handlePlay} className="text-white/80 hover:text-white transition-colors">
+            {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" fill="currentColor" />}
+          </button>
+          <span className="text-[11px] text-white/60 font-mono tabular-nums">
+            {formatTime(mediaRef.current?.currentTime ?? 0)} / {formatTime(duration)}
+          </span>
+          <div className="flex-1" />
+          <button
+            type="button"
+            onClick={() => {
+              if (mediaRef.current) {
+                mediaRef.current.muted = !mediaRef.current.muted;
+                setIsMuted(mediaRef.current.muted);
+              }
+            }}
+            className="text-white/80 hover:text-white transition-colors"
+          >
+            {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+          </button>
+        </div>
+      </div>
+    </>
+  );
 }
 
 export function LightboxModal({
@@ -203,48 +339,34 @@ export function LightboxModal({
       aria-modal="true"
       aria-label="Просмотр элемента"
     >
-      {/* Header - keyboard hints centered, close button on right */}
-      <div className="flex items-center justify-between px-4 py-3 border-b shrink-0">
-        <div className="w-10" /> {/* Spacer for centering */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="text-xs text-muted-foreground/70 tracking-wide cursor-help select-none hidden sm:inline">
-              ← → навигация · Esc закрыть · F избранное · Del удалить
-            </span>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            <p>Горячие клавиши</p>
-          </TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onClose}
-              aria-label="Закрыть"
-            >
-              <X className="h-5 w-5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Закрыть (Esc)</p>
-          </TooltipContent>
-        </Tooltip>
-      </div>
-
-      {/* Filter bar - centered */}
-      {onFilterChange && (
-        <div className="border-b px-4 py-2 shrink-0 bg-background">
-          <div className="flex justify-center">
+      {/* Header */}
+      <div className="relative flex items-center justify-between px-4 py-2 border-b shrink-0 bg-surface">
+        <div className="flex items-center gap-3">
+          {onFilterChange && (
             <ElementFilters
               filter={filter}
               onFilterChange={onFilterChange}
               counts={filterCounts}
             />
-          </div>
+          )}
         </div>
-      )}
+        <div className="absolute left-1/2 -translate-x-1/2 hidden sm:flex items-center gap-2 text-[11px] text-muted-foreground/60 select-none pointer-events-none">
+          <span>Горячие клавиши:</span>
+          <kbd className="px-1.5 py-0.5 rounded bg-card text-muted-foreground text-[10px] font-mono">← →</kbd>
+          <kbd className="px-1.5 py-0.5 rounded bg-card text-muted-foreground text-[10px] font-mono">Esc</kbd>
+          <kbd className="px-1.5 py-0.5 rounded bg-card text-muted-foreground text-[10px] font-mono">F</kbd>
+          <kbd className="px-1.5 py-0.5 rounded bg-card text-muted-foreground text-[10px] font-mono">Del</kbd>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onClose}
+          aria-label="Закрыть"
+          className="h-7 w-7"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
 
       {/* Main content area */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
@@ -266,7 +388,7 @@ export function LightboxModal({
               "relative flex items-center justify-center",
               "w-full max-w-[80vw] md:max-w-[900px]",
               "h-full max-h-[65vh] md:max-h-[600px]",
-              "bg-muted/30 rounded-md overflow-hidden"
+              "rounded-md overflow-hidden"
             )}
           >
             {isEmpty ? (
@@ -285,9 +407,6 @@ export function LightboxModal({
                     <video
                       ref={mediaRef as React.RefObject<HTMLVideoElement>}
                       src={currentElement.file_url}
-                      controls
-                      autoPlay
-                      muted
                       playsInline
                       onLoadedMetadata={updateBounds}
                       className="max-w-full max-h-full object-contain rounded-lg"
@@ -301,14 +420,20 @@ export function LightboxModal({
                       className="max-w-full max-h-full object-contain rounded-lg"
                     />
                   )
-                ) : currentElement.status === "PENDING" || currentElement.status === "PROCESSING" ? (
+                ) : currentElement.status === "PENDING" || currentElement.status === "PROCESSING" || currentElement.status === "UPLOADING" ? (
                   // In progress — placeholder
                   <div className="flex flex-col items-center justify-center text-muted-foreground gap-3">
                     <Loader2 className="h-12 w-12 animate-spin opacity-60" />
                     <p className="text-sm font-medium">
-                      {currentElement.status === "PENDING" ? "Ожидание генерации..." : "Генерация видео..."}
+                      {currentElement.status === "UPLOADING"
+                        ? "Загрузка..."
+                        : currentElement.source_type === "UPLOADED"
+                          ? "Обработка..."
+                          : currentElement.status === "PENDING"
+                            ? "Ожидание генерации..."
+                            : `Генерация${currentElement.ai_model_name ? `: ${currentElement.ai_model_name}` : ""}...`}
                     </p>
-                    {currentElement.ai_model_name && (
+                    {currentElement.source_type !== "UPLOADED" && currentElement.ai_model_name && (
                       <p className="text-xs text-muted-foreground/60">{currentElement.ai_model_name}</p>
                     )}
                   </div>
@@ -372,13 +497,9 @@ export function LightboxModal({
                       </button>
                     </div>
 
-                    {/* Play button for video - center */}
+                    {/* Video controls - positioned within bounds */}
                     {isVideo && (
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-auto">
-                        <div className="rounded-full bg-overlay p-4 hover:bg-overlay-medium transition-colors">
-                          <Play className="w-10 h-10 text-overlay-text fill-current" />
-                        </div>
-                      </div>
+                      <VideoControls mediaRef={mediaRef as React.RefObject<HTMLVideoElement>} />
                     )}
                   </div>
                 )}
@@ -394,73 +515,70 @@ export function LightboxModal({
 
           {/* Action buttons below the box - only when element exists */}
           {!isEmpty && currentElement && (
-            <div className="mt-4 flex items-center gap-4">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onDelete(currentElement.id)}
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Удалить
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Удалить элемент</p>
-                </TooltipContent>
-              </Tooltip>
+            <div className="mt-4 flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => onDelete(currentElement.id)}
+                className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-destructive bg-card hover:bg-destructive/10 transition-colors"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Удалить
+              </button>
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    asChild
-                    disabled={!hasFileUrl}
-                    className={cn(!hasFileUrl && "opacity-30 cursor-not-allowed")}
-                  >
-                    <a
-                      href={hasFileUrl ? currentElement.file_url : undefined}
-                      download
-                      className="flex items-center"
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      Скачать
-                    </a>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Скачать файл</p>
-                </TooltipContent>
-              </Tooltip>
+              {hasFileUrl && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const fileUrl = currentElement.file_url;
+                    const ext = fileUrl.split("/").pop()?.split("?")[0]?.split(".").pop() ?? "file";
+                    const fileName = `element-${currentElement.id}.${ext}`;
 
-              {/* "View original" button — shown for images when preview_url differs from file_url */}
-              {!isVideo && hasFileUrl && currentElement.preview_url?.trim() && currentElement.preview_url.trim() !== currentElement.file_url.trim() && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      asChild
-                      className="text-muted-foreground hover:text-foreground"
-                    >
-                      <a
-                        href={currentElement.file_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center"
-                      >
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        Оригинал
-                      </a>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Открыть оригинал в новой вкладке</p>
-                  </TooltipContent>
-                </Tooltip>
+                    const downloadBlob = (blob: Blob) => {
+                      const blobUrl = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = blobUrl;
+                      a.download = fileName;
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+                    };
+
+                    try {
+                      // Direct S3 fetch — cache: no-store forces fresh request with Origin header
+                      const res = await fetch(fileUrl, { mode: "cors", cache: "no-store" });
+                      if (!res.ok) throw new Error("fetch failed");
+                      downloadBlob(await res.blob());
+                    } catch {
+                      try {
+                        // Fallback: proxy through backend
+                        const { apiClient } = await import("@/lib/api/client");
+                        const res = await apiClient.get(`/api/elements/${currentElement.id}/download/`, {
+                          responseType: "blob",
+                        });
+                        downloadBlob(res.data);
+                      } catch {
+                        window.open(fileUrl, "_blank");
+                      }
+                    }
+                  }}
+                  className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-muted-foreground bg-card hover:text-foreground transition-colors"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Скачать
+                </button>
+              )}
+
+              {hasFileUrl && (
+                <a
+                  href={currentElement.file_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-muted-foreground bg-card hover:text-foreground transition-colors"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Оригинал
+                </a>
               )}
             </div>
           )}

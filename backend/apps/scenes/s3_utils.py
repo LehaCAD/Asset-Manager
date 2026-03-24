@@ -109,18 +109,48 @@ def save_to_staging(file: UploadedFile) -> str:
     return staging_path
 
 
-def upload_staging_to_s3(staging_path: str, project_id: int, scene_id: int) -> str:
+def upload_staging_to_s3(staging_path: str, project_id: int, scene_id: int, on_progress=None) -> str:
     """
     Загрузить файл из staging-директории в S3.
+    on_progress(percent: int) — optional callback, 0-100.
     Возвращает публичный S3 URL.
     """
-    from django.core.files import File
+    from apps.common.presigned import _get_s3_client, get_public_url
+    from django.conf import settings
 
     filename = os.path.basename(staging_path)
     s3_key = f"projects/{project_id}/scenes/{scene_id}/{filename}"
+    file_size = os.path.getsize(staging_path)
 
-    with open(staging_path, 'rb') as f:
-        saved_path = default_storage.save(s3_key, File(f))
+    # Determine content type
+    ext = os.path.splitext(filename)[1].lower()
+    content_types = {'.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.mp4': 'video/mp4'}
+    content_type = content_types.get(ext, 'application/octet-stream')
 
-    return default_storage.url(saved_path)
+    if on_progress and file_size > 0:
+        uploaded = 0
+        last_reported = -1
+
+        def progress_callback(bytes_transferred):
+            nonlocal uploaded, last_reported
+            uploaded += bytes_transferred
+            pct = min(100, int(uploaded * 100 / file_size))
+            if pct >= last_reported + 10:  # report every 10%
+                last_reported = pct
+                on_progress(pct)
+
+        client = _get_s3_client()
+        client.upload_file(
+            staging_path,
+            settings.AWS_STORAGE_BUCKET_NAME,
+            s3_key,
+            ExtraArgs={'ContentType': content_type},
+            Callback=progress_callback,
+        )
+        return get_public_url(s3_key)
+    else:
+        from django.core.files import File
+        with open(staging_path, 'rb') as f:
+            default_storage.save(s3_key, File(f))
+        return default_storage.url(s3_key)
 

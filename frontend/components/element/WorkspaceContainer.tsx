@@ -35,7 +35,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { MAX_FILE_SIZE_MB } from '@/lib/utils/constants';
-import type { WSEvent } from '@/lib/types';
+import type { WSEvent, WorkspaceElement } from '@/lib/types';
 
 interface WorkspaceContainerProps {
   projectId: number;
@@ -90,6 +90,8 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   } | null>(null);
   const [isGroupDeleting, setIsGroupDeleting] = useState(false);
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
+  const [promptBarHeight, setPromptBarHeight] = useState(0);
+  const promptBarRef = useRef<HTMLDivElement>(null);
   const fallbackRefetchIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const disconnectDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -166,6 +168,9 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
             ...(event.file_url && { file_url: event.file_url }),
             ...(event.thumbnail_url && { thumbnail_url: event.thumbnail_url }),
             ...(event.preview_url && { preview_url: event.preview_url }),
+            // Clear upload progress tracking
+            client_upload_phase: undefined,
+            client_upload_progress: undefined,
           });
         } else if (event.status === 'FAILED') {
           const err = (event.error_message ?? '').toLowerCase();
@@ -183,12 +188,23 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
             void useCreditsStore.getState().loadBalance();
           }
         } else {
-          updateElement(event.element_id, {
+          const updates: Partial<WorkspaceElement> = {
             status: event.status,
             ...(event.file_url && { file_url: event.file_url }),
             ...(event.thumbnail_url && { thumbnail_url: event.thumbnail_url }),
             ...(event.preview_url && { preview_url: event.preview_url }),
-          });
+          };
+          // Server-side progress from Celery (upload or generation finalization)
+          if (event.upload_progress != null) {
+            // Check if this is an upload element (has client upload tracking) or generation
+            const el = elements.find((e) => e.id === event.element_id);
+            const isUploadElement = el?.source_type === "UPLOADED";
+            updates.client_upload_phase = "completing";
+            updates.client_upload_progress = isUploadElement
+              ? 90 + Math.round(event.upload_progress * 0.1) // upload: 90-100
+              : event.upload_progress; // generation: 0-100
+          }
+          updateElement(event.element_id, updates);
         }
       }
     });
@@ -446,6 +462,16 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
     enabled: lightboxOpen,
   });
 
+  // Measure PromptBar height dynamically
+  useEffect(() => {
+    const el = promptBarRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      setPromptBarHeight(entry.contentRect.height);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // Build breadcrumb parts — always visible
   const breadcrumbs = useMemo(() => {
@@ -492,62 +518,65 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
       >
         <input {...getInputProps()} />
 
-        {/* Breadcrumbs + Filters toolbar */}
-        <div className="border-b px-4 py-2 shrink-0 bg-background">
-          {/* Breadcrumbs — always visible */}
-          {breadcrumbs.length > 0 && (
-            <div className="flex items-center gap-1 mb-2">
-              <button
-                type="button"
-                onClick={handleBack}
-                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4" />
-                <span>Назад</span>
-              </button>
-              <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30 mx-0.5 shrink-0" />
-              {breadcrumbs.map((crumb, i) => (
-                <span key={i} className="flex items-center gap-1">
-                  {i > 0 && <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30 mx-0.5 shrink-0" />}
-                  {crumb.href ? (
-                    <button
-                      type="button"
-                      onClick={() => router.push(crumb.href!)}
-                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      {crumb.label}
-                    </button>
-                  ) : (
-                    <span className="text-sm text-foreground font-medium">{crumb.label}</span>
-                  )}
-                </span>
-              ))}
-            </div>
-          )}
+        {/* Breadcrumbs + Filters toolbar — single row */}
+        <div className="flex items-center justify-between border-b px-4 py-2 shrink-0 bg-surface">
+          {/* Left: breadcrumbs + create group */}
+          <div className="flex items-center gap-1 min-w-0">
+            {breadcrumbs.length > 0 && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleBack}
+                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Назад</span>
+                </button>
+                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30 mx-0.5 shrink-0" />
+                {breadcrumbs.map((crumb, i) => (
+                  <span key={i} className="flex items-center gap-1 min-w-0">
+                    {i > 0 && <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30 mx-0.5 shrink-0" />}
+                    {crumb.href ? (
+                      <button
+                        type="button"
+                        onClick={() => router.push(crumb.href!)}
+                        className="text-sm text-muted-foreground hover:text-foreground transition-colors truncate"
+                      >
+                        {crumb.label}
+                      </button>
+                    ) : (
+                      <span className="text-sm text-foreground font-medium truncate">{crumb.label}</span>
+                    )}
+                  </span>
+                ))}
+              </>
+            )}
+            <button
+              type="button"
+              onClick={() => setCreateGroupOpen(true)}
+              className="flex items-center gap-1.5 h-7 px-3 ml-2 rounded text-xs font-medium text-primary bg-card hover:bg-card/80 transition-colors shrink-0"
+            >
+              <FolderPlus className="h-4 w-4" />
+              Создать группу
+            </button>
+          </div>
 
-          <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+          {/* Right: filters + view */}
+          <div className="flex items-center gap-1.5 shrink-0">
             <ElementFilters
               filter={filter}
               onFilterChange={setFilter}
               counts={filterCounts}
             />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCreateGroupOpen(true)}
-              className="gap-2"
-            >
-              <FolderPlus className="h-4 w-4" />
-              Создать группу
-            </Button>
-            <div className="ml-auto">
-              <DisplaySettingsPopover />
-            </div>
+            <DisplaySettingsPopover />
           </div>
         </div>
 
         {/* Zone 3: Grid area - scrollable */}
-        <div className="flex-1 overflow-auto p-2 sm:p-4 relative min-h-0">
+        <div
+          className="flex-1 overflow-auto p-2 sm:p-4 relative min-h-0"
+          style={{ paddingBottom: promptBarHeight + 16 }}
+        >
           {isLoading ? (
             <div className="flex items-center justify-center py-16">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -564,8 +593,12 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
           )}
         </div>
 
-        {/* Zone 2: Prompt Bar (bottom) */}
-        <PromptBar projectId={projectId} groupId={groupId} />
+        {/* Zone 2: Prompt Bar (floating bottom) */}
+        <div ref={promptBarRef} className="absolute bottom-0 left-0 right-0 z-40 pointer-events-none">
+          <div className="pointer-events-auto">
+            <PromptBar projectId={projectId} groupId={groupId} />
+          </div>
+        </div>
 
         {/* Bulk actions bar */}
         <ElementBulkBar

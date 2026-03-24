@@ -146,9 +146,13 @@ export interface Element {
   updated_at: string;
 }
 
+export type UploadPhase = "resize" | "presign" | "upload_thumb" | "upload_full" | "completing";
+
 export interface WorkspaceElement extends Element {
   client_optimistic_kind?: OptimisticElementKind;
   client_generation_submit_state?: GenerationSubmitState;
+  client_upload_phase?: UploadPhase;
+  client_upload_progress?: number; // 0–100
 }
 
 export interface GeneratePayload {
@@ -161,6 +165,7 @@ export interface CreateOptimisticGenerationInput {
   sceneId: number;
   promptText: string;
   aiModelId: number | null;
+  aiModelName?: string;
   generationConfig?: Record<string, unknown>;
   elementType?: ElementType;
 }
@@ -363,6 +368,7 @@ export interface WSElementStatusChangedEvent {
   thumbnail_url?: string;
   preview_url?: string;
   error_message?: string;
+  upload_progress?: number;
 }
 
 export type WSEvent = WSElementStatusChangedEvent;

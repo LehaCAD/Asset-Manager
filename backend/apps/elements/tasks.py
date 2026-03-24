@@ -27,10 +27,14 @@ from apps.ai_providers.validators import validate_model_admin_config
 logger = logging.getLogger(__name__)
 
 
-def notify_element_status(element: Element, status: str, file_url: str = '', error_message: str = '', preview_url: str = '') -> None:
+def notify_element_status(
+    element: Element, status: str, file_url: str = '', error_message: str = '',
+    preview_url: str = '', upload_progress: int | None = None,
+) -> None:
     """
     Отправить WebSocket-уведомление об изменении статуса элемента.
     Вызывается из Celery-задач при завершении/ошибке генерации.
+    upload_progress: 0-100 реальный серверный прогресс (для upload flow).
     """
     try:
         from channels.layers import get_channel_layer
@@ -43,18 +47,19 @@ def notify_element_status(element: Element, status: str, file_url: str = '', err
         project_id = element.project_id
         group_name = f'project_{project_id}'
 
-        async_to_sync(channel_layer.group_send)(
-            group_name,
-            {
-                'type': 'element_status_changed',
-                'element_id': element.id,
-                'status': status,
-                'file_url': file_url,
-                'thumbnail_url': element.thumbnail_url or '',
-                'preview_url': preview_url or element.preview_url or '',
-                'error_message': error_message,
-            }
-        )
+        payload = {
+            'type': 'element_status_changed',
+            'element_id': element.id,
+            'status': status,
+            'file_url': file_url,
+            'thumbnail_url': element.thumbnail_url or '',
+            'preview_url': preview_url or element.preview_url or '',
+            'error_message': error_message,
+        }
+        if upload_progress is not None:
+            payload['upload_progress'] = upload_progress
+
+        async_to_sync(channel_layer.group_send)(group_name, payload)
     except Exception as e:
         logger.exception("Не удалось отправить WebSocket-уведомление: %s", e)
 
@@ -373,21 +378,31 @@ def process_uploaded_file(self, element_id: int, staging_path: str) -> dict:
     try:
         element = Element.objects.select_related('project', 'scene').get(id=element_id)
 
+        # Step 1: Upload original to S3 (bulk of time — real progress via boto3 callback)
+        notify_element_status(element, 'PROCESSING', upload_progress=0)
         file_url = upload_staging_to_s3(
             staging_path,
             project_id=element.project_id,
             scene_id=element.scene_id,
+            on_progress=lambda pct: notify_element_status(
+                element, 'PROCESSING', upload_progress=int(pct * 0.8),  # 0-80%
+            ),
         )
 
         file_size = os.path.getsize(staging_path) if os.path.exists(staging_path) else None
 
         element.file_url = file_url
         element.file_size = file_size
-        element.status = Element.STATUS_COMPLETED
 
+        # Step 2: Generate thumbnails
+        notify_element_status(element, 'PROCESSING', upload_progress=80)
         thumbs = generate_thumbnails(staging_path, element.element_type, element.project_id, element.scene_id)
         element.thumbnail_url = thumbs.get('thumbnail_url') or file_url
         element.preview_url = thumbs.get('preview_url') or ''
+        notify_element_status(element, 'PROCESSING', upload_progress=95)
+
+        # Step 3: Save and complete
+        element.status = Element.STATUS_COMPLETED
         element.save(update_fields=['file_url', 'file_size', 'thumbnail_url', 'preview_url', 'status', 'updated_at'])
 
         notify_element_status(element, 'COMPLETED', file_url=file_url)

@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { scenesApi } from "@/lib/api/scenes";
 import { elementsApi } from "@/lib/api/elements";
 import { projectsApi } from "@/lib/api/projects";
-import { clientUploadFile } from "@/lib/utils/client-upload";
+import { clientUploadFile, PresignOrphanError } from "@/lib/utils/client-upload";
 import { toast } from "sonner";
 import type {
   Scene,
@@ -136,6 +136,8 @@ async function processUploadQueue() {
 
     try {
       let element;
+      // Track which ID to update — starts as tempId, switches to real after _replaceOptimistic
+      let trackingId = item.tempId;
       try {
         // New presigned upload flow
         element = await clientUploadFile(
@@ -148,19 +150,51 @@ async function processUploadQueue() {
           (thumbElement) => {
             // Replace optimistic element as soon as thumbnail is ready
             useSceneWorkspaceStore.getState()._replaceOptimistic(item.tempId, thumbElement);
+            trackingId = thumbElement.id;
+          },
+          (phase, progress) => {
+            useSceneWorkspaceStore.getState().updateElement(trackingId, {
+              client_upload_phase: phase,
+              client_upload_progress: Math.round(progress),
+            });
           },
         );
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
           throw error; // Don't fallback on cancel
         }
-        // Fallback to old FormData flow
+        // Clean up orphaned presign element before fallback
+        if (error instanceof PresignOrphanError) {
+          elementsApi.delete(error.elementId).catch(() => {});
+        }
+        // Fallback to old FormData flow (with progress tracking)
         console.warn("Client upload failed, falling back to server upload:", error);
+        const fallbackProgress = (pct: number) => {
+          useSceneWorkspaceStore.getState().updateElement(trackingId, {
+            client_upload_phase: "upload_full",
+            client_upload_progress: Math.round(pct * 0.9), // 0–90%, last 10% = server processing
+          });
+        };
         element = item.sceneId > 0
-          ? await scenesApi.upload(item.sceneId, item.file, { signal: controller.signal })
-          : await projectsApi.uploadToProject(item.projectId, item.file, { signal: controller.signal });
+          ? await scenesApi.upload(item.sceneId, item.file, { signal: controller.signal, onUploadProgress: fallbackProgress })
+          : await projectsApi.uploadToProject(item.projectId, item.file, { signal: controller.signal, onUploadProgress: fallbackProgress });
       }
-      useSceneWorkspaceStore.getState()._replaceOptimistic(item.tempId, element);
+      // Use trackingId: after presigned thumbnail it's the real ID, otherwise still tempId
+      useSceneWorkspaceStore.getState()._replaceOptimistic(trackingId, element);
+
+      // Race condition fix: WS COMPLETED may have arrived while we waited for HTTP response
+      // (element still had tempId → WS event was ignored). Re-fetch to catch up.
+      if (element.status === "PROCESSING" || element.status === "UPLOADING") {
+        elementsApi.getById(element.id).then((fresh) => {
+          if (fresh.status === "COMPLETED" || fresh.status === "FAILED") {
+            useSceneWorkspaceStore.getState().updateElement(fresh.id, {
+              ...fresh,
+              client_upload_phase: undefined,
+              client_upload_progress: undefined,
+            });
+          }
+        }).catch(() => {});
+      }
       // Blob URL revocation is handled by the store (updateElement/removeElement)
     } catch (error) {
       if (isAbortLikeError(error)) {
@@ -371,6 +405,7 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
     sceneId,
     promptText,
     aiModelId,
+    aiModelName,
     generationConfig = {},
     elementType = "IMAGE",
   }) => {
@@ -390,6 +425,7 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
       is_favorite: false,
       prompt_text: promptText,
       ai_model: aiModelId,
+      ai_model_name: aiModelName,
       generation_config: generationConfig,
       seed: null,
       status: "PENDING",
@@ -630,12 +666,14 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
         ai_model: null,
         generation_config: {},
         seed: null,
-        status: "PROCESSING",
+        status: "UPLOADING",
         error_message: "",
         source_type: "UPLOADED",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         client_optimistic_kind: "upload",
+        client_upload_phase: "resize",
+        client_upload_progress: 0,
       };
 
       get().addElement(optimistic);
@@ -688,6 +726,12 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
             ...real,
             file_url: real.file_url || e.file_url,
             thumbnail_url: real.thumbnail_url || e.thumbnail_url,
+            // Preserve client-side tracking fields while upload is in progress
+            ...(real.status !== "COMPLETED" && real.status !== "FAILED" ? {
+              client_optimistic_kind: e.client_optimistic_kind,
+              client_upload_phase: e.client_upload_phase,
+              client_upload_progress: e.client_upload_progress,
+            } : {}),
           };
         })
         .sort((a, b) => a.order_index - b.order_index),
