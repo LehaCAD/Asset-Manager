@@ -508,12 +508,12 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
                     <ChevronLeft className="w-4 h-4" />
                     <span>Назад</span>
                   </button>
-                  <span className="text-muted-foreground/50 mx-1">/</span>
+                  <span className="text-muted-foreground/30 mx-1.5">›</span>
                 </>
               )}
               {breadcrumbs.map((crumb, i) => (
                 <span key={i} className="flex items-center gap-1">
-                  {i > 0 && <span className="text-muted-foreground/50 mx-1">&gt;</span>}
+                  {i > 0 && <span className="text-muted-foreground/30 mx-1.5">›</span>}
                   {crumb.href ? (
                     <button
                       type="button"
@@ -695,6 +695,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
             <DetailPanel
               element={currentElementForLightbox}
               onUpdateElement={updateElement}
+              onClose={closeLightbox}
             />
           )}
         </LightboxModal>
