@@ -18,12 +18,14 @@ class Element(models.Model):
     STATUS_PROCESSING = 'PROCESSING'
     STATUS_COMPLETED = 'COMPLETED'
     STATUS_FAILED = 'FAILED'
-    
+    STATUS_UPLOADING = 'UPLOADING'
+
     STATUS_CHOICES = [
         (STATUS_PENDING, 'Ожидание'),
         (STATUS_PROCESSING, 'Обработка'),
         (STATUS_COMPLETED, 'Завершено'),
         (STATUS_FAILED, 'Ошибка'),
+        (STATUS_UPLOADING, 'Загрузка'),
     ]
     
     # Типы источников
@@ -71,6 +73,7 @@ class Element(models.Model):
         blank=True,
         verbose_name='URL превью'
     )
+    preview_url = models.URLField(max_length=500, blank=True, default='')
     is_favorite = models.BooleanField(
         default=False,
         verbose_name='Избранное'
@@ -135,6 +138,7 @@ class Element(models.Model):
         blank=True,
         verbose_name='Размер файла (байт)',
     )
+    upload_keys = models.JSONField(null=True, blank=True, help_text='S3 keys for presigned upload: {original, small, medium}')
 
     created_at = models.DateTimeField(
         auto_now_add=True,
