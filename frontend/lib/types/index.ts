@@ -115,7 +115,7 @@ export interface ReorderScenesPayload {
 /* ── Elements ─────────────────────────────────────────────── */
 
 export type ElementType = "IMAGE" | "VIDEO";
-export type ElementStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
+export type ElementStatus = "PENDING" | "PROCESSING" | "UPLOADING" | "COMPLETED" | "FAILED";
 export type ElementSource = "GENERATED" | "UPLOADED" | "IMG2VID";
 export type OptimisticElementKind = "upload" | "generation";
 export type GenerationSubmitState = "idle" | "submitting" | "accepted" | "rejected";
@@ -130,6 +130,7 @@ export interface Element {
   order_index: number;
   file_url: string;
   thumbnail_url: string;
+  preview_url: string;
   is_favorite: boolean;
   prompt_text: string;
   ai_model: number | null;
@@ -360,6 +361,7 @@ export interface WSElementStatusChangedEvent {
   status: ElementStatus;
   file_url?: string;
   thumbnail_url?: string;
+  preview_url?: string;
   error_message?: string;
 }
 
