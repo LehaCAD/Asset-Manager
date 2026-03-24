@@ -420,10 +420,12 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   const handleBack = useCallback(() => {
     if (scene?.parent) {
       router.push(`/projects/${projectId}/groups/${scene.parent}`);
-    } else {
+    } else if (groupId) {
       router.push(`/projects/${projectId}`);
+    } else {
+      router.push('/projects');
     }
-  }, [router, projectId, scene]);
+  }, [router, projectId, groupId, scene]);
 
   const hasContent = elements.length > 0 || groups.length > 0;
 
@@ -498,19 +500,15 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
           {/* Breadcrumbs — always visible */}
           {breadcrumbs.length > 0 && (
             <div className="flex items-center gap-1 mb-2">
-              {groupId && (
-                <>
-                  <button
-                    type="button"
-                    onClick={handleBack}
-                    className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                    <span>Назад</span>
-                  </button>
-                  <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30 mx-0.5 shrink-0" />
-                </>
-              )}
+              <button
+                type="button"
+                onClick={handleBack}
+                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                <span>Назад</span>
+              </button>
+              <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30 mx-0.5 shrink-0" />
               {breadcrumbs.map((crumb, i) => (
                 <span key={i} className="flex items-center gap-1">
                   {i > 0 && <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30 mx-0.5 shrink-0" />}
