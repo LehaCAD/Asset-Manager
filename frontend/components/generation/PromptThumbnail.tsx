@@ -43,7 +43,7 @@ export function PromptThumbnail({
       />
 
       {/* Hover overlay с X */}
-      <div className="absolute inset-0 flex items-start justify-end bg-black/0 p-1.5 transition-colors group-hover:bg-black/30">
+      <div className="absolute inset-0 flex items-start justify-end bg-transparent p-1.5 transition-colors group-hover:bg-overlay-light-hover">
         <button
           type="button"
           onClick={handleRemove}
