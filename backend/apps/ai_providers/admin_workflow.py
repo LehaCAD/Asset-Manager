@@ -310,9 +310,13 @@ def build_mapping_rows(ai_model: AIModel) -> list[dict[str, Any]]:
                 ) if binding is not None else {'featured': [], 'overflow': [], 'overflow_count': 0, 'all_values': []},
                 'editor_hint': describe_placeholder_for_admin(placeholder),
                 'current_default': (
-                    binding.default_override
-                    if binding is not None and binding.default_override not in ({}, None, '')
-                    else ''
+                    str(binding.default_override).lower()
+                    if binding is not None and isinstance(binding.default_override, bool)
+                    else (
+                        binding.default_override
+                        if binding is not None and binding.default_override not in ({}, None, '')
+                        else ''
+                    )
                 ),
             }
         )

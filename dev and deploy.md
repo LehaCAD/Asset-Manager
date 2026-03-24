@@ -106,10 +106,17 @@ CELERY_RESULT_BACKEND=redis://redis:6379/0
 
 # S3 (TimeWeb)
 AWS_ACCESS_KEY_ID=...
-AWS_SECRET_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
 AWS_STORAGE_BUCKET_NAME=...
 AWS_S3_REGION_NAME=ru-1
 AWS_S3_ENDPOINT_URL=https://s3.timeweb.com
+
+# Database connection (defaults work in docker-compose)
+DB_HOST=db
+DB_PORT=5432
+
+# Kie.ai callback auth (optional)
+KIE_CALLBACK_TOKEN=<token_для_callback>
 
 # Frontend (build-time)
 NEXT_PUBLIC_API_URL=https://raskadrawka.ru

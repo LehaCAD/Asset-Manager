@@ -147,7 +147,7 @@ export function GroupCard({
       <div className="p-2.5 space-y-1">
         <div className="flex items-center gap-1.5">
           <Folder className="h-3.5 w-3.5 text-primary/60 shrink-0" />
-          <span className={cn('font-medium line-clamp-1 group-hover:text-primary transition-colors', textSizes.title)}>
+          <span className={cn('font-medium line-clamp-1 text-foreground group-hover:text-primary transition-colors', textSizes.title)}>
             {group.name}
           </span>
         </div>

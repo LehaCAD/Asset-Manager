@@ -350,7 +350,7 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
         <input {...getInputProps()} />
 
         {/* Filters toolbar - inside scene workspace */}
-        <div className="border-b px-4 py-2 shrink-0 bg-background">
+        <div className="border-b px-4 py-2 shrink-0 bg-surface">
           <div className="flex items-center gap-4">
             <ElementFilters
               filter={filter}

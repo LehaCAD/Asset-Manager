@@ -48,7 +48,7 @@ export function ModelCard({ model, isSelected, onSelect }: ModelCardProps) {
             {badges.map((badge) => (
               <span
                 key={badge}
-                className="inline-flex items-center rounded-sm bg-foreground/[0.07] px-1.5 py-px text-[10px] font-medium text-muted-foreground"
+                className="inline-flex items-center rounded-sm bg-foreground/[0.12] px-1.5 py-px text-[10px] text-foreground/70"
               >
                 {badge}
               </span>

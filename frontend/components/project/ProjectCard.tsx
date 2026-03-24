@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, Pencil, Trash2, Film, Layers, HardDrive, ImageIcon } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash2, Film, Layers, HardDrive, ImageIcon, FolderOpen } from "lucide-react";
 import { ChargeIcon } from "@/components/ui/charge-icon";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -38,10 +38,6 @@ const STATUS_BADGE_VARIANTS: Record<string, "default" | "secondary" | "outline" 
   COMPLETED: "outline",
 };
 
-const ASPECT_RATIO_STYLE: Record<string, string> = {
-  "16:9": "aspect-video",
-  "9:16": "aspect-[9/16]",
-};
 
 export function ProjectCard({ project }: ProjectCardProps) {
   const router = useRouter();
@@ -75,8 +71,6 @@ export function ProjectCard({ project }: ProjectCardProps) {
     e.stopPropagation();
   }
 
-  const aspectClass = ASPECT_RATIO_STYLE[project.aspect_ratio] ?? "aspect-video";
-
   return (
     <>
       <div
@@ -84,7 +78,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
         className="group relative bg-card border border-border rounded-md overflow-hidden cursor-pointer hover:border-primary/40 hover:shadow-md hover:shadow-primary/5 transition-all duration-150"
       >
         {/* Thumbnail area */}
-        <div className={`${aspectClass} bg-muted relative overflow-hidden`}>
+        <div className="aspect-video bg-muted relative overflow-hidden">
           {project.preview_thumbnails && project.preview_thumbnails.length > 0 ? (
             /* 2x2 Preview Grid */
             <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-0.5">
@@ -119,10 +113,11 @@ export function ProjectCard({ project }: ProjectCardProps) {
               </div>
             </>
           )}
-          {/* Aspect ratio badge */}
+          {/* Type badge */}
           <div className="absolute top-1.5 left-1.5">
-            <span className="text-[10px] font-mono font-medium bg-background/80 backdrop-blur-sm text-muted-foreground px-1.5 py-0.5 rounded border border-border/50">
-              {project.aspect_ratio}
+            <span className="flex items-center gap-1 text-[10px] font-medium bg-background/80 backdrop-blur-sm text-muted-foreground px-1.5 py-0.5 rounded border border-border/50">
+              <FolderOpen className="h-3 w-3" />
+              Проект
             </span>
           </div>
           {/* Actions menu */}

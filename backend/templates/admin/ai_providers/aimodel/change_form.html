@@ -65,14 +65,20 @@
           {{ adminform.form.preview_url.errors }}
           <label for="{{ adminform.form.preview_url.id_for_label }}">URL превью</label>
           {{ adminform.form.preview_url }}
-          <p class="wf-help">Картинка в карточке выбора модели.</p>
+          <p class="wf-help">Имя файла из /images/models/ без .png (например: veo_3_1_fast) или полный https://...</p>
         </div>
         <div class="wf-field">
-          {{ adminform.form.description.errors }}
-          <label for="{{ adminform.form.description.id_for_label }}">Описание</label>
-          {{ adminform.form.description }}
-          <p class="wf-help">Короткая подпись под названием модели.</p>
+          {{ adminform.form.tags.errors }}
+          <label for="{{ adminform.form.tags.id_for_label }}">Теги (JSON-массив)</label>
+          {{ adminform.form.tags }}
+          <p class="wf-help">Бейджи в карточке, например: ["Start Frame", "4K", "Audio"]</p>
         </div>
+      </div>
+      <div class="wf-field" style="margin-top:12px">
+        {{ adminform.form.description.errors }}
+        <label for="{{ adminform.form.description.id_for_label }}">Описание</label>
+        {{ adminform.form.description }}
+        <p class="wf-help">Короткая подпись под названием модели.</p>
       </div>
     </section>
 
@@ -103,6 +109,21 @@
           Системные (не надо настраивать): <code>&#123;&#123;prompt&#125;&#125;</code>,
           <code>&#123;&#123;callback_url&#125;&#125;</code>, <code>&#123;&#123;input_urls&#125;&#125;</code>.
         </p>
+      </div>
+
+      <div class="wf-grid wf-grid--2" style="margin-top:16px">
+        <div class="wf-field">
+          {{ adminform.form.status_check_endpoint.errors }}
+          <label for="{{ adminform.form.status_check_endpoint.id_for_label }}">Эндпоинт проверки статуса</label>
+          {{ adminform.form.status_check_endpoint }}
+          <p class="wf-help">Пусто = стандартный Kie.ai. Для VEO: <code>/api/v1/veo/record-info</code></p>
+        </div>
+        <div class="wf-field">
+          {{ adminform.form.response_mapping.errors }}
+          <label for="{{ adminform.form.response_mapping.id_for_label }}">Маппинг ответа API</label>
+          {{ adminform.form.response_mapping }}
+          <p class="wf-help">Пусто = стандарт Kie.ai. Для VEO вставь JSON маппинга (см. подсказку).</p>
+        </div>
       </div>
     </section>
 
@@ -171,12 +192,6 @@
           </div>
           <div class="wf-field" style="display:none">
             {{ adminform.form.image_inputs_schema }}
-          </div>
-          <div class="wf-field">
-            {{ adminform.form.tags.errors }}
-            <label for="{{ adminform.form.tags.id_for_label }}">Теги (JSON-массив)</label>
-            {{ adminform.form.tags }}
-            <p class="wf-help">Пример: <code>["Style Ref", "Image Ref"]</code></p>
           </div>
         </div>
       </details>

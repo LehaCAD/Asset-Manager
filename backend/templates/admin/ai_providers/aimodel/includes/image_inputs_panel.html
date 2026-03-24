@@ -1,4 +1,13 @@
 <div class="wf-image-inputs-editor" data-image-inputs-editor>
+  <!-- Show validation errors from image_inputs_schema field -->
+  {% if adminform.form.errors.image_inputs_schema %}
+    <div class="wf-validation-error" style="margin-bottom: 16px;">
+      {% for error in adminform.form.errors.image_inputs_schema %}
+        <p>{{ error }}</p>
+      {% endfor %}
+    </div>
+  {% endif %}
+
   <!-- Tab bar: Visual / JSON -->
   <div class="wf-tab-bar" data-ii-tab-bar>
     <button type="button" class="wf-tab wf-tab--active" data-ii-tab="visual">Визуальный редактор</button>
@@ -131,6 +140,11 @@
       <div class="wf-field">
         <label>Иконка</label>
         <input type="text" data-ii-slot-icon class="wf-input" placeholder="play-circle">
+      </div>
+      <div class="wf-field">
+        <label>Иллюстрация</label>
+        <input type="text" data-ii-slot-illustration class="wf-input" placeholder="start_frame">
+        <p class="wf-help">Имя файла из /images/modes/ (без .png)</p>
       </div>
       <div class="wf-grid wf-grid--2" style="gap: 8px;">
         <div class="wf-field">

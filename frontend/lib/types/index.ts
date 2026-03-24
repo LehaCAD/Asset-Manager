@@ -252,6 +252,7 @@ export interface ParameterSchemaItem {
   step?: number;
   visible?: boolean;
   advanced?: boolean;
+  affects_pricing?: boolean;
 }
 
 export interface ImageInputSchemaItem {

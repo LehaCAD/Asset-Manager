@@ -60,6 +60,11 @@ def _validate_slot(slot: Any, path: str, seen_keys: set[str]) -> None:
             f'{path}: "min" ({min_val}) не может быть больше "max" ({slot["max"]}).'
         )
 
+    # Optional string fields
+    for opt_str in ('description', 'icon', 'illustration'):
+        if opt_str in slot and not isinstance(slot[opt_str], str):
+            raise ValidationError(f'{path}: "{opt_str}" должен быть строкой.')
+
 
 def validate_image_inputs_schema(value: Any) -> None:
     """Validate image_inputs_schema field value.

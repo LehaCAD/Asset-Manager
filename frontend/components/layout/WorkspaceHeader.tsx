@@ -53,7 +53,7 @@ export function WorkspaceHeader({ projectId, sceneId }: WorkspaceHeaderProps) {
   }, [projects, projectId]);
 
   return (
-    <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <div className="border-b bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/60">
       <div className="flex items-center justify-between px-4 py-3">
         {/* Left: Breadcrumbs - только проект, сцена показывается в навигации по центру */}
         <div className="flex-1 min-w-0">

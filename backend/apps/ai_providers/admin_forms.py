@@ -7,7 +7,7 @@ from .models import AIModel, CanonicalParameter, ModelParameterBinding, ModelPri
 from .pricing_tools import build_pricing_template_for_model, parse_bulk_pricing_json
 from django.core.exceptions import ValidationError as DjangoValidationError
 
-from .validators import validate_model_admin_config
+from .validators import validate_image_inputs_schema, validate_model_admin_config
 
 
 class AIModelAdminForm(forms.ModelForm):
@@ -180,7 +180,6 @@ class AIModelAdminForm(forms.ModelForm):
             setattr(instance, field_name, value)
 
         # ── Validate image_inputs_schema ──
-        from .validators import validate_image_inputs_schema
         raw_ii_payload = cleaned_data.get('image_inputs_payload', '')
         if raw_ii_payload and raw_ii_payload.strip():
             try:

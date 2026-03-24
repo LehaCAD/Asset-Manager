@@ -2,26 +2,35 @@
 
 import { useEffect, useState } from "react";
 import { Eye, Grid3x3, LayoutGrid, Square, RectangleHorizontal, RectangleVertical, Maximize, Shrink } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Separator } from "@/components/ui/separator";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useDisplayStore } from "@/lib/store/project-display";
 import { cn } from "@/lib/utils";
 import type { DisplayCardSize, DisplayAspectRatio, DisplayFitMode } from "@/lib/types";
 
-// Компонент кнопки-триггера
-function EyeButton({ className }: { className?: string }) {
+interface OptionButtonProps {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  className?: string;
+  ariaLabel: string;
+}
+
+function OptionButton({ active, onClick, children, className, ariaLabel }: OptionButtonProps) {
   return (
-    <Button 
-      variant="ghost" 
-      size="icon" 
-      className={cn("h-8 w-8", className)}
-      aria-label="Настройки отображения"
+    <button
+      type="button"
+      aria-label={ariaLabel}
+      onClick={onClick}
+      className={cn(
+        "flex items-center justify-center rounded transition-colors",
+        active
+          ? "bg-primary text-primary-foreground"
+          : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground",
+        className,
+      )}
     >
-      <Eye className="h-4 w-4" />
-    </Button>
+      {children}
+    </button>
   );
 }
 
@@ -33,178 +42,117 @@ export function DisplaySettingsPopover() {
     hydratePreferences();
   }, [hydratePreferences]);
 
-  const handleSizeChange = (value: string) => {
-    if (value) updatePreferences({ size: value as DisplayCardSize });
-  };
-
-  const handleAspectRatioChange = (value: string) => {
-    if (value) updatePreferences({ aspectRatio: value as DisplayAspectRatio });
-  };
-
-  const handleFitModeChange = (value: string) => {
-    if (value) updatePreferences({ fitMode: value as DisplayFitMode });
-  };
-
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      {open ? (
-        <PopoverTrigger asChild>
-          <span>
-            <EyeButton />
-          </span>
-        </PopoverTrigger>
-      ) : (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <PopoverTrigger asChild>
-              <span>
-                <EyeButton />
-              </span>
-            </PopoverTrigger>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            <p>Отображение</p>
-          </TooltipContent>
-        </Tooltip>
-      )}
+      <PopoverTrigger asChild>
+        <button
+          className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-muted-foreground bg-card hover:text-foreground transition-colors"
+          aria-label="Настройки отображения"
+        >
+          <Eye className="h-3.5 w-3.5" />
+          <span>Вид</span>
+        </button>
+      </PopoverTrigger>
 
-      <PopoverContent className="w-64 p-3" align="end" side="bottom" sideOffset={4}>
-        <div className="space-y-4">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Отображение</span>
-          </div>
+      <PopoverContent className="w-[200px] p-0 border-0" align="end" side="bottom" sideOffset={4}>
+        <div className="rounded-lg bg-card p-2.5 space-y-2">
+          {/* Title */}
+          <span className="text-[13px] font-semibold text-foreground">Отображение</span>
 
-          <Separator />
+          {/* Divider */}
+          <div className="h-px bg-border" />
 
           {/* Size */}
-          <div className="space-y-2">
-            <span className="text-xs text-muted-foreground">Размер</span>
-            <ToggleGroup 
-              type="single" 
-              value={preferences.size} 
-              onValueChange={handleSizeChange}
-              className="grid grid-cols-3 gap-1"
-            >
-              <ToggleGroupItem 
-                value="compact" 
-                aria-label="Компактный"
-                className={cn(
-                  "flex flex-col items-center gap-1 h-auto py-2 px-1 transition-all",
-                  "data-[state=off]:bg-muted/40 data-[state=off]:hover:bg-muted",
-                  "data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-                )}
+          <div className="space-y-1.5">
+            <span className="text-[11px] font-medium text-muted-foreground">Размер</span>
+            <div className="grid grid-cols-3 gap-1">
+              <OptionButton
+                active={preferences.size === "compact"}
+                onClick={() => updatePreferences({ size: "compact" })}
+                ariaLabel="Компактный"
+                className="h-8"
               >
                 <Grid3x3 className="h-4 w-4" />
-              </ToggleGroupItem>
-              <ToggleGroupItem 
-                value="medium" 
-                aria-label="Средний"
-                className={cn(
-                  "flex flex-col items-center gap-1 h-auto py-2 px-1 transition-all",
-                  "data-[state=off]:bg-muted/40 data-[state=off]:hover:bg-muted",
-                  "data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-                )}
+              </OptionButton>
+              <OptionButton
+                active={preferences.size === "medium"}
+                onClick={() => updatePreferences({ size: "medium" })}
+                ariaLabel="Средний"
+                className="h-8"
               >
                 <LayoutGrid className="h-4 w-4" />
-              </ToggleGroupItem>
-              <ToggleGroupItem 
-                value="large" 
-                aria-label="Крупный"
-                className={cn(
-                  "flex flex-col items-center gap-1 h-auto py-2 px-1 transition-all",
-                  "data-[state=off]:bg-muted/40 data-[state=off]:hover:bg-muted",
-                  "data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-                )}
+              </OptionButton>
+              <OptionButton
+                active={preferences.size === "large"}
+                onClick={() => updatePreferences({ size: "large" })}
+                ariaLabel="Крупный"
+                className="h-8"
               >
                 <Square className="h-4 w-4" />
-              </ToggleGroupItem>
-            </ToggleGroup>
+              </OptionButton>
+            </div>
           </div>
 
-          <Separator />
+          {/* Divider */}
+          <div className="h-px bg-border" />
 
           {/* Aspect Ratio */}
-          <div className="space-y-2">
-            <span className="text-xs text-muted-foreground">Соотношение сторон</span>
-            <ToggleGroup 
-              type="single" 
-              value={preferences.aspectRatio} 
-              onValueChange={handleAspectRatioChange}
-              className="grid grid-cols-3 gap-1"
-            >
-              <ToggleGroupItem 
-                value="landscape" 
-                aria-label="Горизонтальный"
-                className={cn(
-                  "flex flex-col items-center gap-1 h-auto py-2 px-1 transition-all",
-                  "data-[state=off]:bg-muted/40 data-[state=off]:hover:bg-muted",
-                  "data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-                )}
+          <div className="space-y-1.5">
+            <span className="text-[11px] font-medium text-muted-foreground">Соотношение сторон</span>
+            <div className="grid grid-cols-3 gap-1">
+              <OptionButton
+                active={preferences.aspectRatio === "landscape"}
+                onClick={() => updatePreferences({ aspectRatio: "landscape" })}
+                ariaLabel="Горизонтальный"
+                className="h-8"
               >
                 <RectangleHorizontal className="h-4 w-4" />
-              </ToggleGroupItem>
-              <ToggleGroupItem 
-                value="square" 
-                aria-label="Квадрат"
-                className={cn(
-                  "flex flex-col items-center gap-1 h-auto py-2 px-1 transition-all",
-                  "data-[state=off]:bg-muted/40 data-[state=off]:hover:bg-muted",
-                  "data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-                )}
+              </OptionButton>
+              <OptionButton
+                active={preferences.aspectRatio === "square"}
+                onClick={() => updatePreferences({ aspectRatio: "square" })}
+                ariaLabel="Квадрат"
+                className="h-8"
               >
                 <Square className="h-4 w-4" />
-              </ToggleGroupItem>
-              <ToggleGroupItem 
-                value="portrait" 
-                aria-label="Вертикальный"
-                className={cn(
-                  "flex flex-col items-center gap-1 h-auto py-2 px-1 transition-all",
-                  "data-[state=off]:bg-muted/40 data-[state=off]:hover:bg-muted",
-                  "data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-                )}
+              </OptionButton>
+              <OptionButton
+                active={preferences.aspectRatio === "portrait"}
+                onClick={() => updatePreferences({ aspectRatio: "portrait" })}
+                ariaLabel="Вертикальный"
+                className="h-8"
               >
                 <RectangleVertical className="h-4 w-4" />
-              </ToggleGroupItem>
-            </ToggleGroup>
+              </OptionButton>
+            </div>
           </div>
 
-          <Separator />
+          {/* Divider */}
+          <div className="h-px bg-border" />
 
           {/* Fit Mode */}
-          <div className="space-y-2">
-            <span className="text-xs text-muted-foreground">Режим отображения</span>
-            <ToggleGroup 
-              type="single" 
-              value={preferences.fitMode} 
-              onValueChange={handleFitModeChange}
-              className="grid grid-cols-2 gap-1"
-            >
-              <ToggleGroupItem 
-                value="fill" 
-                aria-label="Заполнить"
-                className={cn(
-                  "flex flex-col items-center gap-1 h-auto py-2 px-1 transition-all",
-                  "data-[state=off]:bg-muted/40 data-[state=off]:hover:bg-muted",
-                  "data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-                )}
+          <div className="space-y-1.5">
+            <span className="text-[11px] font-medium text-muted-foreground">Режим отображения</span>
+            <div className="grid grid-cols-2 gap-1">
+              <OptionButton
+                active={preferences.fitMode === "fill"}
+                onClick={() => updatePreferences({ fitMode: "fill" })}
+                ariaLabel="Заполнить"
+                className="h-[52px] flex-col gap-1"
               >
                 <Maximize className="h-4 w-4" />
-                <span className="text-[10px]">Заполнить</span>
-              </ToggleGroupItem>
-              <ToggleGroupItem 
-                value="fit" 
-                aria-label="Целиком"
-                className={cn(
-                  "flex flex-col items-center gap-1 h-auto py-2 px-1 transition-all",
-                  "data-[state=off]:bg-muted/40 data-[state=off]:hover:bg-muted",
-                  "data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-                )}
+                <span className="text-[9px] font-medium">Заполнить</span>
+              </OptionButton>
+              <OptionButton
+                active={preferences.fitMode === "fit"}
+                onClick={() => updatePreferences({ fitMode: "fit" })}
+                ariaLabel="Целиком"
+                className="h-[52px] flex-col gap-1"
               >
                 <Shrink className="h-4 w-4" />
-                <span className="text-[10px]">Целиком</span>
-              </ToggleGroupItem>
-            </ToggleGroup>
+                <span className="text-[9px] font-medium">Целиком</span>
+              </OptionButton>
+            </div>
           </div>
         </div>
       </PopoverContent>

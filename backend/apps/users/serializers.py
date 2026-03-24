@@ -1,3 +1,4 @@
+from django.db import models
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
@@ -63,25 +64,28 @@ class UserSerializer(serializers.ModelSerializer):
             # Автоматически создаем квоту для legacy users
             user_quota = UserQuota.objects.create(user=obj)
         
-        # Подсчитываем использование
+        # Подсчитываем использование (3 запроса вместо N+1)
         used_projects = Project.objects.filter(user=obj).count()
-        
-        # Для сцен и элементов считаем максимальное использование в одном проекте/сцене
-        projects = Project.objects.filter(user=obj)
-        max_scenes_used = 0
-        max_elements_used = 0
-        
-        for project in projects:
-            scenes_count = Scene.objects.filter(project=project).count()
-            if scenes_count > max_scenes_used:
-                max_scenes_used = scenes_count
-            
-            scenes = Scene.objects.filter(project=project)
-            for scene in scenes:
-                elements_count = Element.objects.filter(scene=scene).count()
-                if elements_count > max_elements_used:
-                    max_elements_used = elements_count
-        
+
+        max_scenes_used = (
+            Scene.objects.filter(project__user=obj)
+            .values('project')
+            .annotate(c=models.Count('id'))
+            .aggregate(m=models.Max('c'))['m']
+        ) or 0
+
+        max_elements_used = (
+            Element.objects.filter(project__user=obj, scene__isnull=False)
+            .values('scene')
+            .annotate(c=models.Count('id'))
+            .aggregate(m=models.Max('c'))['m']
+        ) or 0
+
+        storage_used = Element.objects.filter(
+            project__user=obj,
+            file_size__isnull=False,
+        ).aggregate(total=models.Sum('file_size'))['total'] or 0
+
         return {
             'max_projects': user_quota.max_projects,
             'used_projects': used_projects,
@@ -89,4 +93,6 @@ class UserSerializer(serializers.ModelSerializer):
             'max_scenes_used': max_scenes_used,
             'max_elements_per_scene': user_quota.max_elements_per_scene,
             'max_elements_used': max_elements_used,
+            'storage_limit_bytes': user_quota.storage_limit_bytes,
+            'storage_used_bytes': storage_used,
         }

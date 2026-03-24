@@ -197,8 +197,12 @@ export const useGenerationStore = create<GenerationState>()((set, get) => ({
     set((state) => ({
       parameters: { ...state.parameters, [key]: value },
     }));
-    // Перезапрашиваем оценку при изменении параметров
-    get()._requestEstimate();
+    // Перезапрашиваем оценку только если параметр влияет на цену
+    const { selectedModel } = get();
+    const param = selectedModel?.parameters_schema.find((p) => p.request_key === key);
+    if (param?.affects_pricing) {
+      get()._requestEstimate();
+    }
   },
 
   setPrompt: (text) => {

@@ -92,19 +92,20 @@ export function ConfigPanel({ className }: ConfigPanelProps) {
                 modelSelectorOpen && "ring-2 ring-primary bg-primary/5"
               )}
             >
-              {selectedModel?.preview_url && (
+              {selectedModel?.preview_url ? (
                 <img
-                  src={selectedModel.preview_url}
+                  src={selectedModel.preview_url.startsWith("http") ? selectedModel.preview_url : `/images/models/${selectedModel.preview_url}.png`}
                   alt=""
                   className="w-10 h-10 rounded-md object-cover"
                 />
+              ) : (
+                <div className="flex w-10 h-10 shrink-0 items-center justify-center rounded-md bg-foreground/[0.05]">
+                  <div className="h-4 w-4 rounded-sm bg-muted-foreground/20" />
+                </div>
               )}
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-sm truncate">
                   {selectedModel?.name ?? "Выберите модель"}
-                </p>
-                <p className="text-xs text-muted-foreground truncate">
-                  {selectedModel?.description}
                 </p>
               </div>
               <ChevronRight 
@@ -129,34 +130,37 @@ export function ConfigPanel({ className }: ConfigPanelProps) {
 
           {/* Стоимость генерации */}
           {selectedModel && (
-            <div className="space-y-2 mt-4">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-sm font-medium">Стоимость</span>
-                {isEstimateLoading ? (
-                  <span className="text-muted-foreground">...</span>
-                ) : estimateError && !estimateCost ? (
-                  <span className="flex items-center gap-1 text-warning">
-                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                    <span className="text-xs">Ошибка</span>
-                  </span>
-                ) : estimateCost ? (
-                  <span className={cn(
-                    "font-medium flex items-center gap-1",
-                    canAfford ? "text-success" : "text-destructive"
-                  )}>
-                    <ChargeIcon size="sm" />
-                    {(() => {
+            <div className="mt-4 rounded-lg border border-border bg-background/50 p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Стоимость</span>
+                <span className={cn(
+                  "flex items-center gap-1 text-xs font-medium",
+                  estimateError && !estimateCost && !isEstimateLoading
+                    ? "text-muted-foreground"
+                    : !isEstimateLoading && !canAfford
+                      ? "text-destructive"
+                      : "text-foreground"
+                )}>
+                  <ChargeIcon size="sm" />
+                  {isEstimateLoading ? (
+                    <span className="w-5 h-3 rounded bg-muted animate-pulse inline-block" />
+                  ) : estimateError && !estimateCost ? (
+                    "—"
+                  ) : estimateCost ? (
+                    (() => {
                       const n = parseFloat(estimateCost);
                       return n % 1 === 0 ? n.toFixed(0) : n.toFixed(1);
-                    })()}
-                  </span>
-                ) : null}
+                    })()
+                  ) : (
+                    "..."
+                  )}
+                </span>
               </div>
               {estimateError && !estimateCost && (
-                <p className="text-xs text-warning">{estimateError}</p>
+                <p className="text-[11px] text-muted-foreground">{estimateError}</p>
               )}
               {!isEstimateLoading && estimateCost && !canAfford && (
-                <p className="text-xs text-destructive">Недостаточно средств</p>
+                <p className="text-[11px] text-destructive">Недостаточно средств</p>
               )}
             </div>
           )}

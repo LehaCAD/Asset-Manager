@@ -246,12 +246,12 @@ export function PromptBar({ projectId, sceneId, groupId, className }: PromptBarP
   }, [activeInput, effectiveGroupId]);
 
   return (
-    <div className={cn("p-4", className)}>
-      <div
-        className={cn(
-          "relative flex items-start gap-3 rounded-xl bg-card p-3 px-4 shadow-lg shadow-black/20"
-        )}
-      >
+    <div
+      className={cn(
+        "relative flex items-start gap-3 rounded-xl bg-card p-3 px-4 m-4 shadow-lg shadow-black/20 border border-border",
+        className
+      )}
+    >
           {/* Add-кнопка */}
           {canSelectImages ? (
             groupsSchema ? (
@@ -393,7 +393,6 @@ export function PromptBar({ projectId, sceneId, groupId, className }: PromptBarP
               Создать
             </button>
           </div>
-      </div>
 
       {/* Element Selection Modal */}
       {activeInput && (

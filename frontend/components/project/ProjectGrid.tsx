@@ -18,20 +18,22 @@ export function ProjectGrid() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      {/* Header - breadcrumbs + count + button (left-aligned) */}
-      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="flex items-center gap-4 px-4 py-3">
-          <span className="text-foreground font-medium">Проекты</span>
-          {!isLoading && (
-            <span className="text-muted-foreground">
-              · {projects.length} {projectsLabel(projects.length)}
-            </span>
-          )}
-          <Button onClick={() => setCreateOpen(true)} size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            Создать проект
-          </Button>
-        </div>
+      {/* Header - breadcrumbs + create button */}
+      <div className="flex items-center border-b px-4 py-2 bg-surface shrink-0">
+        <span className="text-sm text-foreground font-medium">Проекты</span>
+        {!isLoading && (
+          <span className="text-sm text-muted-foreground ml-2">
+            · {projects.length} {projectsLabel(projects.length)}
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() => setCreateOpen(true)}
+          className="flex items-center gap-1.5 h-7 px-3 ml-3 rounded text-xs font-medium text-primary bg-card hover:bg-card/80 transition-colors shrink-0"
+        >
+          <Plus className="h-4 w-4" />
+          Создать проект
+        </button>
       </div>
 
       {/* Grid - full width, no max-width */}

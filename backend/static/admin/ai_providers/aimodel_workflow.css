@@ -17,7 +17,15 @@
   --wf-radius-sm:   10px;
   color: var(--wf-text);
   margin-top: 16px;
+  /* Prevent Django admin sidebar from squeezing content */
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
+
+/* Override Django admin content area to give full width to workflow */
+#content.colM { max-width: none; }
+#content-main { overflow: visible; }
 
 /* ─── Shell / layout ─────────────────────────────────────────────────────── */
 
@@ -231,6 +239,7 @@
 .ai-model-workflow textarea {
   width: 100%;
   min-width: 0;
+  height: auto;
   padding: 10px 14px;
   border: 1.5px solid #cdd8e6;
   border-radius: var(--wf-radius-sm);
@@ -239,7 +248,15 @@
   font-size: 14px;
   line-height: 1.45;
   box-sizing: border-box;
+  overflow: visible;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Override Django admin's default select height which clips text */
+.ai-model-workflow select {
+  height: auto !important;
+  min-height: 40px;
+  overflow: visible;
 }
 
 .ai-model-workflow textarea {
@@ -433,9 +450,9 @@
 }
 
 .ai-model-workflow .wf-card__label-input {
-  width: auto;
+  width: 100%;
   min-width: 120px;
-  max-width: 260px;
+  flex: 1;
   padding: 5px 10px;
   border: 1.5px solid transparent;
   border-radius: 8px;

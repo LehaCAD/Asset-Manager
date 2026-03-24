@@ -161,6 +161,7 @@ export function MoveToGroupDialog({
   // Render tree node
   const renderNode = (node: GroupTreeNode) => {
     const isSelected = selectedTarget === node.group.id;
+    const indent = 12 + node.depth * 24;
 
     return (
       <div key={node.group.id}>
@@ -169,21 +170,23 @@ export function MoveToGroupDialog({
           disabled={node.disabled}
           onClick={() => setSelectedTarget(node.group.id)}
           className={cn(
-            'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors text-left',
+            'w-full flex items-center gap-2 py-2 rounded-md text-sm transition-colors text-left',
             isSelected
               ? 'bg-primary text-primary-foreground'
               : 'hover:bg-muted',
             node.disabled && 'opacity-40 cursor-not-allowed',
           )}
-          style={{ paddingLeft: `${12 + node.depth * 20}px` }}
+          style={{ paddingLeft: `${indent}px`, paddingRight: '12px' }}
         >
-          {node.children.length > 0 && (
+          {node.children.length > 0 ? (
             <ChevronRight className="w-3 h-3 shrink-0 text-muted-foreground" />
+          ) : (
+            <span className="w-3 shrink-0" />
           )}
           <Folder className="w-4 h-4 shrink-0" />
           <span className="truncate">{node.group.name}</span>
         </button>
-        {node.children.map(renderNode)}
+        {node.children.length > 0 && node.children.map(renderNode)}
       </div>
     );
   };

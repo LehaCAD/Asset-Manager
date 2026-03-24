@@ -58,6 +58,11 @@ class UserQuota(models.Model):
         verbose_name='Макс. элементов в группе',
         help_text='Максимальное количество элементов в одной группе'
     )
+    storage_limit_bytes = models.BigIntegerField(
+        default=300 * 1024 * 1024,  # 300 MB
+        verbose_name='Лимит хранилища (байт)',
+        help_text='Максимальный объём файлов в S3. По умолчанию 300 МБ.'
+    )
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name='Дата создания'

@@ -58,17 +58,17 @@ class AIModelAdmin(admin.ModelAdmin):
     fieldsets = (
         ('Model Identity', {'fields': ('provider', 'name', 'model_type', 'is_active')}),
         (
-            'Request Mapping',
+            'Карточка модели',
             {
-                'fields': ('api_endpoint', 'full_url_display', 'request_schema'),
-                'description': 'Transport template and placeholder discovery live here.',
+                'fields': ('preview_url', 'tags', 'description'),
+                'description': 'Превью, теги-бейджи и описание для карточки в селекторе моделей.',
             },
         ),
         (
-            'UI Parameter Overrides',
+            'Request Mapping',
             {
-                'fields': ('preview_url', 'description', 'tags'),
-                'description': 'Model-specific UI metadata and binding overrides are managed via inline records.',
+                'fields': ('api_endpoint', 'full_url_display', 'request_schema', 'status_check_endpoint', 'response_mapping'),
+                'description': 'Transport template and placeholder discovery live here.',
             },
         ),
         (

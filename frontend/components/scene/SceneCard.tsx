@@ -10,6 +10,7 @@ import {
   Layers,
   HardDrive,
   ImageIcon,
+  FolderOpen,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ChargeIcon } from "@/components/ui/charge-icon";
@@ -212,10 +213,11 @@ export function SceneCard({ scene, projectId, index, aspectClass = "aspect-video
             </>
           )}
 
-          {/* Order badge */}
+          {/* Type badge */}
           <div className="absolute top-1.5 left-1.5">
-            <span className="text-[10px] font-mono font-semibold bg-background/80 backdrop-blur-sm text-muted-foreground px-1.5 py-0.5 rounded border border-border/50">
-              #{index + 1}
+            <span className="flex items-center gap-1 text-[10px] font-medium bg-background/80 backdrop-blur-sm text-muted-foreground px-1.5 py-0.5 rounded border border-border/50">
+              <FolderOpen className="h-3 w-3" />
+              Группа
             </span>
           </div>
 

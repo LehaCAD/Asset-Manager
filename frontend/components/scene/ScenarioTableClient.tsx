@@ -97,19 +97,23 @@ export function ScenarioTableClient({ projectId }: ScenarioTableClientProps) {
 
   return (
     <>
-      {/* Header: breadcrumbs + count + button (all left-aligned) + display settings */}
-      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="flex items-center gap-4 px-4 py-3">
-          <Breadcrumbs 
-            projectName={project?.name} 
+      {/* Header: breadcrumbs + create group + display settings */}
+      <div className="flex items-center justify-between border-b px-4 py-2 bg-surface shrink-0">
+        <div className="flex items-center gap-1 min-w-0">
+          <Breadcrumbs
+            projectName={project?.name}
             suffix={!isLoading ? `· ${scenes.length} ${pluralizeScenes(scenes.length)}` : undefined}
           />
-          <Button onClick={() => setCreateOpen(true)} size="sm">
-            <Plus className="h-4 w-4 mr-2" />
+          <button
+            type="button"
+            onClick={() => setCreateOpen(true)}
+            className="flex items-center gap-1.5 h-7 px-3 ml-3 rounded text-xs font-medium text-primary bg-card hover:bg-card/80 transition-colors shrink-0"
+          >
+            <Plus className="h-4 w-4" />
             Добавить группу
-          </Button>
-          <DisplaySettingsPopover />
+          </button>
         </div>
+        <DisplaySettingsPopover />
       </div>
 
       {/* Grid - full width, no max-width limit, with display preferences */}

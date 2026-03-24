@@ -58,6 +58,14 @@ def compile_parameters_schema(ai_model: AIModel) -> list[dict[str, Any]]:
     bindings = ai_model.parameter_bindings.select_related('canonical_parameter').order_by('sort_order', 'id')
     compiled: list[dict[str, Any]] = []
 
+    # Determine which canonical codes affect pricing
+    pricing_codes: set[str] = set()
+    pricing_config = getattr(ai_model, 'pricing_config', None)
+    if pricing_config and pricing_config.mode == pricing_config.MODE_LOOKUP:
+        pricing_codes = set(pricing_config.dimensions or [])
+    elif ai_model.pricing_schema and 'cost_params' in ai_model.pricing_schema:
+        pricing_codes = set(ai_model.pricing_schema['cost_params'])
+
     for binding in bindings:
         parameter = binding.canonical_parameter
         raw_options = binding.options_override or parameter.base_options or []
@@ -101,6 +109,7 @@ def compile_parameters_schema(ai_model: AIModel) -> list[dict[str, Any]]:
             'show_other_button': bool(overflow_options),
             'advanced': binding.is_advanced,
             'visible': binding.is_visible,
+            'affects_pricing': parameter.code in pricing_codes,
         }
         default_value = binding.default_override
         if default_value not in ({}, None, ''):

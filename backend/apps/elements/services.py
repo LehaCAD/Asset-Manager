@@ -344,6 +344,14 @@ def create_generation(project, scene, prompt, ai_model_id, generation_config, us
                 }
                 element.save(update_fields=['generation_config'])
 
+            # Привязываем транзакцию дебита к созданному элементу
+            CreditsTransaction.objects.filter(
+                user=user,
+                reason=CreditsTransaction.REASON_GENERATION_DEBIT,
+                element__isnull=True,
+                metadata__operation_key=operation_key,
+            ).update(element=element)
+
         # Запускаем асинхронную генерацию
         from .tasks import start_generation
         start_generation.delay(element.id)

@@ -47,7 +47,7 @@ export function Navbar() {
     : "??";
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b border-border bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/60">
       <div className="flex h-12 items-center justify-between px-4">
         {/* Logo */}
         <Link
@@ -64,11 +64,9 @@ export function Navbar() {
         <div className="flex items-center gap-1 shrink-0">
           {/* Баланс */}
           {user && (
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-muted/50 text-[13px] font-medium">
-              <div className="flex items-center gap-1 text-[13px]">
-                <ChargeIcon size="md" />
-                <span>{formatCurrency(balance)}</span>
-              </div>
+            <div className="flex items-center gap-1.5 h-7 px-3 rounded bg-success/10 border border-success/20">
+              <ChargeIcon size="sm" />
+              <span className="text-xs font-medium text-foreground">{formatCurrency(balance)}</span>
             </div>
           )}
           

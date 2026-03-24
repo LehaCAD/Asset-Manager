@@ -19,10 +19,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useProjectsStore } from "@/lib/store/projects";
 import { PROJECT_STATUSES } from "@/lib/utils/constants";
-import type { Project, ProjectStatus, AspectRatio } from "@/lib/types";
+import type { Project, ProjectStatus } from "@/lib/types";
 
 interface ProjectSettingsDialogProps {
   project: Project;
@@ -34,14 +33,12 @@ export function ProjectSettingsDialog({ project, open, onOpenChange }: ProjectSe
   const updateProject = useProjectsStore((s) => s.updateProject);
   const [name, setName] = useState(project.name);
   const [status, setStatus] = useState<ProjectStatus>(project.status);
-  const [aspectRatio, setAspectRatio] = useState<AspectRatio>(project.aspect_ratio);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (open) {
       setName(project.name);
       setStatus(project.status);
-      setAspectRatio(project.aspect_ratio);
     }
   }, [open, project]);
 
@@ -54,7 +51,6 @@ export function ProjectSettingsDialog({ project, open, onOpenChange }: ProjectSe
       await updateProject(project.id, {
         name: name.trim(),
         status,
-        aspect_ratio: aspectRatio,
       });
       toast.success("Проект обновлён");
       onOpenChange(false);
@@ -108,25 +104,6 @@ export function ProjectSettingsDialog({ project, open, onOpenChange }: ProjectSe
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Соотношение сторон</Label>
-            <ToggleGroup
-              type="single"
-              value={aspectRatio}
-              onValueChange={(v) => v && setAspectRatio(v as AspectRatio)}
-              className="justify-start gap-2"
-            >
-              <ToggleGroupItem value="16:9" className="flex items-center gap-2 px-4 h-auto py-2.5">
-                <span className="inline-block w-7 h-4 border-2 border-current rounded-sm" />
-                <span className="text-sm">16:9</span>
-              </ToggleGroupItem>
-              <ToggleGroupItem value="9:16" className="flex items-center gap-2 px-4 h-auto py-2.5">
-                <span className="inline-block w-4 h-7 border-2 border-current rounded-sm" />
-                <span className="text-sm">9:16</span>
-              </ToggleGroupItem>
-            </ToggleGroup>
           </div>
 
           <DialogFooter>

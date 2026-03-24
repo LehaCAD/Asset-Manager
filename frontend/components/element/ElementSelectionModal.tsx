@@ -13,16 +13,16 @@ import {
 import { Button } from "@/components/ui/button";
 
 import { ElementSelectionGrid } from "./ElementSelectionGrid";
-import { SceneNavigation } from "./SceneNavigation";
-import { useSceneNeighbors } from "@/lib/hooks/use-scene-neighbors";
+import { ElementFilters } from "./ElementFilters";
 import { useModalSceneElements } from "@/lib/hooks/use-modal-scene-elements";
+import { useScenesStore } from "@/lib/store/scenes";
 import { useSceneWorkspaceStore } from "@/lib/store/scene-workspace";
 import { useUIStore } from "@/lib/store/ui";
 import { toast } from "sonner";
-import { Upload, Plus, X } from "lucide-react";
+import { Upload, Plus, X, Folder, FolderOpen, ChevronRight, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MAX_FILE_SIZE_MB } from "@/lib/utils/constants";
-import type { Element, ElementType, ModalSelectionByScene, ElementFilter } from "@/lib/types";
+import type { Element, ElementType, ModalSelectionByScene, ElementFilter, Scene } from "@/lib/types";
 
 export interface ElementSelectionModalProps {
   isOpen: boolean;
@@ -37,12 +37,125 @@ export interface ElementSelectionModalProps {
   title?: string;
 }
 
-const filterTabs: { value: ElementFilter; label: string }[] = [
-  { value: "all", label: "Все" },
-  { value: "favorites", label: "★ Избранное" },
-  { value: "images", label: "Изображения" },
-  { value: "videos", label: "Видео" },
-];
+
+// --- Group tree node ---
+interface GroupTreeNode {
+  group: Scene;
+  children: GroupTreeNode[];
+}
+
+function buildGroupTree(groups: Scene[]): GroupTreeNode[] {
+  const childrenMap = new Map<number | null, Scene[]>();
+  for (const g of groups) {
+    const key = g.parent ?? null;
+    if (!childrenMap.has(key)) childrenMap.set(key, []);
+    childrenMap.get(key)!.push(g);
+  }
+
+  const build = (parentId: number | null): GroupTreeNode[] => {
+    const children = childrenMap.get(parentId) ?? [];
+    return children
+      .sort((a, b) => a.order_index - b.order_index)
+      .map((group) => ({
+        group,
+        children: build(group.id),
+      }));
+  };
+
+  return build(null);
+}
+
+// --- Tree item component ---
+function GroupTreeItem({
+  node,
+  depth,
+  activeId,
+  onSelect,
+  expandedIds,
+  onToggleExpand,
+}: {
+  node: GroupTreeNode;
+  depth: number;
+  activeId: number;
+  onSelect: (id: number) => void;
+  expandedIds: Set<number>;
+  onToggleExpand: (id: number) => void;
+}) {
+  const isActive = activeId === node.group.id;
+  const hasChildren = node.children.length > 0;
+  const isExpanded = expandedIds.has(node.group.id);
+  const indent = 8 + depth * 16;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => onSelect(node.group.id)}
+        className={cn(
+          "w-full flex items-center gap-1.5 py-1.5 rounded-md text-xs transition-colors text-left group/item",
+          isActive
+            ? "bg-primary/15 text-foreground"
+            : "text-muted-foreground hover:bg-muted hover:text-foreground",
+        )}
+        style={{ paddingLeft: `${indent}px`, paddingRight: "8px" }}
+      >
+        {/* Expand/collapse chevron */}
+        {hasChildren ? (
+          <span
+            role="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleExpand(node.group.id);
+            }}
+            className="shrink-0 p-0.5 rounded hover:bg-muted-foreground/20 cursor-pointer"
+          >
+            {isExpanded ? (
+              <ChevronDown className="w-3 h-3" />
+            ) : (
+              <ChevronRight className="w-3 h-3" />
+            )}
+          </span>
+        ) : (
+          <span className="w-4 shrink-0" />
+        )}
+
+        {/* Folder icon */}
+        {isActive ? (
+          <FolderOpen className="w-3.5 h-3.5 shrink-0 text-primary" />
+        ) : (
+          <Folder className="w-3.5 h-3.5 shrink-0" />
+        )}
+
+        {/* Name */}
+        <span className={cn("truncate", isActive && "font-medium")}>
+          {node.group.name}
+        </span>
+
+        {/* Element count */}
+        {(node.group.elements_count ?? 0) > 0 && (
+          <span className="ml-auto text-[10px] text-muted-foreground/60 shrink-0">
+            {node.group.elements_count}
+          </span>
+        )}
+      </button>
+
+      {/* Children */}
+      {hasChildren && isExpanded && (
+        node.children.map((child) => (
+          <GroupTreeItem
+            key={child.group.id}
+            node={child}
+            depth={depth + 1}
+            activeId={activeId}
+            onSelect={onSelect}
+            expandedIds={expandedIds}
+            onToggleExpand={onToggleExpand}
+          />
+        ))
+      )}
+    </>
+  );
+}
 
 export function ElementSelectionModal({
   isOpen,
@@ -58,7 +171,7 @@ export function ElementSelectionModal({
 }: ElementSelectionModalProps) {
   // Update global UI store for blocking scene dropzone
   const setModalOpen = useUIStore((s) => s.setElementSelectionModalOpen);
-  
+
   useEffect(() => {
     setModalOpen(isOpen);
     return () => setModalOpen(false);
@@ -66,22 +179,45 @@ export function ElementSelectionModal({
 
   // Local state for active scene in modal
   const [activeSceneId, setActiveSceneId] = useState(currentSceneId);
-  
+
   // Local selection state by scene
   const [selectionByScene, setSelectionByScene] = useState<ModalSelectionByScene>({});
-  
+
   // Local filter state
   const [filter, setFilter] = useState<ElementFilter>("all");
 
-  // Load scene neighbors for navigation
-  const {
-    previousScene,
-    nextScene,
-    currentScene,
-    currentIndex,
-    total,
-    isReady,
-  } = useSceneNeighbors({ projectId, sceneId: activeSceneId, autoLoad: true });
+  // Expanded groups in tree
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+
+  // Load all groups for the tree sidebar
+  const scenes = useScenesStore((s) => s.scenes);
+  const ensureScenesLoaded = useScenesStore((s) => s.ensureScenesLoaded);
+
+  useEffect(() => {
+    if (isOpen) void ensureScenesLoaded(projectId);
+  }, [isOpen, projectId, ensureScenesLoaded]);
+
+  // Build tree
+  const groupTree = useMemo(() => buildGroupTree(scenes), [scenes]);
+
+  // Auto-expand parent of current scene on open
+  useEffect(() => {
+    if (isOpen && currentSceneId) {
+      const current = scenes.find((s) => s.id === currentSceneId);
+      if (current?.parent) {
+        setExpandedIds((prev) => new Set([...prev, current.parent!]));
+      }
+    }
+  }, [isOpen, currentSceneId, scenes]);
+
+  const handleToggleExpand = useCallback((id: number) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   // Load elements for active scene
   const { elements, isLoading, loadElements } = useModalSceneElements();
@@ -111,11 +247,6 @@ export function ElementSelectionModal({
       void loadElements(activeSceneId);
     }
   }, [isOpen, activeSceneId, loadElements]);
-
-  // Handle scene navigation within modal
-  const handleSceneNavigate = useCallback((sceneId: number) => {
-    setActiveSceneId(sceneId);
-  }, []);
 
   // Calculate filter counts
   const filterCounts = useMemo(() => {
@@ -257,13 +388,16 @@ export function ElementSelectionModal({
     onClose();
   }, [onClose]);
 
+  // Active group name
+  const activeGroup = scenes.find((s) => s.id === activeSceneId);
+
   // Modal title
   const modalTitle = title || (max === 1 ? "Выбор элемента" : "Выбор элементов");
   const isValidSelection = totalSelectedCount >= min;
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent showCloseButton={false} className="sm:max-w-5xl p-0 gap-0 overflow-hidden flex flex-col max-h-[85vh]">
+      <DialogContent showCloseButton={false} className="sm:max-w-5xl p-0 gap-0 overflow-hidden flex flex-col h-[85vh]">
         {/* Header with title, upload button, and close */}
         <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
           <div className="flex items-center justify-between gap-4">
@@ -287,73 +421,86 @@ export function ElementSelectionModal({
           </div>
         </DialogHeader>
 
-        {/* Scene navigation */}
-        {isReady && (
-          <div className="px-6 py-3 border-b bg-muted/30 shrink-0">
-            <div className="flex items-center justify-center">
-              <SceneNavigation
-                previousScene={previousScene}
-                nextScene={nextScene}
-                currentScene={currentScene}
-                currentIndex={currentIndex}
-                total={total}
-                onNavigate={handleSceneNavigate}
+        {/* Body: sidebar + content */}
+        <div className="flex flex-1 min-h-0">
+          {/* Sidebar: group tree */}
+          <div className="w-48 shrink-0 border-r bg-muted/30 overflow-y-auto py-2 px-1.5">
+            <p className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider px-2 mb-1.5">
+              Группы
+            </p>
+            {groupTree.length === 0 ? (
+              <p className="text-xs text-muted-foreground px-2 py-4">Нет групп</p>
+            ) : (
+              groupTree.map((node) => (
+                <GroupTreeItem
+                  key={node.group.id}
+                  node={node}
+                  depth={0}
+                  activeId={activeSceneId}
+                  onSelect={setActiveSceneId}
+                  expandedIds={expandedIds}
+                  onToggleExpand={handleToggleExpand}
+                />
+              ))
+            )}
+          </div>
+
+          {/* Right side: filters + grid */}
+          <div className="flex-1 flex flex-col min-w-0">
+            {/* Active group name + filters */}
+            <div className="px-4 py-2.5 border-b shrink-0 flex items-center gap-3">
+              <div className="flex items-center gap-1.5 mr-2">
+                <Folder className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-sm font-medium truncate max-w-[200px]">
+                  {activeGroup?.name ?? "..."}
+                </span>
+              </div>
+              <ElementFilters
+                filter={filter}
+                onFilterChange={setFilter}
+                counts={filterCounts}
               />
             </div>
-          </div>
-        )}
 
-        {/* Filters */}
-        <div className="px-6 py-3 border-b shrink-0">
-          <div className="flex items-center gap-1">
-            {filterTabs.map((tab) => (
-              <Button
-                key={tab.value}
-                variant={filter === tab.value ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setFilter(tab.value)}
-                className="h-8 px-3"
-              >
-                {tab.label} ({filterCounts[tab.value]})
-              </Button>
-            ))}
-          </div>
-        </div>
+            {/* Grid with elements - dropzone area */}
+            <div
+              className={cn(
+                "flex-1 overflow-auto p-4 relative min-h-[350px]",
+                isDragActive && "bg-primary/5"
+              )}
+              {...getRootProps()}
+            >
+              <input {...getInputProps()} />
 
-        {/* Grid with elements - dropzone area */}
-        <div 
-          className={cn(
-            "flex-1 overflow-auto p-6 relative min-h-[400px]",
-            isDragActive && "bg-primary/5"
-          )}
-          {...getRootProps()}
-        >
-          <input {...getInputProps()} />
-          
-          {isLoading ? (
-            <div className="flex items-center justify-center h-full text-muted-foreground">
-              <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mr-3" />
-              Загрузка элементов...
+              {isLoading ? (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mr-3" />
+                  Загрузка...
+                </div>
+              ) : filteredElements.length === 0 ? (
+                <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                  Нет элементов
+                </div>
+              ) : (
+                <ElementSelectionGrid
+                  elements={filteredElements}
+                  selectedIds={selectedIdsForCurrentScene}
+                  onToggle={handleToggle}
+                  maxReached={maxReached}
+                />
+              )}
+
+              {/* Drag overlay */}
+              {isDragActive && (
+                <div className="absolute inset-0 z-50 border-2 border-dashed border-primary bg-primary/5 flex items-center justify-center pointer-events-none">
+                  <div className="flex flex-col items-center gap-3">
+                    <Upload className="h-10 w-10 text-primary animate-pulse" />
+                    <p className="text-lg font-medium text-primary">Отпустите файлы для загрузки</p>
+                  </div>
+                </div>
+              )}
             </div>
-          ) : (
-            <ElementSelectionGrid
-              elements={filteredElements}
-              selectedIds={selectedIdsForCurrentScene}
-              onToggle={handleToggle}
-              maxReached={maxReached}
-            />
-          )}
-
-          {/* Drag overlay */}
-          {isDragActive && (
-            <div className="fixed inset-0 z-50 border-2 border-dashed border-primary bg-primary/5 flex items-center justify-center pointer-events-none">
-              <div className="flex flex-col items-center gap-3">
-                <Upload className="h-10 w-10 text-primary animate-pulse" />
-                <p className="text-lg font-medium text-primary">Отпустите файлы для загрузки</p>
-                <p className="text-sm text-muted-foreground">JPG, PNG, MP4, MOV</p>
-              </div>
-            </div>
-          )}
+          </div>
         </div>
 
         {/* Footer */}

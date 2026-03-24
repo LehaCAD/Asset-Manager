@@ -96,8 +96,9 @@ document.addEventListener('DOMContentLoaded', () => {
     el.querySelector('[data-ii-slot-key]').value         = slot.key || '';
     el.querySelector('[data-ii-slot-label]').value       = slot.label || '';
     el.querySelector('[data-ii-slot-description]').value = slot.description || '';
-    el.querySelector('[data-ii-slot-icon]').value        = slot.icon || '';
-    el.querySelector('[data-ii-slot-min]').value         = slot.min != null ? slot.min : 0;
+    el.querySelector('[data-ii-slot-icon]').value          = slot.icon || '';
+    el.querySelector('[data-ii-slot-illustration]').value = slot.illustration || '';
+    el.querySelector('[data-ii-slot-min]').value          = slot.min != null ? slot.min : 0;
     el.querySelector('[data-ii-slot-max]').value         = slot.max != null ? slot.max : 1;
     el.querySelector('[data-ii-slot-depends-on]').value  = slot.depends_on || '';
     el.dataset.pendingDependsOn = slot.depends_on || '';
@@ -257,6 +258,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (desc) slot.description = desc;
     var icon = slotEl.querySelector('[data-ii-slot-icon]').value.trim();
     if (icon) slot.icon = icon;
+    var illus = slotEl.querySelector('[data-ii-slot-illustration]').value.trim();
+    if (illus) slot.illustration = illus;
     var dep = slotEl.querySelector('[data-ii-slot-depends-on]').value;
     if (dep) slot.depends_on = dep;
     return slot;

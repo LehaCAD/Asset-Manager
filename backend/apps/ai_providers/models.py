@@ -80,6 +80,26 @@ class AIModel(models.Model):
         verbose_name='Путь эндпоинта',
         help_text='Путь эндпоинта, например /v1/generate или /nano-banana'
     )
+    status_check_endpoint = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        verbose_name='Эндпоинт проверки статуса',
+        help_text='Путь для polling статуса. Пусто = /api/v1/jobs/recordInfo (стандарт Kie.ai). '
+                  'Для VEO: /api/v1/veo/record-info'
+    )
+    response_mapping = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name='Маппинг ответа API',
+        help_text=(
+            'Как парсить ответ провайдера. Пусто = стандарт Kie.ai.\n'
+            'Поля: state_path, success_value, failed_values, result_url_path, error_path.\n'
+            'Пример VEO: {"state_path": "data.successFlag", "success_value": 1, '
+            '"failed_values": [2, 3], "result_url_path": "data.response.resultUrls.0", '
+            '"error_path": "data.errorMessage"}'
+        ),
+    )
     request_schema = models.JSONField(
         default=dict,
         blank=True,
@@ -92,11 +112,11 @@ class AIModel(models.Model):
         verbose_name='Схема параметров',
         help_text='Описание параметров для UI в виде списка: [{"key": "aspect_ratio", "label": "Соотношение сторон", "type": "toggle_group", "options": [...], "default": "1:1"}]'
     )
-    preview_url = models.URLField(
+    preview_url = models.CharField(
         max_length=500,
         blank=True,
         verbose_name='URL превью',
-        help_text='URL превью-картинки для карточки модели в селекторе'
+        help_text='URL или путь к превью-картинке, например: /images/models/veo_3_1_fast.png или https://...'
     )
     description = models.TextField(
         blank=True,

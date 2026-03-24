@@ -1,5 +1,7 @@
 import logging
+import requests
 
+from django.http import StreamingHttpResponse
 from django.db.models import Sum, Subquery, OuterRef, DecimalField
 from django.db.models.functions import Abs
 from rest_framework import viewsets, permissions, status
@@ -130,6 +132,41 @@ class ElementViewSet(viewsets.ModelViewSet):
 
         reorder_elements(element_ids)
         return Response({'status': 'ok'})
+
+    @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
+    def download(self, request, pk=None):
+        """
+        Proxy-скачивание файла элемента.
+        GET /api/elements/{id}/download/
+        """
+        element = self.get_object()
+        if not element.file_url:
+            return Response(
+                {'error': 'Файл не найден'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        try:
+            r = requests.get(element.file_url, stream=True, timeout=30)
+            r.raise_for_status()
+        except requests.RequestException:
+            return Response(
+                {'error': 'Не удалось скачать файл'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        ext = element.file_url.rsplit('.', 1)[-1].split('?')[0] if '.' in element.file_url else 'file'
+        filename = f'element-{element.id}.{ext}'
+        content_type = r.headers.get('Content-Type', 'application/octet-stream')
+
+        response = StreamingHttpResponse(
+            r.iter_content(chunk_size=8192),
+            content_type=content_type,
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        if 'Content-Length' in r.headers:
+            response['Content-Length'] = r.headers['Content-Length']
+        return response
 
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
     def move(self, request):

@@ -144,6 +144,21 @@ SceneWorkspace
 └── Zone 4: LightboxModal (полноэкранный просмотр + DetailPanel)
 ```
 
+## Дизайн-система
+
+Все визуальные решения хранятся в **pen-файле** и документации:
+
+- `pen/pencil-new.pen` — основной дизайн-файл (открывать через Pencil / Cursor)
+  - **Color System v2** (node `gx1cz`) — единый источник правды: цвета dark/light, состояния компонентов, типографика, spacing, скругления, правила использования, специальные элементы (gradient button, теги, popup-стиль, breadcrumbs, source images, иконки Lucide, GroupCard паттерн)
+  - **UI Primitives** (node `p7bxZ`) — Button, Input, Badge, Switch, Toggle, Tabs, Skeleton, Select, Separator, ChargeIcon во всех вариантах
+  - **Composed Components** (node `quniB`) — ModelCard, DetailPanel, Group Tree, Breadcrumbs
+  - Отдельные фреймы: ElementCard, GroupCard, PromptBar, ProjectCard, EmptyState
+  - Готовые mockup'ы: ConfigPanel (`vhJaR`), Aspect Ratio Grid (`B373b`), Header+Breadcrumbs (`4LdlA`), View Popover (`rm7Gb`), Bulk Actions (`x4yHo`), ModelSelector (`utRXR`), ModeSelector (`zY3MQ`), Full Workspace (`SPr2a`)
+- `docs/COMPONENT_INVENTORY.md` — инвентаризация всех 60 React-компонентов
+- `docs/BACKLOG_IDEAS.md` — бэклог UI/UX идей
+- `.claude/skills/pen-to-code/` — скилл переноса дизайна из pen в код
+- `.claude/skills/ux-analysis/` — скилл UX-анализа перед реализацией
+
 ## Документация
 
 - `ARCHITECTURE_CONSTITUTION.md` — правила архитектуры frontend/backend, чеклисты ревью, протоколы дебага.
