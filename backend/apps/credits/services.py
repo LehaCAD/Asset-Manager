@@ -325,14 +325,22 @@ class CreditsService:
         # Ни fixed_cost, ни lookup pricing не найдены
         return None
     
+    @staticmethod
+    def _round_up_to_half(value: Decimal) -> Decimal:
+        """Округление вверх до ближайших 0.5 (в пользу владельца).
+
+        7.02 → 7.5, 3.50 → 3.5, 5.00 → 5.0, 4.01 → 4.5
+        """
+        doubled = value * 2
+        ceiled = doubled.to_integral_value(rounding=ROUND_CEILING)
+        return ceiled / 2
+
     def _apply_pricing_percent(self, base_cost: Decimal, pricing_percent: int) -> Decimal:
         """
-        Применить процент цены к базовой стоимости.
-        
-        pricing_percent=100 -> себестоимость
-        pricing_percent=80 -> скидка 20%
-        pricing_percent=130 -> наценка 30%
+        pricing_percent=100 -> себестоимость (100%)
+        pricing_percent=80 -> скидка 20% (80%)
+        pricing_percent=130 -> наценка 30% (130%)
         """
         multiplier = Decimal(pricing_percent) / Decimal(100)
-        final_cost = (base_cost * multiplier).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-        return final_cost
+        final_cost = base_cost * multiplier
+        return self._round_up_to_half(final_cost)
