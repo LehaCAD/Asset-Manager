@@ -127,7 +127,7 @@ export function AspectRatioIcon({ value }: { value: string }) {
 
   return (
     <span
-      className="inline-block rounded-[2px] border-[1.5px] border-current"
+      className="block shrink-0 rounded-[2px] border-[1.5px] border-current"
       style={{ width: `${width}px`, height: `${height}px` }}
     />
   );
