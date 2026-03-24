@@ -21,7 +21,7 @@ import { DetailPanel } from '@/components/lightbox/DetailPanel';
 import { useKeyboard } from '@/lib/hooks/use-keyboard';
 import { scenesApi } from '@/lib/api/scenes';
 import { MoveToGroupDialog } from '@/components/element/MoveToGroupDialog';
-import { Upload, ChevronLeft, FolderPlus } from 'lucide-react';
+import { Upload, ChevronLeft, ChevronRight, FolderPlus } from 'lucide-react';
 import { CreateSceneDialog } from '@/components/scene/CreateSceneDialog';
 import {
   Dialog,
@@ -508,12 +508,12 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
                     <ChevronLeft className="w-4 h-4" />
                     <span>Назад</span>
                   </button>
-                  <span className="text-muted-foreground/30 mx-1.5">›</span>
+                  <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30 mx-0.5 shrink-0" />
                 </>
               )}
               {breadcrumbs.map((crumb, i) => (
                 <span key={i} className="flex items-center gap-1">
-                  {i > 0 && <span className="text-muted-foreground/30 mx-1.5">›</span>}
+                  {i > 0 && <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30 mx-0.5 shrink-0" />}
                   {crumb.href ? (
                     <button
                       type="button"
