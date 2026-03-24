@@ -22,7 +22,11 @@
 
 **Файл:** `frontend/lib/store/generation.ts` → `generate()` catch-блок
 
-**Нюанс:** optimistic элемент с отрицательным tempId живёт только в памяти. При перезагрузке пропадёт. Это ок — деньги не списались, элемент не создан на бэкенде.
+**Нюансы optimistic элементов (отрицательный tempId):**
+- Живёт только в памяти — при перезагрузке пропадёт. Это ок, деньги не списались.
+- **Delete:** `deleteElements` должен проверять `id < 0` и удалять из локального стейта без API-вызова, иначе `DELETE /api/elements/-123/` вернёт 404.
+- **Multi-select:** error cards с отрицательным ID не участвуют в bulk actions (move to group, bulk delete). Selection checkbox скрыт для `isFailed`.
+- **`ai_model_name`:** optimistic элемент не содержит `ai_model_name`. Передавать `selectedModel.name` в `createOptimisticGeneration` или lookup из `availableModels` по `element.ai_model` при рендере.
 
 ### 2. Error Card — Default State (без hover)
 
@@ -55,7 +59,7 @@
 
 ### 3. Error Card — Hover State
 
-Поверх всей карточки (z-20, как у обычных карточек):
+**Заменяет** обычный hover overlay (z-20). Когда `isFailed === true`, обычный hover (Download + Delete) НЕ рендерится — вместо него рендерится error hover:
 
 ```
 ┌─────────────────────────────┐
@@ -87,11 +91,12 @@
 2. Если не найдена → `toast.error("Модель недоступна")`; return
 3. `selectModel(model)` — загружает defaults и image_inputs_schema
 4. `setPrompt(element.prompt_text)`
-5. Восстановить параметры: для каждого ключа в `generation_config` (кроме `_debit_amount`, `_debit_transaction`, `input_urls`) → `setParameter(key, value)`
-6. Если в лайтбоксе → `closeLightbox()`
-7. `toast.success("Параметры загружены")`
+5. Восстановить параметры: для каждого ключа в `generation_config` — пропускать ключи начинающиеся с `_` и значения-URL (строки начинающиеся с `http`), массивы URL. Остальное → `setParameter(key, value)`
+6. Если `isGenerating` → `toast.error("Генерация уже выполняется")`; return (проверять до шага 3)
+7. `useSceneWorkspaceStore.getState().closeLightbox()` (если лайтбокс открыт)
+8. `toast.success("Параметры загружены")`
 
-**Размещение:** вынести в хелпер или action в generation store, чтобы не дублировать между ElementCard и DetailPanel.
+**Размещение:** action `retryFromElement(element)` в generation store. ElementCard вызывает через `onRetry` prop (новый callback, как `onDelete`). DetailPanel вызывает напрямую из store.
 
 ### 5. Что НЕ входит в эту задачу
 
@@ -99,14 +104,17 @@
 - Bulk delete failed cards — отдельная задача
 - Автоудаление failed cards по таймеру — не делаем (никто не делает)
 - Изменение backend/моделей данных — не нужно
+- Фильтр "failed" в ElementFilters — follow-up
 
 ## Файлы для изменения
 
 | Файл | Что делать |
 |------|-----------|
-| `frontend/components/element/ElementCard.tsx` | Новый error overlay (default + hover) с retry |
-| `frontend/lib/store/generation.ts` | 1) catch-блок: FAILED вместо discard. 2) Shared retry action |
-| `frontend/components/lightbox/DetailPanel.tsx` | Использовать shared retry вместо inline логики |
+| `frontend/components/element/ElementCard.tsx` | Новый error overlay (default + hover), `onRetry` prop, скрыть checkbox для failed |
+| `frontend/lib/store/generation.ts` | 1) catch-блок: FAILED вместо discard. 2) `retryFromElement()` action |
+| `frontend/lib/store/scene-workspace.ts` | Guard в `deleteElements`: id < 0 → local remove без API |
+| `frontend/components/lightbox/DetailPanel.tsx` | Использовать `retryFromElement()` вместо inline логики |
+| `frontend/components/element/SceneWorkspace.tsx` | Прокинуть `onRetry` в ElementCard |
 
 ## Проверка готовности
 
