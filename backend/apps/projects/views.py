@@ -100,6 +100,53 @@ class ProjectViewSet(viewsets.ModelViewSet):
         return Response({'status': 'ok'})
 
     @action(detail=True, methods=['post'])
+    def presign(self, request, pk=None):
+        """Generate presigned URLs for direct S3 upload at project level (no group)."""
+        project = self.get_object()
+        from apps.common.presigned import generate_upload_presigned_urls
+        from apps.scenes.s3_utils import validate_file_type, detect_element_type
+
+        filename = request.data.get('filename', '')
+        file_size = request.data.get('file_size', 0)
+
+        if not validate_file_type(filename):
+            return Response(
+                {'error': 'Неподдерживаемый формат файла'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        element_type = detect_element_type(filename)
+
+        result = generate_upload_presigned_urls(
+            project_id=project.id,
+            scene_id=None,
+            filename=filename,
+            element_type=element_type,
+        )
+
+        # Calculate order_index (append to end, root-level elements only)
+        current_count = Element.objects.filter(
+            project=project, scene__isnull=True,
+        ).count()
+
+        # Create Element in UPLOADING status
+        element = Element.objects.create(
+            project=project,
+            scene=None,
+            element_type=element_type,
+            status=Element.STATUS_UPLOADING,
+            source_type=Element.SOURCE_UPLOADED,
+            upload_keys=result['upload_keys'],
+            prompt_text=request.data.get('prompt_text', ''),
+            order_index=current_count,
+        )
+
+        return Response({
+            'element_id': element.id,
+            **result,
+        })
+
+    @action(detail=True, methods=['post'])
     def generate(self, request, pk=None):
         """
         Запустить AI генерацию элемента на уровне проекта (без группы).
