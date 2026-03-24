@@ -1,20 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDate, formatStorage, formatCurrency } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
-import { Copy, Check, Save } from "lucide-react";
+import { Copy, Check, Save, RotateCcw, ImageOff } from "lucide-react";
 import { toast } from "sonner";
 import { elementsApi } from "@/lib/api/elements";
+import { useGenerationStore } from "@/lib/store/generation";
 import type { Element } from "@/lib/types";
 
 interface DetailPanelProps {
   element: Element;
   onUpdateElement?: (id: number, updates: Partial<Element>) => void;
+  onClose?: () => void;
 }
 
 const sourceLabels: Record<string, string> = {
@@ -23,11 +24,53 @@ const sourceLabels: Record<string, string> = {
   IMG2VID: "Из изображения",
 };
 
-export function DetailPanel({ element, onUpdateElement }: DetailPanelProps) {
+/** Keys in generation_config that are system metadata, not user params */
+const HIDDEN_CONFIG_KEYS = new Set(["_debit_amount", "_debit_transaction", "input_urls"]);
+
+/** Extract image URLs from generation_config. URLs stored under variable key names as arrays or strings. */
+function extractInputImageUrls(config: Record<string, unknown> | null | undefined): string[] {
+  if (!config) return [];
+  const urls: string[] = [];
+  for (const [key, value] of Object.entries(config)) {
+    if (key.startsWith("_")) continue; // skip internal keys (_debit_amount, _debit_transaction)
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (typeof item === "string" && item.startsWith("http")) urls.push(item);
+      }
+    } else if (typeof value === "string" && value.startsWith("http")) {
+      urls.push(value);
+    }
+  }
+  return urls;
+}
+
+/** 40x40 thumbnail with error fallback via React state. */
+function InputImageThumbnail({ url, index }: { url: string; index: number }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return (
+      <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center">
+        <ImageOff className="h-4 w-4 text-muted-foreground" />
+      </div>
+    );
+  }
+  return (
+    <img
+      src={url}
+      alt={`Исходное ${index + 1}`}
+      className="w-10 h-10 rounded-md object-cover bg-muted"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
+export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelProps) {
   const [promptText, setPromptText] = useState(element.prompt_text ?? "");
   const [isSaving, setIsSaving] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [commentText, setCommentText] = useState("");
+
+  const { availableModels, selectModel, setPrompt, setParameter } = useGenerationStore();
 
   // Sync prompt text when element changes
   useEffect(() => {
@@ -35,10 +78,23 @@ export function DetailPanel({ element, onUpdateElement }: DetailPanelProps) {
   }, [element.id, element.prompt_text]);
 
   const hasPromptChanged = promptText !== (element.prompt_text ?? "");
+  const isGenerated = element.source_type === "GENERATED" || element.source_type === "IMG2VID";
+
+  // Filter generation_config to user-visible params
+  const configParams = useMemo(() => {
+    if (!element.generation_config || !isGenerated) return [];
+    return Object.entries(element.generation_config)
+      .filter(([key]) => !HIDDEN_CONFIG_KEYS.has(key))
+      .map(([key, value]) => ({ key, value: String(value) }));
+  }, [element.generation_config, isGenerated]);
+
+  // Cost from generation_config
+  const generationCost = element.generation_cost
+    ?? (element.generation_config?.["_debit_amount"] as string | undefined);
 
   const metadata = [
     ...(element.ai_model_name ? [{ label: "Модель", value: element.ai_model_name }] : []),
-    ...(element.generation_cost ? [{ label: "Стоимость", value: formatCurrency(element.generation_cost) }] : []),
+    ...(generationCost ? [{ label: "Стоимость", value: formatCurrency(generationCost) }] : []),
     ...(element.file_size ? [{ label: "Размер", value: formatStorage(element.file_size) }] : []),
     ...(element.seed ? [{ label: "Seed", value: String(element.seed) }] : []),
     { label: "Создан", value: formatDate(element.created_at) },
@@ -70,6 +126,30 @@ export function DetailPanel({ element, onUpdateElement }: DetailPanelProps) {
     }
   };
 
+  const handleRepeat = () => {
+    // Find matching model
+    const model = availableModels.find((m) => m.id === element.ai_model);
+    if (!model) {
+      toast.error("Модель недоступна");
+      return;
+    }
+
+    selectModel(model);
+    setPrompt(element.prompt_text ?? "");
+
+    // Restore parameters from generation_config
+    if (element.generation_config) {
+      for (const [key, value] of Object.entries(element.generation_config)) {
+        if (!HIDDEN_CONFIG_KEYS.has(key)) {
+          setParameter(key, value);
+        }
+      }
+    }
+
+    toast.success("Параметры загружены");
+    onClose?.();
+  };
+
   return (
     <div className="p-4 space-y-4">
       {/* Metadata Section */}
@@ -85,6 +165,54 @@ export function DetailPanel({ element, onUpdateElement }: DetailPanelProps) {
           ))}
         </dl>
       </div>
+
+      {/* Generation Parameters - only for generated elements */}
+      {isGenerated && configParams.length > 0 && (
+        <div>
+          <h3 className="text-sm font-medium text-muted-foreground mb-2">Параметры</h3>
+          <Separator className="mb-3" />
+          <dl className="space-y-1.5 text-sm">
+            {configParams.map(({ key, value }) => (
+              <div key={key} className="flex justify-between gap-2">
+                <dt className="text-muted-foreground truncate">{key}:</dt>
+                <dd className="font-medium text-right truncate max-w-[140px]" title={value}>
+                  {value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
+
+      {/* Error Section - for failed elements */}
+      {element.status === "FAILED" && element.error_message && (
+        <div>
+          <h3 className="text-sm font-medium text-destructive mb-2">Ошибка</h3>
+          <Separator className="mb-3" />
+          <p className="text-sm text-muted-foreground">{element.error_message}</p>
+        </div>
+      )}
+
+        {/* Исходные изображения */}
+        {(() => {
+          const inputUrls = extractInputImageUrls(element.generation_config);
+          if (inputUrls.length === 0) return null;
+          return (
+            <>
+              <Separator />
+              <div className="space-y-2">
+                <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Исходные изображения
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {inputUrls.map((url, i) => (
+                    <InputImageThumbnail key={url} url={url} index={i} />
+                  ))}
+                </div>
+              </div>
+            </>
+          );
+        })()}
 
       {/* Prompt Section */}
       <div>
@@ -128,6 +256,21 @@ export function DetailPanel({ element, onUpdateElement }: DetailPanelProps) {
         </div>
       </div>
 
+      {/* Repeat button - only for generated elements */}
+      {isGenerated && (
+        <div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRepeat}
+            className="w-full"
+          >
+            <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+            Повторить запрос
+          </Button>
+        </div>
+      )}
+
       {/* Comments Placeholder */}
       <div>
         <h3 className="text-sm font-medium text-muted-foreground mb-2">Комментарии</h3>
@@ -144,7 +287,6 @@ export function DetailPanel({ element, onUpdateElement }: DetailPanelProps) {
           Функция комментариев в разработке
         </p>
       </div>
-
     </div>
   );
 }
