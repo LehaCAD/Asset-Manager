@@ -56,6 +56,7 @@ class ProjectConsumer(AsyncJsonWebsocketConsumer):
             'status': event['status'],
             'file_url': event.get('file_url', ''),
             'thumbnail_url': event.get('thumbnail_url', ''),
+            'preview_url': event.get('preview_url', ''),
             'error_message': event.get('error_message', ''),
         })
 

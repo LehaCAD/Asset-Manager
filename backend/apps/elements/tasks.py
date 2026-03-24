@@ -30,7 +30,7 @@ from apps.ai_providers.validators import validate_model_admin_config
 logger = logging.getLogger(__name__)
 
 
-def notify_element_status(element: Element, status: str, file_url: str = '', error_message: str = '') -> None:
+def notify_element_status(element: Element, status: str, file_url: str = '', error_message: str = '', preview_url: str = '') -> None:
     """
     Отправить WebSocket-уведомление об изменении статуса элемента.
     Вызывается из Celery-задач при завершении/ошибке генерации.
@@ -54,6 +54,7 @@ def notify_element_status(element: Element, status: str, file_url: str = '', err
                 'status': status,
                 'file_url': file_url,
                 'thumbnail_url': element.thumbnail_url or '',
+                'preview_url': preview_url or element.preview_url or '',
                 'error_message': error_message,
             }
         )
