@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP, ROUND_CEILING
 from typing import Any
 
 from django.db import transaction
@@ -53,7 +53,7 @@ class CreditsService:
         return {
             "balance": str(user.balance),
             "pricing_percent": user.pricing_percent,
-            "label": f"{user.balance} ₽",
+            "label": f"{user.balance} зар.",
         }
     
     def estimate_generation(
@@ -87,7 +87,7 @@ class CreditsService:
             cost=final_cost,
             balance=user.balance,
             can_afford=can_afford,
-            error=None if can_afford else self.ERROR_INSUFFICIENT_FUNDS
+            error=None
         )
 
     @transaction.atomic
@@ -303,7 +303,11 @@ class CreditsService:
                         value = generation_config.get(binding.placeholder)
                 if value is None:
                     return None
-                key_parts.append(str(value))
+                # Normalize booleans to lowercase (True → "true") for lookup key
+                if isinstance(value, bool):
+                    key_parts.append(str(value).lower())
+                else:
+                    key_parts.append(str(value))
             
             lookup_key = "|".join(key_parts)
             
@@ -311,8 +315,11 @@ class CreditsService:
                 return None
             
             try:
-                return Decimal(str(costs[lookup_key]))
-            except (ValueError, TypeError):
+                raw_cost = str(costs[lookup_key]).strip()
+                if not raw_cost:
+                    return None
+                return Decimal(raw_cost)
+            except (ValueError, TypeError, InvalidOperation):
                 return None
         
         # Ни fixed_cost, ни lookup pricing не найдены
