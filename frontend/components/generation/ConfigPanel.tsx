@@ -118,19 +118,18 @@ export function ConfigPanel({ className }: ConfigPanelProps) {
 
           {/* Parameters form */}
           {hasParameters && (
-            <>
-              <div className="h-px bg-border my-3" />
+            <div className="mt-3">
               <ParametersForm
                 schema={selectedModel?.parameters_schema ?? []}
                 values={parameters}
                 onChange={setParameter}
               />
-            </>
+            </div>
           )}
 
           {/* Стоимость генерации */}
           {selectedModel && (
-            <div className="space-y-2 pt-3 mt-3 border-t border-border">
+            <div className="space-y-2 mt-4">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Стоимость</span>
                 {isEstimateLoading ? (

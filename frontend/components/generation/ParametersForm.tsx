@@ -42,17 +42,15 @@ export function ParametersForm({ schema, values, onChange }: ParametersFormProps
   };
 
   return (
-    <div className="space-y-0">
-      {visibleSchema.map((param, index) => (
-        <div key={param.request_key}>
-          {index > 0 && <div className="h-px bg-border my-2.5" />}
-          <ParameterField
-            param={param}
-            value={values[param.request_key]}
-            onChange={onChange}
-            onOpenCustom={handleOpenCustom}
-          />
-        </div>
+    <div className="space-y-3">
+      {visibleSchema.map((param) => (
+        <ParameterField
+          key={param.request_key}
+          param={param}
+          value={values[param.request_key]}
+          onChange={onChange}
+          onOpenCustom={handleOpenCustom}
+        />
       ))}
 
       {activeCustomParam && (
@@ -154,11 +152,29 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
     const hasOverflow = (show_other_button ?? false) && overflowOptions.length > 0;
     const selectedOverflowOption = overflowOptions.find((opt) => opt.value === currentValue);
     const isAspectRatio = param.ui_semantic === "aspect_ratio";
+    const isResolution = param.ui_semantic === "resolution";
+
+    // Layout: aspect_ratio → 4-col grid, resolution → equal grid, others → flex wrap
+    const containerClass = isAspectRatio
+      ? "grid grid-cols-4 gap-1.5"
+      : isResolution
+        ? "grid grid-cols-3 gap-1.5"
+        : "flex flex-wrap gap-1.5";
+
+    // Sizing: aspect_ratio → tall with icon, resolution → medium, others → compact
+    const buttonSizeClass = isAspectRatio
+      ? "flex flex-col items-center justify-center gap-0.5 h-[48px]"
+      : isResolution
+        ? "h-9 px-3"
+        : "h-7 px-2.5";
+
+    const selectedClass = "bg-primary/15 text-primary border-primary/50";
+    const unselectedClass = "bg-card/50 border-border text-muted-foreground hover:text-foreground hover:border-primary/30";
 
     return (
       <div className="space-y-1.5">
         <label className="text-xs font-semibold text-foreground">{label}</label>
-        <div className={isAspectRatio ? "grid grid-cols-3 gap-1.5" : "flex flex-wrap gap-1.5"}>
+        <div className={containerClass}>
           {featuredOptions.map((opt) => {
             const isSelected = currentValue === opt.value;
             return (
@@ -168,12 +184,8 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
                 onClick={() => onChange(request_key, opt.value)}
                 className={cn(
                   "rounded-md text-xs font-medium transition-all duration-150 border",
-                  isAspectRatio
-                    ? "flex flex-col items-center justify-center gap-0.5 h-[48px]"
-                    : "h-7 px-2.5",
-                  isSelected
-                    ? "bg-primary/15 text-primary border-primary/50"
-                    : "bg-card/50 border-border text-muted-foreground hover:text-foreground hover:border-primary/30"
+                  buttonSizeClass,
+                  isSelected ? selectedClass : unselectedClass,
                 )}
               >
                 {isAspectRatio && <AspectRatioIcon value={String(opt.value)} />}
@@ -187,12 +199,8 @@ function ParameterField({ param, value, onChange, onOpenCustom }: ParameterField
               onClick={() => onOpenCustom(param)}
               className={cn(
                 "rounded-md text-xs font-medium transition-all duration-150 border",
-                isAspectRatio
-                  ? "flex flex-col items-center justify-center gap-0.5 h-[48px]"
-                  : "h-7 px-2.5",
-                selectedOverflowOption
-                  ? "bg-primary/15 text-primary border-primary/50"
-                  : "bg-card/50 border-border text-muted-foreground hover:text-foreground hover:border-primary/30"
+                buttonSizeClass,
+                selectedOverflowOption ? selectedClass : unselectedClass,
               )}
             >
               <span className={isAspectRatio ? "text-[10px]" : ""}>{selectedOverflowOption?.label ?? "Другое"}</span>
