@@ -44,6 +44,15 @@ upload_keys = models.JSONField(null=True, blank=True)
 
 Миграция: одна, AddField + новый choice. Без data migration.
 
+## Предварительная валидация (spike)
+
+Перед реализацией — проверить presigned PUT на Timeweb S3:
+1. Сгенерировать presigned PUT URL через `boto3.client('s3')`
+2. Тест через `curl -X PUT -T file.jpg <presigned_url>`
+3. Тест из браузера с CORS (fetch PUT из localhost:3000)
+
+Если Timeweb не поддерживает presigned PUT — fallback на подход B (клиент делает thumb, но шлёт через сервер).
+
 ## Поток 1: Upload (клиент → S3 напрямую)
 
 ### Шаг 1: Клиентский ресайз
@@ -56,7 +65,7 @@ IMAGE:
 VIDEO:
   File → <video>.currentTime=1 → seeked → canvas.drawImage(video) → toBlob()
   → small (256px, q80) + medium (800px, q85)
-  Fallback: currentTime=0 если seek не сработал
+  Fallback: currentTime=0.1 → currentTime=0 (чтобы избежать чёрного кадра)
 ```
 
 ### Шаг 2: Presign
@@ -75,35 +84,56 @@ Response: {
 Бэкенд:
 1. Валидация (формат, размер, квота пользователя)
 2. Создаёт Element со `status=UPLOADING`, сохраняет `upload_keys`
-3. Генерит 3 presigned PUT URL через boto3 (TTL 15 мин)
-4. **Ноль файлового IO**
+3. Генерит 3 presigned PUT URL через **отдельный `boto3.client('s3')`** (не `default_storage` — у него `AWS_QUERYSTRING_AUTH=False`)
+4. Presigned URL включает `Content-Type` condition (image/jpeg, image/png, video/mp4) для защиты от загрузки произвольных файлов
+5. **Ноль файлового IO**
 
 Аналогичный эндпоинт для project-level: `POST /api/projects/{id}/presign/`
 
-### Шаг 3: Upload с приоритетом
+**`scene_id` может быть null** (root-level элементы). S3 key: `projects/{project_id}/root/{filename}` если scene=null, иначе `projects/{project_id}/scenes/{scene_id}/{filename}`.
+
+### Шаг 3: Upload — трёхфазный
 
 ```
-1. PUT small → S3                          (~10KB, мгновенно)
-2. POST /api/elements/{id}/complete/       (карточка появляется в гриде)
-   Body: { file_size, thumbnail_uploaded: true, preview_uploaded: false }
-3. PUT medium + PUT original → S3          (параллельно, Promise.all)
-4. PATCH /api/elements/{id}/
-   Body: { preview_uploaded: true, original_uploaded: true }
+Фаза 1 — мгновенная карточка:
+  1. PUT small → S3                          (~10KB, мгновенно)
+  2. POST /api/elements/{id}/complete/
+     Body: { phase: "thumbnail" }
+     → status=UPLOADING, thumbnail_url заполнен
+     → WebSocket notify → карточка появляется
+
+Фаза 2 — фоновая загрузка:
+  3. PUT medium + PUT original → S3          (параллельно, Promise.all)
+  4. POST /api/elements/{id}/complete/
+     Body: { phase: "final", file_size: 5242880 }
+     → HEAD-запрос к S3 проверяет что original существует и получает реальный размер
+     → status=COMPLETED, file_url + preview_url заполнены, file_size = реальный из HEAD
+     → WebSocket notify
 ```
 
-**Результат:** карточка в гриде появляется за ~100ms после начала загрузки.
+**Результат:** карточка в гриде появляется за ~100ms. Оригинал догружается в фоне.
 
-### Эндпоинт complete
+**Важно:** `file_url` проставляется ТОЛЬКО в phase=final после HEAD-проверки. До этого element имеет только `thumbnail_url`. Если пользователь закроет вкладку между фазами — карточка с thumbnail, но `file_url` пустой, `status=UPLOADING`. Cleanup task подберёт.
+
+### Эндпоинт complete (двухфазный)
 
 ```
 POST /api/elements/{id}/complete/
 ```
 
-Бэкенд:
+**phase=thumbnail:**
 1. Проверяет `element.status == UPLOADING` и принадлежит юзеру
-2. Собирает public URLs из сохранённых `upload_keys`
-3. Обновляет: `file_url`, `thumbnail_url`, `preview_url`, `file_size`, `status=COMPLETED`
-4. WebSocket notify
+2. `thumbnail_url` = public URL из `upload_keys.small`
+3. WebSocket notify (карточка появляется)
+
+**phase=final:**
+1. HEAD-запрос к S3 на `upload_keys.original` — проверяет существование, получает `Content-Length`
+2. `file_url` = public URL из `upload_keys.original`
+3. `preview_url` = public URL из `upload_keys.medium`
+4. `file_size` = реальный размер из HEAD (не доверяем клиенту)
+5. Обновляет квоту storage на основе реального размера
+6. `status = COMPLETED`
+7. WebSocket notify
 
 ## Поток 2: Generation (сервер делает thumbnail)
 
@@ -137,10 +167,10 @@ temp file
 ### Изменения в коде
 
 - `finalize_generation_success` → вызывает `generate_thumbnails(temp_path, element_type, project_id, scene_id)`
-- Новая утилита `generate_thumbnails()` в `s3_utils.py` → возвращает `{thumbnail_url, preview_url}`
+- Новый модуль `backend/apps/common/thumbnail_utils.py` — ресайз логика (Pillow + ffmpeg), отдельно от S3. Вызывает `s3_utils` для upload.
 - `generate_upload_thumbnail` task → обновляется: делает два размера
-- WebSocket payload → добавляется `preview_url`
-- Pillow → добавить в `requirements.txt`
+- WebSocket payload → добавляется `preview_url` (в `notify_element_status` и в consumer)
+- Pillow → добавить явно в `requirements.txt` с pinned версией
 
 ## Frontend — модуль client-upload
 
@@ -184,6 +214,22 @@ preview_url   → если нет → thumbnail_url → file_url
 
 Старые элементы работают как раньше. Новые получают оба размера.
 
+### Изменения в TypeScript типах
+
+```typescript
+// frontend/lib/types/index.ts
+// ElementStatus — добавить 'UPLOADING'
+export type ElementStatus = "PENDING" | "PROCESSING" | "UPLOADING" | "COMPLETED" | "FAILED";
+
+// Element interface — добавить preview_url
+export interface Element {
+  // ... existing fields ...
+  preview_url: string;  // новое поле
+}
+
+// WSElementStatusChangedEvent — добавить preview_url
+```
+
 ## Обработка ошибок
 
 ### Upload (клиент)
@@ -217,6 +263,11 @@ preview_url   → если нет → thumbnail_url → file_url
 **Ленивая, без batch-обработки.** Новые элементы получают thumbnail сразу. Старые работают через fallback цепочку.
 
 Опционально потом: Celery task пробегает старые IMAGE-элементы, делает resize, заполняет `thumbnail_url` + `preview_url`. Не блокер.
+
+## Известные долги (не в scope этой задачи)
+
+- **S3 cleanup при удалении Element** — сейчас `element.delete()` не удаляет файлы из S3. С 3 файлами на элемент (вместо 1) orphan rate утроится. Отдельная задача.
+- **Backfill старых элементов** — Celery task для ресайза существующих картинок. Не блокер.
 
 ## CORS на S3 (Timeweb)
 
