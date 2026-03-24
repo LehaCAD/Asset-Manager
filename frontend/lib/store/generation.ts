@@ -473,20 +473,57 @@ export const useGenerationStore = create<GenerationState>()((set, get) => ({
     get().setPrompt(element.prompt_text ?? "");
 
     // Restore parameters and image inputs from generation_config
+    const imageRestorePromises: Promise<void>[] = [];
+
     if (element.generation_config) {
       for (const [key, value] of Object.entries(element.generation_config)) {
         if (key.startsWith("_")) continue;
 
-        // URL array → restore as image input
+        // URL array → restore as image input (check availability)
         if (Array.isArray(value) && value.length > 0 && value.every((v) => typeof v === "string" && v.startsWith("http"))) {
-          const files = value.map((url: string) => ({ displayUrl: url, apiUrl: url }));
-          get().setImageInput(key, files);
+          const urls = value as string[];
+          imageRestorePromises.push(
+            (async () => {
+              const results = await Promise.all(
+                urls.map(async (url) => {
+                  try {
+                    const res = await fetch(url, { method: "HEAD" });
+                    return res.ok ? url : null;
+                  } catch {
+                    return null;
+                  }
+                })
+              );
+              const available = results.filter((u): u is string => u !== null);
+              const missing = urls.length - available.length;
+              if (available.length > 0) {
+                const files = available.map((url) => ({ displayUrl: url, apiUrl: url }));
+                get().setImageInput(key, files);
+              }
+              if (missing > 0) {
+                toast.warning(`Некоторые исходные изображения недоступны (${missing})`);
+              }
+            })()
+          );
           continue;
         }
 
-        // Single URL → restore as image input
+        // Single URL → restore as image input (check availability)
         if (typeof value === "string" && value.startsWith("http")) {
-          get().setImageInput(key, [{ displayUrl: value, apiUrl: value }]);
+          imageRestorePromises.push(
+            (async () => {
+              try {
+                const res = await fetch(value, { method: "HEAD" });
+                if (res.ok) {
+                  get().setImageInput(key, [{ displayUrl: value, apiUrl: value }]);
+                } else {
+                  toast.warning("Исходное изображение недоступно");
+                }
+              } catch {
+                toast.warning("Исходное изображение недоступно");
+              }
+            })()
+          );
           continue;
         }
 
@@ -497,6 +534,11 @@ export const useGenerationStore = create<GenerationState>()((set, get) => ({
     // Close lightbox if open
     const { closeLightbox, lightboxOpen } = useSceneWorkspaceStore.getState();
     if (lightboxOpen) closeLightbox();
+
+    // Wait for image checks, then show result
+    if (imageRestorePromises.length > 0) {
+      void Promise.all(imageRestorePromises);
+    }
 
     toast.success("Параметры загружены");
   },
