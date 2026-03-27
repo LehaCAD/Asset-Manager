@@ -6,8 +6,8 @@ from rest_framework.response import Response
 
 from apps.elements.models import Element
 from apps.elements.serializers import ElementSerializer
-from apps.elements.tasks import notify_element_status
-from apps.common.presigned import head_s3_object, get_public_url
+from apps.notifications.services import notify_element_status
+from apps.storage.services import head_s3_object, get_public_url
 
 logger = logging.getLogger(__name__)
 

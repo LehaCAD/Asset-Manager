@@ -68,13 +68,18 @@ docker compose exec frontend npm run build
 ```
 backend/
 ├── apps/
-│   ├── users/          → User, UserQuota, JWT auth
-│   ├── projects/       → Project, WebSocket consumer
-│   ├── scenes/         → Scene (будет Group), upload, generate endpoints
-│   ├── elements/       → Element, Celery tasks (generation polling, upload processing)
-│   ├── ai_providers/   → AIProvider, AIModel, CanonicalParameter, ModelParameterBinding, ModelPricingConfig
-│   ├── credits/        → CreditsTransaction, CreditsService
-│   └── sharing/        → SharedLink, Comment
+│   ├── storage/        → S3 operations, presigned URLs, thumbnails (TIER 0)
+│   ├── notifications/  → WebSocket уведомления (TIER 0)
+│   ├── users/          → User, UserQuota, JWT auth (TIER 1)
+│   ├── ai_providers/   → AIModel, параметры, pricing, generation context (TIER 1)
+│   ├── credits/        → CreditsTransaction, CreditsService — "Банк" (TIER 2)
+│   ├── projects/       → Project, WebSocket consumer (TIER 2)
+│   ├── scenes/         → Scene (будет Group), CRUD (TIER 3)
+│   ├── elements/       → Element CRUD + orchestration + generation + Celery tasks (TIER 3)
+│   │   ├── orchestration.py → create_generation(), create_upload()
+│   │   ├── generation.py    → finalize_success/failure, normalize responses
+│   │   └── tasks.py         → Celery: start_generation, check_status, process_upload
+│   └── sharing/        → SharedLink, Comment (TIER 3)
 ├── config/             → settings.py, urls.py, celery.py, asgi.py
 
 frontend/
@@ -163,6 +168,7 @@ SceneWorkspace
 
 - `ARCHITECTURE_CONSTITUTION.md` — правила архитектуры frontend/backend, чеклисты ревью, протоколы дебага.
 - `ARCHITECTURE_OVERVIEW.md` — общая схема проекта.
+- `docs/MODULE_MAP.md` — **карта модулей** (куда смотреть при проблемах, куда добавлять фичи).
 - `agent-tasks.md` — бэклог задач.
 - `dev and deploy.md` — инструкция по локальной разработке и деплою.
 - `docs/plans/BLOCK_*.md` — пошаговые планы для каждого блока работы.

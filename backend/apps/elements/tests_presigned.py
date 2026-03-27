@@ -10,7 +10,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from apps.common.presigned import (
+from apps.storage.presigned import (
     generate_upload_presigned_urls,
     get_public_url,
     head_s3_object,
@@ -454,7 +454,7 @@ class CompleteEndpointThumbnailPhaseTest(TestCase):
             },
         )
 
-    @patch('apps.elements.views_upload.notify_element_status')
+    @patch('apps.notifications.services.notify_element_status')
     def test_thumbnail_phase_sets_thumbnail_url(self, mock_notify):
         """phase=thumbnail -> sets thumbnail_url, status stays UPLOADING."""
         self.client.force_authenticate(user=self.user)
@@ -560,7 +560,7 @@ class CompleteEndpointFinalPhaseTest(TestCase):
             },
         )
 
-    @patch('apps.elements.views_upload.notify_element_status')
+    @patch('apps.notifications.services.notify_element_status')
     @patch('apps.elements.views_upload.head_s3_object')
     def test_final_phase_sets_file_url_and_status(self, mock_head, mock_notify):
         """phase=final -> sets file_url, preview_url, file_size, status=COMPLETED."""
@@ -580,7 +580,7 @@ class CompleteEndpointFinalPhaseTest(TestCase):
         self.assertIn('abc_md.jpg', self.element.preview_url)
         self.assertEqual(self.element.file_size, 5000)
 
-    @patch('apps.elements.views_upload.notify_element_status')
+    @patch('apps.notifications.services.notify_element_status')
     @patch('apps.elements.views_upload.head_s3_object')
     def test_final_phase_sends_websocket_notification(self, mock_head, mock_notify):
         """Final phase should notify via WebSocket with status COMPLETED."""
@@ -650,7 +650,7 @@ class CompleteEndpointRaceConditionTest(TestCase):
             project=self.project, name='Test Scene', order_index=0,
         )
 
-    @patch('apps.elements.views_upload.notify_element_status')
+    @patch('apps.notifications.services.notify_element_status')
     @patch('apps.elements.views_upload.head_s3_object')
     def test_second_complete_returns_404(self, mock_head, mock_notify):
         """After first complete(final) succeeds, second should 404 (status already COMPLETED)."""
@@ -708,7 +708,7 @@ class BatchUploadTest(TestCase):
             project=self.project, name='Test Scene', order_index=0,
         )
 
-    @patch('apps.elements.views_upload.notify_element_status')
+    @patch('apps.notifications.services.notify_element_status')
     @patch('apps.elements.views_upload.head_s3_object')
     @patch('apps.common.presigned._get_s3_client')
     def test_five_elements_upload_complete_cycle(self, mock_get_client, mock_head, mock_notify):
@@ -769,7 +769,7 @@ class BatchUploadTest(TestCase):
         ).count()
         self.assertEqual(completed_count, 5)
 
-    @patch('apps.elements.views_upload.notify_element_status')
+    @patch('apps.notifications.services.notify_element_status')
     @patch('apps.elements.views_upload.head_s3_object')
     @patch('apps.common.presigned._get_s3_client')
     def test_five_elements_correct_types(self, mock_get_client, mock_head, mock_notify):

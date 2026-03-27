@@ -8,13 +8,12 @@ import requests
 import logging
 from django.conf import settings
 from .models import Element
-from .services import substitute_variables, collect_unresolved_placeholders, build_generation_context
+from apps.ai_providers.services import substitute_variables, collect_unresolved_placeholders, build_generation_context
 import os
 from decimal import Decimal
 
-from apps.scenes.s3_utils import upload_staging_to_s3
-from apps.common.thumbnail_utils import generate_thumbnails
-from apps.common.generation import (
+from apps.storage.services import upload_staging_to_s3, generate_thumbnails
+from apps.elements.generation import (
     finalize_generation_failure,
     finalize_generation_success,
     is_public_callback_url,
@@ -24,44 +23,9 @@ from apps.credits.models import CreditsTransaction
 from apps.credits.services import CreditsService
 from apps.ai_providers.validators import validate_model_admin_config
 
+from apps.notifications.services import notify_element_status
+
 logger = logging.getLogger(__name__)
-
-
-def notify_element_status(
-    element: Element, status: str, file_url: str = '', error_message: str = '',
-    preview_url: str = '', upload_progress: int | None = None,
-) -> None:
-    """
-    Отправить WebSocket-уведомление об изменении статуса элемента.
-    Вызывается из Celery-задач при завершении/ошибке генерации.
-    upload_progress: 0-100 реальный серверный прогресс (для upload flow).
-    """
-    try:
-        from channels.layers import get_channel_layer
-        from asgiref.sync import async_to_sync
-
-        channel_layer = get_channel_layer()
-        if channel_layer is None:
-            return
-
-        project_id = element.project_id
-        group_name = f'project_{project_id}'
-
-        payload = {
-            'type': 'element_status_changed',
-            'element_id': element.id,
-            'status': status,
-            'file_url': file_url,
-            'thumbnail_url': element.thumbnail_url or '',
-            'preview_url': preview_url or element.preview_url or '',
-            'error_message': error_message,
-        }
-        if upload_progress is not None:
-            payload['upload_progress'] = upload_progress
-
-        async_to_sync(channel_layer.group_send)(group_name, payload)
-    except Exception as e:
-        logger.exception("Не удалось отправить WebSocket-уведомление: %s", e)
 
 
 @shared_task

@@ -11,7 +11,7 @@ from unittest.mock import patch, MagicMock, call
 from django.test import TestCase
 from PIL import Image
 
-from apps.common.thumbnail_utils import (
+from apps.storage.thumbnails import (
     _resize_to_fit,
     generate_thumbnails,
     SMALL_SIZE,

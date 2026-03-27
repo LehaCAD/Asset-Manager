@@ -29,6 +29,13 @@ DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,backend,0.0.0.0').split(',')
 BACKEND_BASE_URL = os.getenv('BACKEND_BASE_URL', 'http://localhost:8000').rstrip('/')
+
+# CSRF / Proxy
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv('CSRF_TRUSTED_ORIGINS', 'https://raskadrawka.ru,https://www.raskadrawka.ru').split(',')
+]
 KIE_CALLBACK_TOKEN = os.getenv('KIE_CALLBACK_TOKEN', '')
 
 # Application definition
@@ -52,6 +59,8 @@ INSTALLED_APPS = [
     'apps.ai_providers',
     'apps.sharing',
     'apps.credits',
+    'apps.storage',
+    'apps.notifications',
 ]
 
 MIDDLEWARE = [

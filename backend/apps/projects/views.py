@@ -103,8 +103,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
     def presign(self, request, pk=None):
         """Generate presigned URLs for direct S3 upload at project level (no group)."""
         project = self.get_object()
-        from apps.common.presigned import generate_upload_presigned_urls
-        from apps.scenes.s3_utils import validate_file_type, detect_element_type
+        from apps.storage.services import generate_upload_presigned_urls, validate_file_type, detect_element_type
 
         filename = request.data.get('filename', '')
 

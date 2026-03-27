@@ -1,6 +1,9 @@
 """
-Бизнес-логика для работы с AI провайдерами и моделями.
+AI Providers module — public interface.
+
+Owns: AIProvider, AIModel, parameters, pricing compilation, generation context.
 """
+import re
 from typing import List, Optional, Dict, Any
 
 from .compiler import compile_parameters_schema, compile_pricing_payload, extract_placeholders, match_placeholder_to_canonical
@@ -154,8 +157,104 @@ def build_request_from_schema(
     return replace_placeholders(model.request_schema, parameters)
 
 
+def substitute_variables(request_schema: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Рекурсивно заменяет {{variable}} на реальные значения из context.
+
+    Example:
+        >>> schema = {"prompt": "{{prompt}}", "input_urls": ["{{image_url}}"]}
+        >>> context = {"prompt": "text", "image_url": "https://s3.com/img.jpg"}
+        >>> substitute_variables(schema, context)
+        {"prompt": "text", "input_urls": ["https://s3.com/img.jpg"]}
+    """
+    def replace_value(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {k: replace_value(v) for k, v in value.items()}
+        elif isinstance(value, list):
+            return [replace_value(item) for item in value]
+        elif isinstance(value, str):
+            full_match = re.match(r'^\{\{([^}]+)\}\}$', value.strip())
+            if full_match:
+                var_name = full_match.group(1).strip()
+                return context.get(var_name, value)
+
+            pattern = r'\{\{([^}]+)\}\}'
+
+            def replacer(match):
+                var_name = match.group(1).strip()
+                val = context.get(var_name, match.group(0))
+                return str(val) if val != match.group(0) else match.group(0)
+
+            return re.sub(pattern, replacer, value)
+        else:
+            return value
+
+    return replace_value(request_schema)
+
+
+def collect_unresolved_placeholders(value: Any) -> List[str]:
+    """
+    Собирает все неразрешенные {{placeholders}} после substitute_variables.
+    Нужен для fail-fast в случае неконсистентной конфигурации AIModel.
+    """
+    placeholders: List[str] = []
+    pattern = re.compile(r'\{\{([^}]+)\}\}')
+
+    def walk(node: Any) -> None:
+        if isinstance(node, dict):
+            for nested in node.values():
+                walk(nested)
+            return
+        if isinstance(node, list):
+            for nested in node:
+                walk(nested)
+            return
+        if isinstance(node, str):
+            placeholders.extend(match.group(1).strip() for match in pattern.finditer(node))
+
+    walk(value)
+    return placeholders
+
+
+def build_generation_context(
+    ai_model: AIModel,
+    *,
+    prompt: str,
+    generation_config: Dict[str, Any] | None = None,
+    callback_url: str | None = None
+) -> Dict[str, Any]:
+    """
+    Построение контекста для подстановки в request_schema.
+
+    Собирает prompt, generation_config, callback_url и дефолты из bindings.
+    """
+    context: Dict[str, Any] = {
+        'prompt': prompt or '',
+        'model': ai_model.name,
+    }
+
+    if generation_config:
+        context.update(generation_config)
+
+    if callback_url:
+        context['callback_url'] = callback_url
+
+    for binding in ai_model.parameter_bindings.select_related('canonical_parameter').all():
+        canonical_code = binding.canonical_parameter.code
+        if canonical_code in context and binding.placeholder not in context:
+            context[binding.placeholder] = context[canonical_code]
+        if binding.placeholder not in context:
+            default = binding.default_override
+            if default not in ({}, None, ''):
+                context[binding.placeholder] = default
+
+    return context
+
+
 __all__ = [
+    'build_generation_context',
     'build_request_from_schema',
+    'collect_unresolved_placeholders',
     'compile_parameters_schema',
     'compile_pricing_payload',
     'create_model',
@@ -165,5 +264,6 @@ __all__ = [
     'get_active_providers',
     'get_provider_models',
     'match_placeholder_to_canonical',
+    'substitute_variables',
     'validate_model_admin_config',
 ]

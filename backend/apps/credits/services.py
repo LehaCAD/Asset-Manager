@@ -5,7 +5,7 @@ from typing import Any
 from django.db import transaction
 from django.db.models import F
 
-from apps.ai_providers.compiler import compile_pricing_payload
+from apps.ai_providers.services import compile_pricing_payload
 from apps.ai_providers.models import AIModel
 from apps.users.models import User
 

@@ -7,14 +7,14 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from apps.common.generation import (
+from apps.elements.generation import (
     extract_result_url,
     finalize_generation_failure,
     finalize_generation_success,
     normalize_provider_response,
 )
 from apps.elements.models import Element
-from apps.elements.tasks import notify_element_status
+from apps.notifications.services import notify_element_status
 
 logger = logging.getLogger(__name__)
 

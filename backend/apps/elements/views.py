@@ -11,7 +11,7 @@ from rest_framework.decorators import action
 from .models import Element
 from .serializers import ElementSerializer, ReorderSerializer
 from .services import reorder_elements
-from apps.scenes.s3_utils import delete_file_from_s3
+from apps.storage.services import delete_file_from_s3
 from apps.credits.models import CreditsTransaction
 
 logger = logging.getLogger(__name__)
