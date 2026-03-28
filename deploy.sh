@@ -2,11 +2,13 @@
 set -e
 
 SERVER="root@85.239.36.28"
-SSH_KEY="$HOME/.ssh/id_rsa"
+# Путь к ключу — работает и в Git Bash на Windows, и в Linux
+SSH_KEY="${USERPROFILE:-$HOME}/.ssh/id_rsa"
+SSH_OPTS="-i $SSH_KEY -o StrictHostKeyChecking=no -o BatchMode=yes"
 
 echo "=== Деплой на raskadrawka.ru ==="
 
-ssh -i "$SSH_KEY" "$SERVER" << 'ENDSSH'
+ssh $SSH_OPTS "$SERVER" << 'ENDSSH'
 set -e
 cd /root/Asset-Manager
 
