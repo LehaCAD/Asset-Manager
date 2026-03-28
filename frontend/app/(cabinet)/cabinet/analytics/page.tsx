@@ -13,6 +13,7 @@ import {
 import { TrendingUp, Image, Layers, Wallet } from "lucide-react";
 import { format } from "date-fns";
 import type { DateRange } from "react-day-picker";
+import { useTheme } from "next-themes";
 import { getAnalytics } from "@/lib/api/cabinet";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { formatCurrency, formatStorage } from "@/lib/utils/format";
@@ -22,14 +23,46 @@ import { SelectDropdown } from "@/components/ui/select-dropdown";
 import { apiClient } from "@/lib/api/client";
 
 /* ── Colors ─────────────────────────────────────────────── */
-/* Hex values matching theme tokens for SVG compatibility   */
-const AXIS_COLOR = "#8B8FA3";       /* --muted-foreground    */
-const GRID_COLOR = "#2D3A55";       /* --border              */
-const BAR_COLOR  = "#7C8CF5";       /* soft indigo           */
-const TOOLTIP_BG = "#212B45";       /* --popover             */
-const TOOLTIP_BORDER = "#2D3A55";   /* --border              */
+/* SVG fill/stroke attrs don't resolve CSS vars — we read   */
+/* actual computed values from the DOM at runtime instead.  */
+const BAR_COLOR = "#7C8CF5"; /* accent bar — intentionally fixed */
+
+function resolveCssVar(varName: string): string {
+  const raw = getComputedStyle(document.documentElement)
+    .getPropertyValue(varName)
+    .trim();
+  if (!raw) return "";
+  /* Feed the raw value (e.g. oklch(...)) into a temp element so the
+     browser converts it to a serializable rgb(...) string. */
+  const el = document.createElement("span");
+  el.style.color = raw;
+  document.body.appendChild(el);
+  const resolved = getComputedStyle(el).color;
+  document.body.removeChild(el);
+  return resolved;
+}
+
+function useChartColors() {
+  const { resolvedTheme } = useTheme();
+  const [colors, setColors] = useState({ axis: "", grid: "" });
+
+  useEffect(() => {
+    setColors({
+      axis: resolveCssVar("--muted-foreground"),
+      grid: resolveCssVar("--border"),
+    });
+  }, [resolvedTheme]);
+
+  return colors;
+}
 
 /* ── Helpers ────────────────────────────────────────────── */
+
+/** Parse "YYYY-MM-DD" as local date (not UTC midnight) to avoid off-by-one in UTC+ zones. */
+function parseDateLocal(s: string): Date {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(s + "T12:00:00");
+  return new Date(s);
+}
 
 function dateRangeToParams(range: DateRange | undefined) {
   if (!range?.from) return {};
@@ -45,13 +78,10 @@ function defaultRange(): DateRange {
 
 function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number }>; label?: string }) {
   if (!active || !payload?.length) return null;
-  const d = new Date(label ?? "");
+  const d = parseDateLocal(label ?? "");
   const dateStr = isNaN(d.getTime()) ? label : d.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
   return (
-    <div
-      className="rounded-lg border px-3 py-2 shadow-lg"
-      style={{ background: TOOLTIP_BG, borderColor: TOOLTIP_BORDER }}
-    >
+    <div className="rounded-lg border border-border bg-popover px-3 py-2 shadow-lg">
       <p className="text-[11px] text-muted-foreground mb-1">{dateStr}</p>
       <p className="text-sm font-semibold text-foreground font-mono">{payload[0].value}</p>
     </div>
@@ -61,6 +91,7 @@ function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: 
 /* ── Main Component ─────────────────────────────────────── */
 
 export default function AnalyticsPage() {
+  const chartColors = useChartColors();
   const [data, setData] = useState<CabinetAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(defaultRange);
@@ -215,15 +246,15 @@ export default function AnalyticsPage() {
             <BarChart data={spending_by_day} barCategoryGap="20%">
               <CartesianGrid
                 strokeDasharray="3 3"
-                stroke={GRID_COLOR}
+                stroke={chartColors.grid}
                 vertical={false}
                 opacity={0.5}
               />
               <XAxis
                 dataKey="date"
-                tick={{ fontSize: 11, fill: AXIS_COLOR }}
+                tick={{ fontSize: 11, fill: chartColors.axis }}
                 tickFormatter={(v: string) => {
-                  const d = new Date(v);
+                  const d = parseDateLocal(v);
                   if (isNaN(d.getTime())) return v;
                   return `${d.getDate()}.${String(d.getMonth() + 1).padStart(2, "0")}`;
                 }}
@@ -232,7 +263,7 @@ export default function AnalyticsPage() {
                 dy={8}
               />
               <YAxis
-                tick={{ fontSize: 11, fill: AXIS_COLOR }}
+                tick={{ fontSize: 11, fill: chartColors.axis }}
                 axisLine={false}
                 tickLine={false}
                 domain={[0, "auto"]}

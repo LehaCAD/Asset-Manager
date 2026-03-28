@@ -29,7 +29,7 @@ certbot/
 
 # SSH keys
 private.ppk
-public
+/public
 *.swp
 *.swo
 
