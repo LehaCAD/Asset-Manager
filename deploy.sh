@@ -1,68 +1,34 @@
 #!/bin/bash
 set -e
 
-# === Настройки ===
 SERVER="root@85.239.36.28"
 SSH_KEY="$HOME/.ssh/id_rsa"
-REMOTE_DIR="/root/Asset-Manager"
 
-echo "=== 1. Собираю архив (только код) ==="
-tar -czf /tmp/deploy.tar.gz \
-    --exclude='node_modules' \
-    --exclude='.next' \
-    --exclude='__pycache__' \
-    --exclude='*.pyc' \
-    --exclude='.git' \
-    --exclude='.env' \
-    --exclude='.env.local' \
-    --exclude='.env.production' \
-    --exclude='deploy.tar.gz' \
-    --exclude='postgres_data' \
-    --exclude='backups' \
-    --exclude='*.exe' \
-    --exclude='*.torrent' \
-    --exclude='*.docx' \
-    --exclude='*.png' \
-    --exclude='*.svg' \
-    --exclude='*.ppk' \
-    --exclude='.claude' \
-    --exclude='.superpowers' \
-    --exclude='.mcp.json' \
-    --exclude='.playwright-mcp' \
-    --exclude='pen' \
-    --exclude='certbot' \
-    .
+echo "=== Деплой на raskadrawka.ru ==="
 
-echo "=== 2. Загружаю на сервер ==="
-scp -i "$SSH_KEY" /tmp/deploy.tar.gz "$SERVER:/tmp/"
-rm /tmp/deploy.tar.gz
-
-echo "=== 3. Разворачиваю на сервере ==="
 ssh -i "$SSH_KEY" "$SERVER" << 'ENDSSH'
 set -e
 cd /root/Asset-Manager
 
-# Распаковываю код (НЕ трогает .env — он excluded из архива)
-tar -xzf /tmp/deploy.tar.gz
-rm /tmp/deploy.tar.gz
+echo "--- 1. Получаю новый код с GitHub ---"
+git pull origin main
 
-# Пересобираю и запускаю
+echo "--- 2. Пересобираю и запускаю контейнеры ---"
 docker compose -f docker-compose.production.yml up -d --build
 
-# Жду пока БД поднимется
-echo "Жду базу данных..."
+echo "--- 3. Жду базу данных ---"
 sleep 10
 
-# Миграции
+echo "--- 4. Применяю миграции ---"
 docker compose -f docker-compose.production.yml exec -T backend python manage.py migrate
 
-# Статика
+echo "--- 5. Собираю статику ---"
 docker compose -f docker-compose.production.yml exec -T backend python manage.py collectstatic --noinput
 
-# Рестарт nginx (чтобы подхватил новые конфиги)
+echo "--- 6. Рестарт nginx ---"
 docker compose -f docker-compose.production.yml restart nginx
 
-echo "=== Деплой завершён ==="
+echo "=== Готово ==="
 ENDSSH
 
-echo "=== Готово! Сайт: https://raskadrawka.ru ==="
+echo "Сайт: https://raskadrawka.ru"
