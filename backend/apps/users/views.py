@@ -5,6 +5,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
 
 from .serializers import RegisterSerializer, UserSerializer
+from .throttles import AuthRateThrottle
 
 User = get_user_model()
 
@@ -13,6 +14,7 @@ class RegisterView(generics.CreateAPIView):
     """Регистрация нового пользователя. Возвращает токены сразу после регистрации."""
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthRateThrottle]
 
     def create(self, request, *args, **kwargs) -> Response:
         serializer = self.get_serializer(data=request.data)

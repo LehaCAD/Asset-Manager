@@ -26,6 +26,9 @@ def analytics_view(request):
         period=request.query_params.get('period', '30d'),
         ai_model_id=_int_or_none(request.query_params.get('ai_model_id')),
         element_type=request.query_params.get('element_type') or None,
+        date_from=_date_or_none(request.query_params.get('date_from')),
+        date_to=_date_or_none(request.query_params.get('date_to')),
+        project_id=_int_or_none(request.query_params.get('project_id')),
     )
     return Response({
         'period': {

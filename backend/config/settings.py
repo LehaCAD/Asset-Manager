@@ -25,13 +25,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key-change-me')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'True') == 'True'
+DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,backend,0.0.0.0').split(',')
 BACKEND_BASE_URL = os.getenv('BACKEND_BASE_URL', 'http://localhost:8000').rstrip('/')
 
 # CSRF / Proxy
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 CSRF_TRUSTED_ORIGINS = [
     origin.strip()
     for origin in os.getenv('CSRF_TRUSTED_ORIGINS', 'https://raskadrawka.ru,https://www.raskadrawka.ru').split(',')
@@ -109,6 +110,7 @@ DATABASES = {
         'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'postgres'),
         'HOST': os.getenv('DB_HOST', 'db'),
         'PORT': os.getenv('DB_PORT', '5432'),
+        'CONN_MAX_AGE': int(os.getenv('CONN_MAX_AGE', '0' if DEBUG else '600')),
     }
 }
 
@@ -168,6 +170,15 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '60/minute',
+        'user': '120/minute',
+        'auth': '5/minute',
+    },
 }
 
 # SimpleJWT
@@ -222,9 +233,71 @@ DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
 
 # CORS settings
-CORS_ALLOW_ALL_ORIGINS = True  # Р’ РїСЂРѕРґР°РєС€РµРЅРµ СѓРєР°Р·Р°С‚СЊ РєРѕРЅРєСЂРµС‚РЅС‹Рµ РґРѕРјРµРЅС‹
+CORS_ALLOW_ALL_ORIGINS = DEBUG
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-]
+_cors_origins = os.getenv(‘CORS_ALLOWED_ORIGINS’, ‘http://localhost:3000,http://127.0.0.1:3000’)
+CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins.split(‘,’) if o.strip()]
+
+# === Security (production only, auto-disabled when DEBUG=True) ===
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
+    SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = ‘Lax’
+
+    CSRF_COOKIE_SECURE = True
+    CSRF_COOKIE_HTTPONLY = True
+    CSRF_COOKIE_SAMESITE = ‘Lax’
+
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_BROWSER_XSS_FILTER = True
+    X_FRAME_OPTIONS = ‘DENY’
+
+# === Sentry ===
+SENTRY_DSN = os.getenv(‘SENTRY_DSN’, ‘’)
+if SENTRY_DSN and not DEBUG:
+    import sentry_sdk
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        traces_sample_rate=0.1,
+        profiles_sample_rate=0.1,
+        send_default_pii=False,
+    )
+
+# === Logging ===
+LOGGING = {
+    ‘version’: 1,
+    ‘disable_existing_loggers’: False,
+    ‘formatters’: {
+        ‘verbose’: {
+            ‘format’: ‘[{asctime}] {levelname} {name} {message}’,
+            ‘style’: ‘{‘,
+        },
+    },
+    ‘handlers’: {
+        ‘console’: {
+            ‘class’: ‘logging.StreamHandler’,
+            ‘formatter’: ‘verbose’,
+        },
+    },
+    ‘root’: {
+        ‘handlers’: [‘console’],
+        ‘level’: ‘INFO’,
+    },
+    ‘loggers’: {
+        ‘django’: {
+            ‘handlers’: [‘console’],
+            ‘level’: ‘WARNING’,
+            ‘propagate’: False,
+        },
+        ‘apps’: {
+            ‘handlers’: [‘console’],
+            ‘level’: ‘INFO’,
+            ‘propagate’: False,
+        },
+    },
+}

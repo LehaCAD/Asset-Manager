@@ -1,78 +1,68 @@
 #!/bin/bash
-
-# Deployment script для Asset Manager
-# Использование: ./deploy.sh
-
 set -e
 
-echo "🚀 Начинаем деплой Asset Manager на VPS..."
+# === Настройки ===
+SERVER="root@85.239.36.28"
+SSH_KEY="$HOME/.ssh/id_rsa"
+REMOTE_DIR="/root/Asset-Manager"
 
-# Цвета для вывода
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m' # No Color
-
-# Переменные
-SERVER_IP="85.239.56.80"
-SERVER_USER="root"
-DEPLOY_DIR="/var/www/asset-manager"
-REPO_URL="." # локальная директория
-
-echo -e "${YELLOW}📦 Создаем архив проекта...${NC}"
-tar -czf deploy.tar.gz \
+echo "=== 1. Собираю архив (только код) ==="
+tar -czf /tmp/deploy.tar.gz \
     --exclude='node_modules' \
     --exclude='.next' \
     --exclude='__pycache__' \
     --exclude='*.pyc' \
     --exclude='.git' \
+    --exclude='.env' \
+    --exclude='.env.local' \
+    --exclude='.env.production' \
     --exclude='deploy.tar.gz' \
     --exclude='postgres_data' \
-    --exclude='private.ppk' \
+    --exclude='backups' \
+    --exclude='*.exe' \
+    --exclude='*.torrent' \
+    --exclude='*.docx' \
+    --exclude='*.png' \
+    --exclude='*.svg' \
+    --exclude='*.ppk' \
+    --exclude='.claude' \
+    --exclude='.superpowers' \
+    --exclude='.mcp.json' \
+    --exclude='.playwright-mcp' \
+    --exclude='pen' \
+    --exclude='certbot' \
     .
 
-echo -e "${YELLOW}📤 Загружаем на сервер...${NC}"
-scp deploy.tar.gz ${SERVER_USER}@${SERVER_IP}:/tmp/
+echo "=== 2. Загружаю на сервер ==="
+scp -i "$SSH_KEY" /tmp/deploy.tar.gz "$SERVER:/tmp/"
+rm /tmp/deploy.tar.gz
 
-echo -e "${YELLOW}🔧 Разворачиваем на сервере...${NC}"
-ssh ${SERVER_USER}@${SERVER_IP} << 'ENDSSH'
+echo "=== 3. Разворачиваю на сервере ==="
+ssh -i "$SSH_KEY" "$SERVER" << 'ENDSSH'
 set -e
+cd /root/Asset-Manager
 
-DEPLOY_DIR="/var/www/asset-manager"
-
-# Создаем директорию если её нет
-mkdir -p $DEPLOY_DIR
-
-# Распаковываем
-cd $DEPLOY_DIR
+# Распаковываю код (НЕ трогает .env — он excluded из архива)
 tar -xzf /tmp/deploy.tar.gz
 rm /tmp/deploy.tar.gz
 
-# Копируем production конфигурации
-cp next.config.production.mjs frontend/next.config.mjs
-
-# Останавливаем контейнеры если они запущены
-docker compose -f docker-compose.production.yml down || true
-
-# Собираем и запускаем
+# Пересобираю и запускаю
 docker compose -f docker-compose.production.yml up -d --build
 
-# Ждем запуска базы данных
-echo "⏳ Ждем запуска базы данных..."
+# Жду пока БД поднимется
+echo "Жду базу данных..."
 sleep 10
 
-# Применяем миграции
+# Миграции
 docker compose -f docker-compose.production.yml exec -T backend python manage.py migrate
 
-# Собираем статику
+# Статика
 docker compose -f docker-compose.production.yml exec -T backend python manage.py collectstatic --noinput
 
-echo "✅ Деплой завершен!"
+# Рестарт nginx (чтобы подхватил новые конфиги)
+docker compose -f docker-compose.production.yml restart nginx
+
+echo "=== Деплой завершён ==="
 ENDSSH
 
-echo -e "${GREEN}✅ Деплой успешно завершен!${NC}"
-echo -e "${GREEN}🌐 Сайт доступен по адресу: http://raskadrawka.ru${NC}"
-echo -e "${YELLOW}⚠️  Не забудьте настроить SSL сертификат!${NC}"
-
-# Удаляем локальный архив
-rm deploy.tar.gz
+echo "=== Готово! Сайт: https://raskadrawka.ru ==="

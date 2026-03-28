@@ -11,6 +11,9 @@ export interface AnalyticsParams {
   period?: string;
   ai_model_id?: number;
   element_type?: string;
+  date_from?: string;
+  date_to?: string;
+  project_id?: number;
 }
 
 export interface HistoryParams {
@@ -33,7 +36,7 @@ export interface TransactionParams {
   date_to?: string;
 }
 
-function cleanParams(params: Record<string, unknown>): Record<string, string | number> {
+function cleanParams(params: Record<string, unknown> | object): Record<string, string | number> {
   const cleaned: Record<string, string | number> = {};
   for (const [key, val] of Object.entries(params)) {
     if (val !== undefined && val !== null && val !== "") {
@@ -45,21 +48,21 @@ function cleanParams(params: Record<string, unknown>): Record<string, string | n
 
 export async function getAnalytics(params: AnalyticsParams = {}): Promise<CabinetAnalytics> {
   const { data } = await apiClient.get("/api/cabinet/analytics/", {
-    params: cleanParams(params),
+    params: cleanParams(params as Record<string, unknown>),
   });
   return data;
 }
 
 export async function getHistory(params: HistoryParams = {}): Promise<PaginatedResponse<CabinetHistoryEntry>> {
   const { data } = await apiClient.get("/api/cabinet/history/", {
-    params: cleanParams(params),
+    params: cleanParams(params as Record<string, unknown>),
   });
   return data;
 }
 
 export async function getTransactions(params: TransactionParams = {}): Promise<PaginatedResponse<CabinetTransaction>> {
   const { data } = await apiClient.get("/api/cabinet/transactions/", {
-    params: cleanParams(params),
+    params: cleanParams(params as Record<string, unknown>),
   });
   return data;
 }

@@ -12,7 +12,7 @@ __pycache__/
 media/
 staticfiles/
 
-# Environment
+# Environment (секреты — никогда в git)
 .env
 .env.local
 .env.production
@@ -20,6 +20,7 @@ staticfiles/
 # IDE
 .vscode/
 .idea/
+.cursor/
 
 # Deployment
 deploy.tar.gz
@@ -31,7 +32,6 @@ private.ppk
 public
 *.swp
 *.swo
-.cursor/
 
 # OS
 .DS_Store
@@ -42,3 +42,36 @@ postgres_data/
 
 # Local worktrees
 .worktrees/
+
+# Claude Code / MCP / Superpowers (локальные инструменты)
+.claude/
+.mcp.json
+.superpowers/
+.playwright-mcp/
+
+# Скриншоты и картинки в корне (рабочий мусор)
+/*.png
+/*.svg
+/*.jpg
+/*.jpeg
+
+# Случайный мусор
+/*.exe
+/*.torrent
+/*.docx
+/*.zip
+
+# Pen-файлы (открываются только через MCP)
+pen/
+
+# Бэкапы БД (большие, не нужны в git)
+backups/
+
+# Backend скрипты разовые
+backend/scripts/
+
+# Скриншоты-референсы в docs
+docs/screens/
+
+# Superpowers планы (генерируются автоматически)
+docs/superpowers/

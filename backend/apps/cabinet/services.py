@@ -161,9 +161,15 @@ def get_analytics(
     period: str = '30d',
     ai_model_id: int | None = None,
     element_type: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    project_id: int | None = None,
 ) -> AnalyticsResult:
     """Aggregate analytics for user's cabinet dashboard."""
-    period_start, period_end = _parse_period(period)
+    if date_from and date_to:
+        period_start, period_end = date_from, date_to
+    else:
+        period_start, period_end = _parse_period(period)
     period_end_dt = timezone.make_aware(
         timezone.datetime.combine(period_end, timezone.datetime.max.time())
     )
@@ -192,6 +198,9 @@ def get_analytics(
     if element_type:
         tx_qs = tx_qs.filter(element__element_type=element_type)
         el_qs = el_qs.filter(element_type=element_type)
+    if project_id:
+        tx_qs = tx_qs.filter(element__project_id=project_id)
+        el_qs = el_qs.filter(project_id=project_id)
 
     # Total spent
     total_spent = tx_qs.aggregate(
@@ -400,12 +409,13 @@ def serialize_history_entry(el: Element) -> dict:
         'status_display': STATUS_DISPLAY.get(el.status, el.status),
         'error_message': el.error_message or '',
         'ai_model_name': el.ai_model.name if el.ai_model else None,
-        'prompt_text': (el.prompt_text or '')[:100],
+        'prompt_text': (el.prompt_text or '')[:500],
         'generation_cost': str(el._generation_cost) if el._generation_cost else None,
         'file_size': el.file_size,
         'project_id': el.project_id,
         'project_name': el.project.name if el.project else None,
         'thumbnail_url': el.thumbnail_url or '',
+        'file_url': el.file_url or '',
     }
 
 

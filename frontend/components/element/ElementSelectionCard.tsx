@@ -25,7 +25,7 @@ export function ElementSelectionCard({
   const isVideo = element.element_type === "VIDEO";
   const videoThumbnailSrc = element.thumbnail_url?.trim() || null;
   const videoFileSrc = element.file_url?.trim() || null;
-  const mediaSrc = (isVideo ? videoThumbnailSrc || videoFileSrc : element.file_url)?.trim() || null;
+  const mediaSrc = (isVideo ? videoThumbnailSrc || videoFileSrc : element.preview_url?.trim() || element.thumbnail_url?.trim() || element.file_url)?.trim() || null;
   
   const fitClass = FIT_MODE_CLASSES[fitMode];
 

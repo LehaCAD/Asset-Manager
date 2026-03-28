@@ -476,6 +476,7 @@ export interface CabinetHistoryEntry {
   project_id: number | null;
   project_name: string | null;
   thumbnail_url: string;
+  file_url: string;
 }
 
 export interface CabinetTransaction {
