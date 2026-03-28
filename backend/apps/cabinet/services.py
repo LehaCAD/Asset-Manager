@@ -230,11 +230,25 @@ def get_analytics(
     top_model = top_model_row['ai_model__name'] if top_model_row else None
 
     # Spending by day/week/month (bar chart data)
+    # Based on element creation dates (not transactions) so older generations
+    # without credit records still appear on the correct day.
     trunc_fn = _get_trunc_fn(period_start, period_end)
     spending_by_day_qs = (
-        tx_qs.annotate(bucket=trunc_fn)
+        el_qs.annotate(bucket=trunc_fn)
         .values('bucket')
-        .annotate(amount=Sum(Abs('amount')), count=Count('id'))
+        .annotate(
+            amount=Coalesce(
+                Sum(
+                    Abs('credits_transactions__amount'),
+                    filter=Q(
+                        credits_transactions__reason=CreditsTransaction.REASON_GENERATION_DEBIT
+                    ),
+                ),
+                Decimal('0'),
+                output_field=DjDecimalField(),
+            ),
+            count=Count('id', distinct=True),
+        )
         .order_by('bucket')
     )
     spending_by_day = [
