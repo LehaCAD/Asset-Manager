@@ -235,8 +235,8 @@ MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
 # CORS settings
 CORS_ALLOW_ALL_ORIGINS = DEBUG
 CORS_ALLOW_CREDENTIALS = True
-_cors_origins = os.getenv(‘CORS_ALLOWED_ORIGINS’, ‘http://localhost:3000,http://127.0.0.1:3000’)
-CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins.split(‘,’) if o.strip()]
+_cors_origins = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000')
+CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins.split(',') if o.strip()]
 
 # === Security (production only, auto-disabled when DEBUG=True) ===
 if not DEBUG:
@@ -247,18 +247,18 @@ if not DEBUG:
 
     SESSION_COOKIE_SECURE = True
     SESSION_COOKIE_HTTPONLY = True
-    SESSION_COOKIE_SAMESITE = ‘Lax’
+    SESSION_COOKIE_SAMESITE = 'Lax'
 
     CSRF_COOKIE_SECURE = True
     CSRF_COOKIE_HTTPONLY = True
-    CSRF_COOKIE_SAMESITE = ‘Lax’
+    CSRF_COOKIE_SAMESITE = 'Lax'
 
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_BROWSER_XSS_FILTER = True
-    X_FRAME_OPTIONS = ‘DENY’
+    X_FRAME_OPTIONS = 'DENY'
 
 # === Sentry ===
-SENTRY_DSN = os.getenv(‘SENTRY_DSN’, ‘’)
+SENTRY_DSN = os.getenv('SENTRY_DSN', '')
 if SENTRY_DSN and not DEBUG:
     import sentry_sdk
     sentry_sdk.init(
@@ -270,34 +270,34 @@ if SENTRY_DSN and not DEBUG:
 
 # === Logging ===
 LOGGING = {
-    ‘version’: 1,
-    ‘disable_existing_loggers’: False,
-    ‘formatters’: {
-        ‘verbose’: {
-            ‘format’: ‘[{asctime}] {levelname} {name} {message}’,
-            ‘style’: ‘{‘,
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{asctime}] {levelname} {name} {message}',
+            'style': '{',
         },
     },
-    ‘handlers’: {
-        ‘console’: {
-            ‘class’: ‘logging.StreamHandler’,
-            ‘formatter’: ‘verbose’,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
         },
     },
-    ‘root’: {
-        ‘handlers’: [‘console’],
-        ‘level’: ‘INFO’,
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
     },
-    ‘loggers’: {
-        ‘django’: {
-            ‘handlers’: [‘console’],
-            ‘level’: ‘WARNING’,
-            ‘propagate’: False,
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
         },
-        ‘apps’: {
-            ‘handlers’: [‘console’],
-            ‘level’: ‘INFO’,
-            ‘propagate’: False,
+        'apps': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
         },
     },
 }
