@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     'apps.credits',
     'apps.storage',
     'apps.notifications',
+    'apps.cabinet',
 ]
 
 MIDDLEWARE = [

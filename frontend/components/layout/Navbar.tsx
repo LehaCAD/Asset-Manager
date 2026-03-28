@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LogOut, User, Clapperboard, HardDrive } from "lucide-react";
+import { LogOut, User, Clapperboard, HardDrive, LayoutDashboard } from "lucide-react";
 import { ChargeIcon } from "@/components/ui/charge-icon";
 import { Button } from "@/components/ui/button";
 import {
@@ -131,6 +131,13 @@ export function Navbar() {
                   <DropdownMenuSeparator />
                 </>
               )}
+              <DropdownMenuItem className="cursor-pointer" asChild>
+                <Link href="/cabinet">
+                  <LayoutDashboard className="mr-2 h-4 w-4" strokeWidth={1.75} />
+                  Личный кабинет
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
                 onClick={handleLogout}

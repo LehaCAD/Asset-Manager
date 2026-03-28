@@ -436,6 +436,70 @@ export interface CreditsEstimateResponse {
   error: string | null;
 }
 
+/* ── Cabinet ─────────────────────────────────────────────── */
+
+export interface CabinetAnalytics {
+  period: { start: string; end: string };
+  summary: {
+    balance: string;
+    total_spent: string;
+    total_generations: number;
+    success_rate: number;
+    storage_used_bytes: number;
+    storage_limit_bytes: number;
+  };
+  spending_by_day: { date: string; amount: string; count: number }[];
+  spending_by_model: { model_id: number | null; model_name: string; amount: string; count: number }[];
+  spending_by_project: { project_id: number; project_name: string; amount: string; storage_bytes: number }[];
+  generation_stats: {
+    total: number;
+    completed: number;
+    failed: number;
+    success_rate: number;
+    avg_cost: string | null;
+    top_model: string | null;
+  };
+}
+
+export interface CabinetHistoryEntry {
+  id: number;
+  created_at: string;
+  element_type: ElementType;
+  source_type: ElementSource;
+  status: ElementStatus;
+  status_display: string;
+  error_message: string;
+  ai_model_name: string | null;
+  prompt_text: string;
+  generation_cost: string | null;
+  file_size: number | null;
+  project_id: number | null;
+  project_name: string | null;
+  thumbnail_url: string;
+}
+
+export interface CabinetTransaction {
+  id: number;
+  created_at: string;
+  reason: string;
+  reason_display: string;
+  amount: string;
+  balance_after: string;
+  ai_model_name: string | null;
+  element_id: number | null;
+}
+
+export interface CabinetStorage {
+  storage_used_bytes: number;
+  storage_limit_bytes: number;
+  by_project: {
+    project_id: number;
+    project_name: string;
+    elements_count: number;
+    storage_bytes: number;
+  }[];
+}
+
 /* ── Stats / Metrics ─────────────────────────────────────── */
 
 export interface ProjectStats {

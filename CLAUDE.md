@@ -12,7 +12,7 @@
 ## Стек
 
 - **Backend:** Django 5, DRF, Channels (WebSocket), Celery, Redis, PostgreSQL, S3 (Timeweb)
-- **Frontend:** Next.js 14 (App Router), React 19, Zustand 5, Tailwind 4, shadcn/ui, DnD-Kit
+- **Frontend:** Next.js 14 (App Router), React 19, Zustand 5, Tailwind 4, shadcn/ui, DnD-Kit, Recharts
 - **Инфра:** Docker Compose, Nginx, Daphne (ASGI), Let's Encrypt
 - **Прод:** VPS, домен `raskadrawka.ru`, данные живые
 
@@ -79,13 +79,15 @@ backend/
 │   │   ├── orchestration.py → create_generation(), create_upload()
 │   │   ├── generation.py    → finalize_success/failure, normalize responses
 │   │   └── tasks.py         → Celery: start_generation, check_status, process_upload
-│   └── sharing/        → SharedLink, Comment (TIER 3)
+│   ├── sharing/        → SharedLink, Comment (TIER 3)
+│   └── cabinet/        → Личный кабинет — read-only аналитика, журнал, баланс, хранилище (TIER 3)
 ├── config/             → settings.py, urls.py, celery.py, asgi.py
 
 frontend/
 ├── app/
 │   ├── (auth)/         → login, register
 │   ├── (workspace)/    → projects list, project detail, scene workspace
+│   │   └── cabinet/    → Личный кабинет (analytics, history, balance, storage, notifications, settings)
 │   └── share/          → public share view
 ├── components/
 │   ├── element/        → SceneWorkspace, ElementGrid, ElementCard
@@ -95,7 +97,7 @@ frontend/
 │   ├── scene/          → ScenarioTableClient, SceneCard
 │   └── ui/             → shadcn components
 ├── lib/
-│   ├── api/            → client.ts, auth, scenes, elements, ai-models, credits, sharing, websocket
+│   ├── api/            → client.ts, auth, scenes, elements, ai-models, credits, sharing, websocket, cabinet
 │   ├── store/          → auth, generation, scene-workspace, credits, projects, scenes, project-display, ui
 │   ├── types/index.ts  → все TypeScript типы (source of truth)
 │   └── utils/          → constants, format, cn
@@ -112,6 +114,8 @@ frontend/
 | `/api/ai-models/` | ai_providers | Список AI-моделей (read-only) |
 | `/api/credits/` | credits | balance, estimate |
 | `/api/sharing/` | sharing | Публичные ссылки, комментарии |
+| `/api/cabinet/` | cabinet | Аналитика, журнал генераций, транзакции, хранилище |
+| `/api/auth/me/password/` | users | Смена пароля |
 | `/api/ai/callback/` | elements | Webhook для Kie.ai |
 | `ws/projects/{id}/` | projects | WebSocket — element_status_changed |
 

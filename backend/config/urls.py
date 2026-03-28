@@ -27,4 +27,5 @@ urlpatterns = [
     path('api/ai-models/', include('apps.ai_providers.urls')),
     path('api/ai/callback/', generation_callback_view),
     path('api/credits/', include('apps.credits.urls')),
+    path('api/cabinet/', include('apps.cabinet.urls')),
 ]
