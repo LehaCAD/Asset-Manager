@@ -3,7 +3,12 @@ set -e
 
 SERVER="root@85.239.36.28"
 # Путь к ключу — работает и в Git Bash на Windows, и в Linux
-SSH_KEY="/c/Users/ImpressivePC/.ssh/id_rsa"
+# Конвертируем Windows-путь к ключу в Unix-формат для Git Bash
+if command -v cygpath &>/dev/null; then
+  SSH_KEY="$(cygpath -u "$USERPROFILE")/.ssh/id_rsa"
+else
+  SSH_KEY="$HOME/.ssh/id_rsa"
+fi
 SSH_OPTS="-i $SSH_KEY -o StrictHostKeyChecking=no -o BatchMode=yes"
 
 echo "=== Деплой на raskadrawka.ru ==="
