@@ -3,9 +3,11 @@ from typing import Any
 
 from django.conf import settings
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+
+from apps.users.throttles import WebhookRateThrottle
 
 from apps.elements.generation import (
     extract_result_url,
@@ -26,6 +28,7 @@ def _get_callback_field(payload: dict[str, Any], field: str, default: Any = "") 
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+@throttle_classes([WebhookRateThrottle])
 def generation_callback_view(request):
     """Kie.ai callback endpoint for generation completion."""
     token = request.query_params.get("token", "")

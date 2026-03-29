@@ -178,6 +178,7 @@ REST_FRAMEWORK = {
         'anon': '60/minute',
         'user': '120/minute',
         'auth': '5/minute',
+        'webhook': '30/minute',
     },
 }
 
@@ -301,3 +302,14 @@ LOGGING = {
         },
     },
 }
+
+# === Email ===
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp-relay.brevo.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() == 'true'
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'Раскадровка <noreply@raskadrawka.ru>')
+
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
