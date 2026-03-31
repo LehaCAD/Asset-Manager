@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LogOut, User, Clapperboard, HardDrive, LayoutDashboard } from "lucide-react";
+import { LogOut, User, Clapperboard, HardDrive, LayoutDashboard, Bell } from "lucide-react";
 import { ChargeIcon } from "@/components/ui/charge-icon";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,8 +15,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "./ThemeToggle";
+import { NotificationDropdown } from "./NotificationDropdown";
 import { useAuthStore } from "@/lib/store/auth";
 import { useCreditsStore } from "@/lib/store/credits";
+import { useNotificationStore } from "@/lib/store/notifications";
+import { notificationWS } from "@/lib/api/notification-ws";
 import { authApi } from "@/lib/api/auth";
 import { formatCurrency, formatStorage } from "@/lib/utils/format";
 
@@ -24,10 +27,15 @@ export function Navbar() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const router = useRouter();
-  
+
   const setUser = useAuthStore((s) => s.setUser);
   const balance = useCreditsStore((s) => s.balance);
   const loadBalance = useCreditsStore((s) => s.loadBalance);
+
+  const unreadCount = useNotificationStore((s) => s.unreadCount);
+  const fetchUnreadCount = useNotificationStore((s) => s.fetchUnreadCount);
+  const addNotification = useNotificationStore((s) => s.addNotification);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Загружаем баланс и обновляем user data при монтировании
   useEffect(() => {
@@ -36,6 +44,32 @@ export function Navbar() {
       authApi.getMe().then(setUser).catch(() => {});
     }
   }, [user?.id, loadBalance, setUser]);
+
+  // Уведомления: WebSocket + polling
+  useEffect(() => {
+    if (!user) return;
+
+    fetchUnreadCount();
+
+    notificationWS.connect();
+    const unsubscribe = notificationWS.on((event) => {
+      addNotification(event.notification);
+    });
+
+    pollIntervalRef.current = setInterval(() => {
+      fetchUnreadCount();
+    }, 30_000);
+
+    return () => {
+      unsubscribe();
+      notificationWS.disconnect();
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   function handleLogout() {
     logout();
@@ -70,6 +104,25 @@ export function Navbar() {
             </div>
           )}
           
+          {/* Колокольчик уведомлений */}
+          {user && (
+            <NotificationDropdown>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative h-9 w-9"
+                aria-label="Уведомления"
+              >
+                <Bell className="h-4 w-4" strokeWidth={1.75} />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-destructive-foreground leading-none">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </Button>
+            </NotificationDropdown>
+          )}
+
           <ThemeToggle />
 
           <DropdownMenu>
