@@ -31,4 +31,5 @@ urlpatterns = [
     path('api/credits/', include('apps.credits.urls')),
     path('api/cabinet/', include('apps.cabinet.urls')),
     path('api/sharing/', include('apps.sharing.urls')),
+    path('api/notifications/', include('apps.notifications.urls')),
 ]
