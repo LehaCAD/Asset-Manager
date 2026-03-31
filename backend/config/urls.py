@@ -30,4 +30,5 @@ urlpatterns = [
     path('api/ai/callback/', generation_callback_view),
     path('api/credits/', include('apps.credits.urls')),
     path('api/cabinet/', include('apps.cabinet.urls')),
+    path('api/sharing/', include('apps.sharing.urls')),
 ]

@@ -47,8 +47,8 @@ class CreateCommentPublicSerializer(serializers.Serializer):
 
 class SharedLinkSerializer(serializers.ModelSerializer):
     element_ids = serializers.PrimaryKeyRelatedField(
-        source='elements', many=True, queryset=None,
-        write_only=True,
+        source='elements', many=True, write_only=True,
+        queryset=[]  # overridden in __init__ for authenticated users
     )
     element_count = serializers.SerializerMethodField()
     comment_count = serializers.SerializerMethodField()
