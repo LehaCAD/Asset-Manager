@@ -4,6 +4,7 @@ export interface User {
   id: number;
   username: string;
   email: string;
+  is_email_verified?: boolean;
   quota?: UserQuota;
 }
 
@@ -32,6 +33,7 @@ export interface RegisterPayload {
   username: string;
   email: string;
   password: string;
+  tos_accepted?: boolean;
 }
 
 /* ── Projects ─────────────────────────────────────────────── */
@@ -307,31 +309,38 @@ export interface AIModel {
 /* ── Sharing ──────────────────────────────────────────────── */
 
 export interface SharedLink {
-  id: number;
-  token: string;
-  project: number;
-  expires_at: string | null;
-  created_at: string;
+  id: number
+  token: string
+  project: number
+  created_by: number
+  name: string
+  element_ids: number[]
+  element_count: number
+  comment_count: number
+  expires_at: string | null
+  created_at: string
+  url: string
 }
 
 export interface CreateSharedLinkPayload {
-  project: number;
-  expires_at?: string;
+  project: number
+  element_ids: number[]
+  name?: string
+  expires_at?: string
 }
 
 export interface PublicProject {
-  id: number;
-  name: string;
-  aspect_ratio: AspectRatio;
-  scenes: PublicScene[];
+  name: string
+  scenes: PublicScene[]
+  ungrouped_elements: PublicElement[]
 }
 
 export interface PublicElement {
-  id: number;
-  element_type: ElementType;
-  file_url: string;
-  thumbnail_url: string;
-  is_favorite: boolean;
+  id: number
+  element_type: ElementType
+  file_url: string
+  thumbnail_url: string
+  comment_count: number
 }
 
 export interface PublicScene {
@@ -345,17 +354,26 @@ export interface PublicScene {
 }
 
 export interface Comment {
-  id: number;
-  author_name: string;
-  text: string;
-  created_at: string;
+  id: number
+  element: number | null
+  scene: number | null
+  parent: number | null
+  author_name: string
+  author_user: number | null
+  session_id: string
+  text: string
+  is_read: boolean
+  created_at: string
+  replies: Comment[]
 }
 
 export interface CreateCommentPayload {
-  scene: number;
-  author_name: string;
-  text: string;
-  token: string;
+  text: string
+  author_name: string
+  session_id: string
+  element_id?: number
+  scene_id?: number
+  parent_id?: number
 }
 
 /* ── WebSocket events ─────────────────────────────────────── */
@@ -372,7 +390,37 @@ export interface WSElementStatusChangedEvent {
   upload_progress?: number;
 }
 
-export type WSEvent = WSElementStatusChangedEvent;
+export type NotificationType = 'comment_new' | 'generation_completed' | 'generation_failed'
+
+export interface Notification {
+  id: number
+  type: NotificationType
+  project: number | null
+  element: number | null
+  scene: number | null
+  comment: number | null
+  title: string
+  message: string
+  is_read: boolean
+  created_at: string
+}
+
+export interface WSNewCommentEvent {
+  type: 'new_comment'
+  comment_id: number
+  element_id: number | null
+  scene_id: number | null
+  author_name: string
+  text: string
+  created_at: string
+}
+
+export interface WSNewNotificationEvent {
+  type: 'new_notification'
+  notification: Notification
+}
+
+export type WSEvent = WSElementStatusChangedEvent | WSNewCommentEvent
 
 /* ── UI Types ─────────────────────────────────────────────── */
 
