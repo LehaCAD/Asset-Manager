@@ -188,6 +188,23 @@ def finalize_generation_success(element_id: int, source_url: str) -> tuple[bool,
         status=Element.STATUS_PROCESSING,
     ).update(**update_payload)
 
+    # Create notification
+    try:
+        from apps.notifications.services import create_notification
+        from apps.notifications.models import Notification
+        el = Element.objects.select_related('project__user', 'scene').get(id=element_id)
+        create_notification(
+            user=el.project.user,
+            type=Notification.Type.GENERATION_COMPLETED,
+            project=el.project,
+            title='Генерация завершена',
+            message=el.prompt_text[:100] if el.prompt_text else '',
+            element=el,
+            scene=el.scene,
+        )
+    except Exception:
+        pass  # Don't break generation flow if notification fails
+
     return updated > 0, file_url
 
 
@@ -201,6 +218,23 @@ def finalize_generation_failure(element_id: int, error_message: str) -> bool:
         error_message=error_message[:4000],
         updated_at=timezone.now(),
     )
+
+    try:
+        from apps.notifications.services import create_notification
+        from apps.notifications.models import Notification
+        el = Element.objects.select_related('project__user', 'scene').get(id=element_id)
+        create_notification(
+            user=el.project.user,
+            type=Notification.Type.GENERATION_FAILED,
+            project=el.project,
+            title='Ошибка генерации',
+            message=error_message[:100] if error_message else '',
+            element=el,
+            scene=el.scene,
+        )
+    except Exception:
+        pass
+
     return updated > 0
 
 
