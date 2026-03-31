@@ -65,9 +65,12 @@ interface ElementGridProps {
   groups?: Scene[];
   onGroupClick?: (id: number) => void;
   onGroupDelete?: (id: number) => void;
+  shareMode?: boolean;
+  shareSelectedIds?: Set<number>;
+  onShareToggle?: (id: number) => void;
 }
 
-export function ElementGrid({ className, onRequestDelete, groups = [], onGroupClick, onGroupDelete }: ElementGridProps) {
+export function ElementGrid({ className, onRequestDelete, groups = [], onGroupClick, onGroupDelete, shareMode, shareSelectedIds, onShareToggle }: ElementGridProps) {
   const {
     getFilteredElements,
     selectedIds,
@@ -213,9 +216,13 @@ export function ElementGrid({ className, onRequestDelete, groups = [], onGroupCl
                 size={cardSize}
                 aspectRatio={preferences.aspectRatio}
                 fitMode={preferences.fitMode}
-                isSelected={selectedIds.has(element.id)}
-                isMultiSelectMode={isMultiSelectMode}
+                isSelected={shareMode ? (shareSelectedIds?.has(element.id) ?? false) : selectedIds.has(element.id)}
+                isMultiSelectMode={shareMode || isMultiSelectMode}
                 {...cardCallbacks}
+                {...(shareMode && onShareToggle ? {
+                  onSelect: (id: number) => onShareToggle(id),
+                  onOpenLightbox: (id: number) => onShareToggle(id),
+                } : {})}
               />
             ))}
           </SortableContext>

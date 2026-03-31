@@ -21,7 +21,10 @@ import { DetailPanel } from '@/components/lightbox/DetailPanel';
 import { useKeyboard } from '@/lib/hooks/use-keyboard';
 import { scenesApi } from '@/lib/api/scenes';
 import { MoveToGroupDialog } from '@/components/element/MoveToGroupDialog';
-import { Upload, ChevronLeft, ChevronRight, FolderPlus } from 'lucide-react';
+import { Upload, ChevronLeft, ChevronRight, FolderPlus, Share2 } from 'lucide-react';
+import { ShareSelectionMode } from '@/components/sharing/ShareSelectionMode';
+import { CreateLinkDialog } from '@/components/sharing/CreateLinkDialog';
+import { ShareLinksPanel } from '@/components/sharing/ShareLinksPanel';
 import { CreateSceneDialog } from '@/components/scene/CreateSceneDialog';
 import {
   Dialog,
@@ -90,6 +93,10 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   } | null>(null);
   const [isGroupDeleting, setIsGroupDeleting] = useState(false);
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
+  const [shareMode, setShareMode] = useState(false);
+  const [shareSelectedIds, setShareSelectedIds] = useState<Set<number>>(new Set());
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [linksPanelOpen, setLinksPanelOpen] = useState(false);
   const [promptBarHeight, setPromptBarHeight] = useState(0);
   const promptBarRef = useRef<HTMLDivElement>(null);
   const fallbackRefetchIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -462,6 +469,42 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
     enabled: lightboxOpen,
   });
 
+  // === Share mode handlers ===
+  const allElementIds = useMemo(() => {
+    return getFilteredElements().map((el) => el.id);
+  }, [getFilteredElements]);
+
+  const handleToggleShareElement = useCallback((id: number) => {
+    setShareSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const handleShareSelectAll = useCallback(() => {
+    setShareSelectedIds((prev) => {
+      if (prev.size === allElementIds.length) return new Set();
+      return new Set(allElementIds);
+    });
+  }, [allElementIds]);
+
+  const handleShareConfirm = useCallback(() => {
+    setLinkDialogOpen(true);
+  }, []);
+
+  const handleShareCancel = useCallback(() => {
+    setShareMode(false);
+    setShareSelectedIds(new Set());
+  }, []);
+
+  const handleLinkCreated = useCallback(() => {
+    setLinkDialogOpen(false);
+    setShareMode(false);
+    setShareSelectedIds(new Set());
+  }, []);
+
   // Measure PromptBar height dynamically
   useEffect(() => {
     const el = promptBarRef.current;
@@ -561,8 +604,24 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
             </button>
           </div>
 
-          {/* Right: filters + view */}
+          {/* Right: share + filters + view */}
           <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setLinksPanelOpen((v) => !v)}
+              className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shrink-0"
+              title="Управление ссылками"
+            >
+              <Share2 className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => { setShareMode(true); setShareSelectedIds(new Set()); }}
+              className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors shrink-0"
+            >
+              <Share2 className="h-3.5 w-3.5" />
+              Поделиться
+            </button>
             <ElementFilters
               filter={filter}
               onFilterChange={setFilter}
@@ -587,6 +646,9 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
               groups={groups}
               onGroupClick={handleGroupClick}
               onGroupDelete={handleRequestGroupDelete}
+              shareMode={shareMode}
+              shareSelectedIds={shareSelectedIds}
+              onShareToggle={handleToggleShareElement}
             />
           ) : (
             <EmptyState onUploadClick={open} isDragActive={isDragActive} />
@@ -609,6 +671,44 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
           onClearSelection={clearSelection}
           onToggleSelectAll={toggleSelectAll}
         />
+
+        {/* Share selection mode bar */}
+        {shareMode && (
+          <ShareSelectionMode
+            selectedIds={shareSelectedIds}
+            totalCount={allElementIds.length}
+            onConfirm={handleShareConfirm}
+            onCancel={handleShareCancel}
+            onSelectAll={handleShareSelectAll}
+          />
+        )}
+
+        {/* Create link dialog */}
+        <CreateLinkDialog
+          isOpen={linkDialogOpen}
+          onClose={handleLinkCreated}
+          projectId={projectId}
+          elementIds={Array.from(shareSelectedIds)}
+        />
+
+        {/* Share links panel (slide-over) */}
+        {linksPanelOpen && (
+          <div className="fixed inset-y-0 right-0 z-50 w-80 bg-background border-l shadow-xl flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b">
+              <h3 className="text-sm font-medium">Ссылки для просмотра</h3>
+              <button
+                type="button"
+                onClick={() => setLinksPanelOpen(false)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto">
+              <ShareLinksPanel projectId={projectId} />
+            </div>
+          </div>
+        )}
 
         {/* Whole-area drag overlay */}
         {isDragActive && hasContent && (
