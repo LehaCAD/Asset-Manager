@@ -1,15 +1,34 @@
 import uuid
+from django.conf import settings
 from django.db import models
 
 
 class SharedLink(models.Model):
     """Публичная ссылка на проект для просмотра без авторизации."""
-    
+
     project = models.ForeignKey(
         'projects.Project',
         on_delete=models.CASCADE,
         related_name='shared_links',
         verbose_name='Проект'
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='shared_links',
+        verbose_name='Создатель'
+    )
+    name = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        verbose_name='Название'
+    )
+    elements = models.ManyToManyField(
+        'elements.Element',
+        related_name='shared_links',
+        blank=True,
+        verbose_name='Элементы'
     )
     token = models.UUIDField(
         unique=True,
