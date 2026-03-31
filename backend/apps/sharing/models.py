@@ -70,42 +70,50 @@ class SharedLink(models.Model):
 
 
 class Comment(models.Model):
-    """Комментарий к группе от клиента через публичную ссылку."""
-    
+    """Комментарий к группе или элементу (единый тред, поддержка ответов)."""
+
     scene = models.ForeignKey(
-        'scenes.Scene',
-        on_delete=models.CASCADE,
-        related_name='comments',
-        verbose_name='Группа'
+        'scenes.Scene', null=True, blank=True,
+        on_delete=models.CASCADE, related_name='comments'
     )
-    author_name = models.CharField(
-        max_length=100,
-        verbose_name='Имя автора',
-        help_text='Имя клиента, оставившего комментарий'
+    element = models.ForeignKey(
+        'elements.Element', null=True, blank=True,
+        on_delete=models.CASCADE, related_name='comments'
     )
-    text = models.TextField(
-        verbose_name='Текст комментария'
+    parent = models.ForeignKey(
+        'self', null=True, blank=True,
+        on_delete=models.CASCADE, related_name='replies'
     )
-    is_read = models.BooleanField(
-        default=False,
-        verbose_name='Прочитано',
-        help_text='Отметка о прочтении комментария'
+    author_name = models.CharField(max_length=100)
+    author_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='comments'
     )
-    created_at = models.DateTimeField(
-        auto_now_add=True,
-        verbose_name='Дата создания'
-    )
-    updated_at = models.DateTimeField(
-        auto_now=True,
-        verbose_name='Дата обновления'
-    )
+    session_id = models.CharField(max_length=36, default='')
+    text = models.TextField(max_length=2000)
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = 'Комментарий'
-        verbose_name_plural = 'Комментарии'
-        ordering = ['-created_at']
+        ordering = ['created_at']
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    models.Q(scene__isnull=False, element__isnull=True) |
+                    models.Q(scene__isnull=True, element__isnull=False)
+                ),
+                name='comment_single_target'
+            )
+        ]
 
-    def __str__(self) -> str:
-        preview = self.text[:50] + '...' if len(self.text) > 50 else self.text
-        status = '✓' if self.is_read else '✗'
-        return f'{status} {self.author_name}: {preview}'
+    def __str__(self):
+        target = f"element {self.element_id}" if self.element_id else f"scene {self.scene_id}"
+        return f"Comment by {self.author_name} on {target}"
+
+    def clean(self):
+        super().clean()
+        if self.parent:
+            if self.parent.element_id != self.element_id or self.parent.scene_id != self.scene_id:
+                from django.core.exceptions import ValidationError
+                raise ValidationError('Reply must target the same element/scene as parent.')
