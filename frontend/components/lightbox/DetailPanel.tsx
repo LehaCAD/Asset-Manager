@@ -9,8 +9,10 @@ import { cn } from "@/lib/utils";
 import { Copy, Check, Save, RotateCcw, ImageOff } from "lucide-react";
 import { toast } from "sonner";
 import { elementsApi } from "@/lib/api/elements";
+import { sharingApi } from "@/lib/api/sharing";
 import { useGenerationStore } from "@/lib/store/generation";
-import type { Element } from "@/lib/types";
+import { CommentThread } from "@/components/sharing/CommentThread";
+import type { Element, Comment } from "@/lib/types";
 
 interface DetailPanelProps {
   element: Element;
@@ -68,7 +70,7 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
   const [promptText, setPromptText] = useState(element.prompt_text ?? "");
   const [isSaving, setIsSaving] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
-  const [commentText, setCommentText] = useState("");
+  const [comments, setComments] = useState<Comment[]>([]);
 
   const { retryFromElement, availableModels } = useGenerationStore();
 
@@ -76,6 +78,15 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
   useEffect(() => {
     setPromptText(element.prompt_text ?? "");
   }, [element.id, element.prompt_text]);
+
+  // Fetch comments when element changes
+  useEffect(() => {
+    let cancelled = false;
+    sharingApi.getElementComments(element.id).then((data) => {
+      if (!cancelled) setComments(data);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [element.id]);
 
   const hasPromptChanged = promptText !== (element.prompt_text ?? "");
   const isGenerated = element.source_type === "GENERATED" || element.source_type === "IMG2VID";
@@ -161,6 +172,12 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
 
   const handleRepeat = () => {
     retryFromElement(element);
+  };
+
+  const handleCommentSubmit = async (text: string, parentId?: number) => {
+    await sharingApi.addElementComment(element.id, text, parentId);
+    const updated = await sharingApi.getElementComments(element.id);
+    setComments(updated);
   };
 
   return (
@@ -284,21 +301,15 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
         </div>
       )}
 
-      {/* Comments Placeholder */}
+      {/* Comments */}
       <div>
         <h3 className="text-sm font-medium text-muted-foreground mb-2">Комментарии</h3>
         <Separator className="mb-3" />
-        <Textarea
-          value={commentText}
-          onChange={(e) => setCommentText(e.target.value)}
-          rows={3}
-          className="text-sm resize-none bg-muted/50"
-          placeholder="Здесь будут комментарии..."
-          disabled
+        <CommentThread
+          comments={comments}
+          onSubmit={handleCommentSubmit}
+          isAuthenticated={true}
         />
-        <p className="text-xs text-muted-foreground mt-1.5">
-          Функция комментариев в разработке
-        </p>
       </div>
     </div>
   );
