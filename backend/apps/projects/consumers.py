@@ -64,10 +64,15 @@ class ProjectConsumer(AsyncJsonWebsocketConsumer):
         await self.send_json(payload)
 
     async def new_comment(self, event):
-        """Обработчик события нового комментария (V2)."""
+        """Forward new comment to connected clients."""
         await self.send_json({
             'type': 'new_comment',
-            'comment': event['comment'],
+            'comment_id': event['comment']['id'],
+            'element_id': event['comment']['element_id'],
+            'scene_id': event['comment']['scene_id'],
+            'author_name': event['comment']['author_name'],
+            'text': event['comment']['text'],
+            'created_at': event['comment']['created_at'],
         })
 
     # --- Helpers ---
