@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { apiClient } from './client'
 import type {
-  SharedLink, Comment, PublicProject,
+  SharedLink, Comment, PublicProject, PublicElementReaction,
 } from '@/lib/types'
 
 const publicClient = axios.create({
@@ -56,6 +56,21 @@ export const sharingApi = {
   }) =>
     publicClient.post<Comment>(`/api/sharing/public/${token}/comments/`, data).then(r => r.data),
 
-  setReaction: (token: string, data: { element_id: number; session_id: string; value: string | null }) =>
+  setReaction: (token: string, data: { element_id: number; session_id: string; value: string | null; author_name?: string }) =>
     publicClient.post(`/api/sharing/public/${token}/reactions/`, data),
+
+  // Reactions — authenticated (creator workspace)
+  getElementReactions: (elementId: number) =>
+    apiClient.get<PublicElementReaction[]>(`/api/sharing/elements/${elementId}/reactions/`).then(r => r.data),
+
+  // Element metadata for sharing
+  getProjectElements: (projectId: number) =>
+    apiClient.get<{ elements: Array<{ id: number; element_type: string; is_favorite: boolean }> }>(
+      `/api/sharing/project-elements/${projectId}/`
+    ).then(r => r.data.elements),
+
+  getGroupElements: (sceneId: number) =>
+    apiClient.get<{ elements: Array<{ id: number; element_type: string; is_favorite: boolean }> }>(
+      `/api/sharing/group-elements/${sceneId}/`
+    ).then(r => r.data.elements),
 }

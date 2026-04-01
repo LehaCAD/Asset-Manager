@@ -324,6 +324,45 @@ def element_reactions_view(request, element_id):
     return Response(data)
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def project_element_ids(request, project_id):
+    """GET /api/sharing/project-elements/{project_id}/ — all elements in project with metadata for filtering."""
+    from apps.projects.models import Project
+    from apps.elements.models import Element
+    project = get_object_or_404(Project, id=project_id, user=request.user)
+    elements = list(
+        Element.objects.filter(project=project)
+        .exclude(status='FAILED')
+        .values('id', 'element_type', 'is_favorite')
+    )
+    return Response({'elements': elements})
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def group_element_ids(request, scene_id):
+    """GET /api/sharing/group-elements/{scene_id}/ — element IDs in scene + children."""
+    from apps.scenes.models import Scene
+    from apps.elements.models import Element
+    scene = get_object_or_404(Scene, id=scene_id, project__user=request.user)
+    scene_ids = [scene.id]
+    if hasattr(Scene, 'parent'):
+        def get_child_ids(parent_id):
+            children = list(Scene.objects.filter(parent_id=parent_id).values_list('id', flat=True))
+            result = list(children)
+            for child_id in children:
+                result.extend(get_child_ids(child_id))
+            return result
+        scene_ids.extend(get_child_ids(scene.id))
+    elements = list(
+        Element.objects.filter(scene_id__in=scene_ids)
+        .exclude(status='FAILED')
+        .values('id', 'element_type', 'is_favorite')
+    )
+    return Response({'elements': elements})
+
+
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
 def mark_comment_read(request, comment_id):

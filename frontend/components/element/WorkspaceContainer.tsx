@@ -127,6 +127,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
     });
   }, []);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [shareElements, setShareElements] = useState<Array<{ id: number; element_type: string; is_favorite: boolean }>>([]);
   const [linksPanelOpen, setLinksPanelOpen] = useState(false);
   const [linksRefreshKey, setLinksRefreshKey] = useState(0);
   const [promptBarHeight, setPromptBarHeight] = useState(0);
@@ -688,48 +689,23 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
                   Поделиться
                 </button>
               </PopoverTrigger>
-              <PopoverContent align="end" className="w-56 p-1" sideOffset={4}>
+              <PopoverContent align="end" className="w-52 p-1" sideOffset={4}>
                 <button
                   type="button"
                   onClick={async () => {
                     setSharePopoverOpen(false);
                     try {
-                      const ids = await sharingApi.getProjectElementIds(projectId);
-                      if (ids.length === 0) { toast.error('В проекте нет элементов'); return; }
-                      setShareSelectedIds(new Set(ids));
+                      const els = await sharingApi.getProjectElements(projectId);
+                      if (els.length === 0) { toast.error('В проекте нет элементов'); return; }
+                      setShareElements(els);
+                      setShareSelectedIds(new Set(els.map(e => e.id)));
                       setLinkDialogOpen(true);
                     } catch { toast.error('Не удалось загрузить элементы'); }
                   }}
                   className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors text-left"
                 >
-                  <FolderPlus className="h-4 w-4 text-muted-foreground" />
+                  <Share2 className="h-4 w-4 text-muted-foreground" />
                   Весь проект
-                </button>
-                {groupId && (
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setSharePopoverOpen(false);
-                      try {
-                        const ids = await sharingApi.getGroupElementIds(groupId);
-                        if (ids.length === 0) { toast.error('В группе нет элементов'); return; }
-                        setShareSelectedIds(new Set(ids));
-                        setLinkDialogOpen(true);
-                      } catch { toast.error('Не удалось загрузить элементы'); }
-                    }}
-                    className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors text-left"
-                  >
-                    <FolderPlus className="h-4 w-4 text-muted-foreground" />
-                    Текущая группа
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => { setSharePopoverOpen(false); setShareMode(true); setShareSelectedIds(new Set()); }}
-                  className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors text-left"
-                >
-                  <Plus className="h-4 w-4 text-muted-foreground" />
-                  Выбрать вручную
                 </button>
                 <div className="h-px bg-border my-1" />
                 <button
@@ -788,6 +764,42 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
           totalCount={getFilteredElements().length + groups.length}
           onDeleteSelected={() => openDeleteDialog(Array.from(selectedIds))}
           onMoveSelected={handleOpenMoveDialog}
+          onShareSelected={() => {
+            const elementOnlyIds = Array.from(selectedIds).filter(
+              id => !groups.some(g => g.id === id)
+            );
+            const selectedGroupIds = Array.from(selectedIds).filter(
+              id => groups.some(g => g.id === id)
+            );
+
+            if (selectedGroupIds.length === 0) {
+              // Only elements — build metadata from store
+              const els = getFilteredElements()
+                .filter(e => elementOnlyIds.includes(e.id))
+                .map(e => ({ id: e.id, element_type: e.element_type, is_favorite: e.is_favorite }));
+              setShareElements(els);
+              setShareSelectedIds(new Set(elementOnlyIds));
+              setLinkDialogOpen(true);
+            } else {
+              // Groups selected — fetch metadata
+              Promise.all(selectedGroupIds.map(gid => sharingApi.getGroupElements(gid)))
+                .then(results => {
+                  const groupEls = results.flat();
+                  const storeEls = getFilteredElements()
+                    .filter(e => elementOnlyIds.includes(e.id))
+                    .map(e => ({ id: e.id, element_type: e.element_type, is_favorite: e.is_favorite }));
+                  const allEls = [...storeEls, ...groupEls];
+                  if (allEls.length === 0) {
+                    toast.error('Нет элементов для шеринга');
+                    return;
+                  }
+                  setShareElements(allEls);
+                  setShareSelectedIds(new Set(allEls.map(e => e.id)));
+                  setLinkDialogOpen(true);
+                })
+                .catch(() => toast.error('Не удалось загрузить элементы групп'));
+            }
+          }}
           onClearSelection={clearSelection}
           onToggleSelectAll={toggleSelectAll}
         />
@@ -810,6 +822,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
           onCreated={handleLinkCreated}
           projectId={projectId}
           elementIds={Array.from(shareSelectedIds)}
+          elements={shareElements}
         />
 
         {/* Share links panel (slide-over) */}

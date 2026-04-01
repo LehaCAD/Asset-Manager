@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { CheckSquare, FolderInput, Trash2, X } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { CheckSquare, Square, FolderInput, Trash2, Share2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface ElementBulkBarProps {
@@ -7,6 +8,7 @@ export interface ElementBulkBarProps {
   totalCount: number;
   onDeleteSelected: () => void;
   onMoveSelected?: () => void;
+  onShareSelected?: () => void;
   onClearSelection: () => void;
   onToggleSelectAll: () => void;
 }
@@ -16,6 +18,7 @@ export function ElementBulkBar({
   totalCount,
   onDeleteSelected,
   onMoveSelected,
+  onShareSelected,
   onClearSelection,
   onToggleSelectAll,
 }: ElementBulkBarProps) {
@@ -27,69 +30,78 @@ export function ElementBulkBar({
     <div
       className={cn(
         "fixed bottom-24 left-1/2 -translate-x-1/2 z-50",
-        "bg-background border shadow-lg rounded-md px-4 py-3",
-        "flex items-center gap-4",
-        "transition-transform duration-200 ease-out"
+        "bg-background border shadow-lg rounded-lg px-3 py-2",
+        "flex items-center gap-0",
+        "animate-in fade-in slide-in-from-bottom-2 duration-200",
       )}
     >
-      <span className="text-sm font-medium min-w-[100px]">
-        {selectedCount} выбрано
-      </span>
+      {/* Left: checkbox toggle + count — fixed width so bar doesn't jump */}
+      <button
+        type="button"
+        onClick={onToggleSelectAll}
+        className="flex items-center gap-2 h-8 px-2 rounded-md text-sm hover:bg-muted transition-colors shrink-0"
+      >
+        {isAllSelected ? (
+          <CheckSquare className="h-4 w-4 text-primary" />
+        ) : (
+          <Square className="h-4 w-4 text-muted-foreground" />
+        )}
+        <span className="font-medium tabular-nums min-w-[80px]">
+          {selectedCount} из {totalCount}
+        </span>
+      </button>
 
-      <div className="flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onToggleSelectAll}
-          className="gap-2 cursor-pointer transition-colors duration-200"
-        >
-          {isAllSelected ? (
-            <>
-              <X className="h-4 w-4" />
-              Снять выбор
-            </>
-          ) : (
-            <>
-              <CheckSquare className="h-4 w-4" />
-              Выбрать все
-            </>
-          )}
-        </Button>
+      <Separator orientation="vertical" className="h-5 mx-1" />
+
+      {/* Center: actions — always rendered, no conditional show/hide */}
+      <div className="flex items-center gap-0.5">
+        {onShareSelected && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onShareSelected}
+            className="gap-1.5 h-8 px-3 text-xs"
+          >
+            <Share2 className="h-3.5 w-3.5" />
+            Поделиться
+          </Button>
+        )}
 
         {onMoveSelected && (
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={onMoveSelected}
-            className="gap-2"
+            className="gap-1.5 h-8 px-3 text-xs"
           >
-            <FolderInput className="h-4 w-4" />
+            <FolderInput className="h-3.5 w-3.5" />
             Переместить
           </Button>
         )}
 
         <Button
-          variant="destructive"
+          variant="ghost"
           size="sm"
           onClick={onDeleteSelected}
-          className="gap-2"
+          className="gap-1.5 h-8 px-3 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
         >
-          <Trash2 className="h-4 w-4" />
+          <Trash2 className="h-3.5 w-3.5" />
           Удалить
         </Button>
-
-        {!isAllSelected && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onClearSelection}
-            className="gap-2"
-          >
-            <X className="h-4 w-4" />
-            Снять выбор
-          </Button>
-        )}
       </div>
+
+      <Separator orientation="vertical" className="h-5 mx-1" />
+
+      {/* Right: dismiss */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={onClearSelection}
+        className="h-8 w-8 shrink-0"
+        aria-label="Снять выбор"
+      >
+        <X className="h-4 w-4" />
+      </Button>
     </div>
   );
 }
