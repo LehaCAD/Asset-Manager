@@ -2,6 +2,7 @@
 
 import { useEffect, useCallback, useState, useRef } from 'react'
 import { X, Download, ExternalLink, MessageCircle, Video, Image, ThumbsUp, ThumbsDown } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { LightboxNavigation } from '@/components/lightbox/LightboxNavigation'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
@@ -133,7 +134,11 @@ export function ReviewerLightbox({
   }
 
   const handleReaction = (value: 'like' | 'dislike') => {
-    if (!current || !sessionId) return
+    if (!current) return
+    if (!sessionId) {
+      toast.info('Введите имя, чтобы оставить реакцию')
+      return
+    }
     onReact(current.id, value)
   }
 
@@ -253,23 +258,6 @@ export function ReviewerLightbox({
             )}
           </div>
 
-          {/* Who reacted — pills below action bar */}
-          {current.reactions && current.reactions.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1 mt-2">
-              {current.reactions.map((r, i) => {
-                const isSelf = r.session_id === sessionId
-                return (
-                  <span key={i} className={cn(
-                    'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs',
-                    r.value === 'like' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-orange-500/10 text-orange-600 dark:text-orange-400'
-                  )}>
-                    {r.value === 'like' ? '👍' : '👎'}
-                    {isSelf ? '' : ` ${r.author_name || 'Гость'}`}
-                  </span>
-                )
-              })}
-            </div>
-          )}
         </div>
 
         {/* Comments panel — matches DetailPanel structure */}

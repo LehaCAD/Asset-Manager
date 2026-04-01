@@ -242,10 +242,11 @@ export function CommentThread({
           <textarea
             ref={textareaRef}
             rows={2}
-            placeholder="Написать комментарий… (Ctrl+Enter)"
+            placeholder={`Написать комментарий… (${typeof navigator !== 'undefined' && /Mac/.test(navigator.userAgent) ? '⌘+Enter' : 'Ctrl+Enter'})`}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKeyDown}
+            maxLength={2000}
             disabled={submitting || isLoading}
             className="flex-1 text-sm bg-muted/10 border border-border rounded-md px-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none disabled:opacity-50 leading-snug"
           />

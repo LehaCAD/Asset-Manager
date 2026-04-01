@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import {
   ChevronDown,
@@ -18,6 +18,8 @@ import {
 import { toast } from 'sonner'
 import { sharingApi } from '@/lib/api/sharing'
 import { ReviewerLightbox } from '@/components/sharing/ReviewerLightbox'
+import { ReviewerNameInput } from '@/components/sharing/ReviewerNameInput'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 import { DisplaySettingsPopover } from '@/components/display/DisplaySettingsPopover'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
@@ -159,9 +161,11 @@ function ElementCard({
         <button
           onClick={(e) => {
             e.stopPropagation()
-            if (!hasIdentity) { onClick(); return }
+            if (!hasIdentity) {
+              toast.info('Введите имя, чтобы оставить реакцию')
+              return
+            }
             onReact(element.id, 'like')
-            toast('Оставьте комментарий', { action: { label: 'Открыть', onClick } })
           }}
           className={cn(
             'flex items-center gap-1 h-7 px-2 rounded-md text-xs font-medium transition-all',
@@ -179,9 +183,11 @@ function ElementCard({
         <button
           onClick={(e) => {
             e.stopPropagation()
-            if (!hasIdentity) { onClick(); return }
+            if (!hasIdentity) {
+              toast.info('Введите имя, чтобы оставить реакцию')
+              return
+            }
             onReact(element.id, 'dislike')
-            toast('Оставьте комментарий', { action: { label: 'Открыть', onClick } })
           }}
           className={cn(
             'flex items-center gap-1 h-7 px-2 rounded-md text-xs font-medium transition-all',
@@ -427,47 +433,41 @@ export default function PublicSharePage() {
     }))
   }, [])
 
-  const handleEditName = () => {
-    const name = prompt('Как вас зовут?', reviewerName)
-    if (name && name.trim()) {
-      localStorage.setItem('reviewer_name', name.trim())
-      setReviewerName(name.trim())
-    }
-  }
-
   const hasIdentity = !!reviewerName && !!sessionId
 
+  const reactingRef = useRef<Set<number>>(new Set())
+
   const handleCardReaction = useCallback(async (elementId: number, value: 'like' | 'dislike') => {
-    if (!sessionId) return
-    const currentValue = reactionsMap[elementId]
-    const newValue = currentValue === value ? null : value
-
-    // Optimistic update of reactionsMap
-    setReactionsMap((prev) => ({ ...prev, [elementId]: newValue }))
-
-    // Optimistic update of element counts in project
-    setProject((prev) => {
-      if (!prev) return prev
-      const updateEl = (el: PublicElement): PublicElement => {
-        if (el.id !== elementId) return el
-        let likes = el.likes ?? 0
-        let dislikes = el.dislikes ?? 0
-        // Remove old reaction
-        if (currentValue === 'like') likes = Math.max(0, likes - 1)
-        if (currentValue === 'dislike') dislikes = Math.max(0, dislikes - 1)
-        // Add new reaction
-        if (newValue === 'like') likes++
-        if (newValue === 'dislike') dislikes++
-        return { ...el, likes, dislikes }
-      }
-      return {
-        ...prev,
-        ungrouped_elements: prev.ungrouped_elements.map(updateEl),
-        scenes: prev.scenes.map((s) => ({ ...s, elements: s.elements.map(updateEl) })),
-      }
-    })
+    if (!sessionId || reactingRef.current.has(elementId)) return
+    reactingRef.current.add(elementId)
 
     try {
+      const currentValue = reactionsMap[elementId]
+      const newValue = currentValue === value ? null : value
+
+      // Optimistic update of reactionsMap
+      setReactionsMap((prev) => ({ ...prev, [elementId]: newValue }))
+
+      // Optimistic update of element counts in project
+      setProject((prev) => {
+        if (!prev) return prev
+        const updateEl = (el: PublicElement): PublicElement => {
+          if (el.id !== elementId) return el
+          let likes = el.likes ?? 0
+          let dislikes = el.dislikes ?? 0
+          if (currentValue === 'like') likes = Math.max(0, likes - 1)
+          if (currentValue === 'dislike') dislikes = Math.max(0, dislikes - 1)
+          if (newValue === 'like') likes++
+          if (newValue === 'dislike') dislikes++
+          return { ...el, likes, dislikes }
+        }
+        return {
+          ...prev,
+          ungrouped_elements: prev.ungrouped_elements.map(updateEl),
+          scenes: prev.scenes.map((s) => ({ ...s, elements: s.elements.map(updateEl) })),
+        }
+      })
+
       await sharingApi.setReaction(token, {
         element_id: elementId,
         session_id: sessionId,
@@ -475,8 +475,12 @@ export default function PublicSharePage() {
         author_name: reviewerName,
       })
     } catch {
-      // Revert on error
-      setReactionsMap((prev) => ({ ...prev, [elementId]: currentValue ?? null }))
+      // Full revert — both reactionsMap AND project
+      setReactionsMap((prev) => ({ ...prev, [elementId]: reactionsMap[elementId] ?? null }))
+      // Re-fetch to get correct state from server
+      sharingApi.getPublicProject(token).then(data => setProject(data)).catch(() => {})
+    } finally {
+      reactingRef.current.delete(elementId)
     }
   }, [sessionId, reactionsMap, token, reviewerName])
 
@@ -512,17 +516,22 @@ export default function PublicSharePage() {
           <div className="flex items-center gap-1">
             <DisplaySettingsPopover />
             <ThemeToggle />
-            <button
-              onClick={isAuthenticated ? undefined : handleEditName}
-              className={cn(
-                "flex items-center gap-1.5 h-9 px-3 rounded-md text-sm text-muted-foreground transition-all duration-150",
-                !isAuthenticated && "hover:text-foreground hover:bg-muted/50 cursor-pointer",
-                isAuthenticated && "cursor-default"
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className="flex items-center gap-1.5 h-9 px-3 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-150">
+                  <span className="truncate max-w-[100px]">{reviewerName || 'Гость'}</span>
+                  {!isAuthenticated && <Pencil className="w-3 h-3 flex-shrink-0 opacity-50" />}
+                </button>
+              </PopoverTrigger>
+              {!isAuthenticated && (
+                <PopoverContent align="end" className="w-64 p-3">
+                  <ReviewerNameInput onSave={(name, sid) => {
+                    setReviewerName(name)
+                    setSessionId(sid)
+                  }} />
+                </PopoverContent>
               )}
-            >
-              <span className="truncate max-w-[100px]">{reviewerName || 'Гость'}</span>
-              {!isAuthenticated && <Pencil className="w-3 h-3 flex-shrink-0 opacity-50" />}
-            </button>
+            </Popover>
           </div>
         </div>
       </header>

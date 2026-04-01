@@ -12,7 +12,8 @@ import { elementsApi } from "@/lib/api/elements";
 import { sharingApi } from "@/lib/api/sharing";
 import { useGenerationStore } from "@/lib/store/generation";
 import { CommentThread } from "@/components/sharing/CommentThread";
-import type { Element, Comment } from "@/lib/types";
+import { ThumbsUp, ThumbsDown } from "lucide-react";
+import type { Element, Comment, PublicElementReaction } from "@/lib/types";
 
 interface DetailPanelProps {
   element: Element;
@@ -71,6 +72,7 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
   const [isSaving, setIsSaving] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
+  const [reactions, setReactions] = useState<PublicElementReaction[]>([]);
 
   const { retryFromElement, availableModels } = useGenerationStore();
 
@@ -79,11 +81,14 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
     setPromptText(element.prompt_text ?? "");
   }, [element.id, element.prompt_text]);
 
-  // Fetch comments when element changes
+  // Fetch comments and reactions when element changes
   useEffect(() => {
     let cancelled = false;
     sharingApi.getElementComments(element.id).then((data) => {
       if (!cancelled) setComments(data);
+    }).catch(() => {});
+    sharingApi.getElementReactions(element.id).then((data) => {
+      if (!cancelled) setReactions(data);
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [element.id]);
@@ -298,6 +303,45 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
             <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
             Повторить запрос
           </Button>
+        </div>
+      )}
+
+      {/* Reactions from reviewers */}
+      {reactions.length > 0 && (
+        <div>
+          <h3 className="text-sm font-medium text-muted-foreground mb-2">Реакции</h3>
+          <Separator className="mb-3" />
+          {/* Summary */}
+          <div className="flex items-center gap-3 mb-2 text-sm">
+            {reactions.filter(r => r.value === 'like').length > 0 && (
+              <span className="flex items-center gap-1 text-emerald-500 font-medium">
+                <ThumbsUp className="h-4 w-4" />
+                {reactions.filter(r => r.value === 'like').length}
+              </span>
+            )}
+            {reactions.filter(r => r.value === 'dislike').length > 0 && (
+              <span className="flex items-center gap-1 text-orange-500 font-medium">
+                <ThumbsDown className="h-4 w-4" />
+                {reactions.filter(r => r.value === 'dislike').length}
+              </span>
+            )}
+          </div>
+          {/* Individual reactions */}
+          <div className="flex flex-wrap gap-1.5">
+            {reactions.map((r, i) => (
+              <span
+                key={i}
+                className={cn(
+                  'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs',
+                  r.value === 'like'
+                    ? 'bg-emerald-500/10 text-emerald-600'
+                    : 'bg-orange-500/10 text-orange-500'
+                )}
+              >
+                {r.value === 'like' ? <ThumbsUp className="w-3 h-3" /> : <ThumbsDown className="w-3 h-3" />} {r.author_name || 'Гость'}
+              </span>
+            ))}
+          </div>
         </div>
       )}
 

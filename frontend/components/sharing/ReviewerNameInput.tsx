@@ -34,6 +34,7 @@ export function ReviewerNameInput({ onSave }: ReviewerNameInputProps) {
         onChange={(e) => setName(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder="Имя"
+        maxLength={50}
         autoFocus
         className="flex-1 text-sm bg-background border border-border rounded-md px-3 py-1.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
       />
