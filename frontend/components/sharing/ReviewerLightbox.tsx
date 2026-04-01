@@ -1,25 +1,22 @@
 'use client'
 
 import { useEffect, useCallback, useState, useRef } from 'react'
-import {
-  X,
-  ChevronLeft,
-  ChevronRight,
-  Play,
-  Download,
-  ExternalLink,
-  MessageCircle,
-} from 'lucide-react'
+import { X, Download, ExternalLink, MessageCircle, Video, Image } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { LightboxNavigation } from '@/components/lightbox/LightboxNavigation'
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { CommentThread } from './CommentThread'
 import { ReviewerNameInput } from './ReviewerNameInput'
 import { sharingApi } from '@/lib/api/sharing'
+import { cn } from '@/lib/utils'
 import type { PublicElement, Comment } from '@/lib/types'
 
 // ── Download helper ─────────────────────────────────────────
 
 async function handleDownload(url: string, filename?: string) {
   try {
-    const response = await fetch(url)
+    const response = await fetch(url, { mode: 'cors', cache: 'no-store' })
+    if (!response.ok) throw new Error('fetch failed')
     const blob = await response.blob()
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
@@ -60,26 +57,26 @@ export function ReviewerLightbox({
 }: ReviewerLightboxProps) {
   const [reviewerName, setReviewerName] = useState('')
   const [sessionId, setSessionId] = useState('')
-  const filmstripRef = useRef<HTMLDivElement>(null)
+  const activeThumbRef = useRef<HTMLButtonElement>(null)
 
   // Load reviewer identity from localStorage
   useEffect(() => {
-    const name = localStorage.getItem('reviewer_name') || ''
-    const sid = localStorage.getItem('reviewer_session_id') || ''
-    setReviewerName(name)
-    setSessionId(sid)
+    setReviewerName(localStorage.getItem('reviewer_name') || '')
+    setSessionId(localStorage.getItem('reviewer_session_id') || '')
   }, [])
 
   const current = elements[currentIndex]
   const isVideo = current?.element_type === 'VIDEO'
+  const hasPrev = currentIndex > 0
+  const hasNext = currentIndex < elements.length - 1
 
   const goNext = useCallback(() => {
-    if (currentIndex < elements.length - 1) onNavigate(currentIndex + 1)
-  }, [currentIndex, elements.length, onNavigate])
+    if (hasNext) onNavigate(currentIndex + 1)
+  }, [currentIndex, hasNext, onNavigate])
 
   const goPrev = useCallback(() => {
-    if (currentIndex > 0) onNavigate(currentIndex - 1)
-  }, [currentIndex, onNavigate])
+    if (hasPrev) onNavigate(currentIndex - 1)
+  }, [currentIndex, hasPrev, onNavigate])
 
   // Keyboard navigation
   useEffect(() => {
@@ -93,12 +90,24 @@ export function ReviewerLightbox({
     return () => window.removeEventListener('keydown', handleKey)
   }, [isOpen, onClose, goNext, goPrev])
 
-  // Scroll filmstrip to keep current element visible
+  // Prevent body scroll
   useEffect(() => {
-    if (!filmstripRef.current) return
-    const thumb = filmstripRef.current.children[currentIndex] as HTMLElement | undefined
-    if (thumb) {
-      thumb.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [isOpen])
+
+  // Auto-scroll filmstrip
+  useEffect(() => {
+    if (activeThumbRef.current) {
+      activeThumbRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center',
+      })
     }
   }, [currentIndex])
 
@@ -123,88 +132,98 @@ export function ReviewerLightbox({
 
   const comments = commentsMap[current.id] || []
   const hasIdentity = !!reviewerName && !!sessionId
+  const hasFileUrl = !!current.file_url?.trim()
+  const ext = current.file_url?.split('/').pop()?.split('?')[0]?.split('.').pop() ?? 'file'
+  const fileName = `element-${current.id}.${ext}`
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/95 flex flex-col">
-      {/* Top bar */}
-      <div className="flex items-center justify-between px-4 py-3 flex-shrink-0">
-        <span className="text-sm text-white/60">
-          {currentIndex + 1} / {elements.length}
-        </span>
-        <button
+    <div
+      className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Просмотр элемента"
+    >
+      {/* Header — matches main LightboxModal */}
+      <div className="relative flex items-center justify-between px-4 py-2 border-b shrink-0 bg-surface">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground select-none">
+            {currentIndex + 1} / {elements.length}
+          </span>
+        </div>
+        <div className="absolute left-1/2 -translate-x-1/2 hidden sm:flex items-center gap-2 text-[11px] text-muted-foreground/60 select-none pointer-events-none">
+          <span>Горячие клавиши:</span>
+          <kbd className="px-1.5 py-0.5 rounded bg-card text-muted-foreground text-[10px] font-mono">← →</kbd>
+          <kbd className="px-1.5 py-0.5 rounded bg-card text-muted-foreground text-[10px] font-mono">Esc</kbd>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={onClose}
-          className="text-white/60 hover:text-white transition-all duration-150 p-1 rounded-full hover:bg-white/10"
           aria-label="Закрыть"
+          className="h-7 w-7"
         >
-          <X className="w-6 h-6" />
-        </button>
+          <X className="h-4 w-4" />
+        </Button>
       </div>
 
-      {/* Main content */}
-      <div className="flex flex-1 min-h-0">
-        {/* Media area */}
-        <div className="flex-1 flex flex-col items-center justify-center relative px-16">
-          {/* Prev arrow */}
-          {currentIndex > 0 && (
-            <button
-              onClick={goPrev}
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all duration-150"
-              aria-label="Предыдущий"
-            >
-              <ChevronLeft className="w-6 h-6 text-white" />
-            </button>
-          )}
+      {/* Main content area */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* Media area with navigation */}
+        <div className="flex-1 relative flex flex-col items-center justify-center p-4 md:p-8">
+          <LightboxNavigation
+            onPrev={goPrev}
+            onNext={goNext}
+            hasPrev={hasPrev}
+            hasNext={hasNext}
+          />
 
-          {/* Media */}
-          {isVideo ? (
-            <video
-              key={current.file_url}
-              src={current.file_url}
-              controls
-              className="max-h-[calc(100vh-200px)] max-w-[calc(100%-380px)] rounded-lg"
-            />
-          ) : (
-            <img
-              key={current.file_url}
-              src={current.file_url}
-              alt=""
-              className="max-h-[calc(100vh-200px)] max-w-[calc(100%-380px)] object-contain rounded-lg"
-            />
-          )}
-
-          {/* Action buttons under media */}
-          <div className="flex items-center gap-2 mt-3">
-            <button
-              onClick={() => handleDownload(current.file_url, `element-${current.id}`)}
-              className="rounded-full bg-overlay-button hover:bg-overlay-button-hover p-2 transition-all duration-150"
-              aria-label="Скачать"
-            >
-              <Download className="w-4 h-4 text-overlay-text" />
-            </button>
-            <button
-              onClick={() => window.open(current.file_url, '_blank')}
-              className="rounded-full bg-overlay-button hover:bg-overlay-button-hover p-2 transition-all duration-150"
-              aria-label="Открыть оригинал"
-            >
-              <ExternalLink className="w-4 h-4 text-overlay-text" />
-            </button>
+          {/* Media container */}
+          <div className="relative flex items-center justify-center w-full max-w-[80vw] md:max-w-[900px] h-full max-h-[65vh] md:max-h-[600px] rounded-md overflow-hidden">
+            {isVideo ? (
+              <video
+                key={current.file_url}
+                src={current.file_url}
+                controls
+                playsInline
+                className="max-w-full max-h-full object-contain rounded-lg"
+              />
+            ) : (
+              <img
+                key={current.file_url}
+                src={current.file_url}
+                alt=""
+                className="max-w-full max-h-full object-contain rounded-lg"
+              />
+            )}
           </div>
 
-          {/* Next arrow */}
-          {currentIndex < elements.length - 1 && (
-            <button
-              onClick={goNext}
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all duration-150"
-              aria-label="Следующий"
-            >
-              <ChevronRight className="w-6 h-6 text-white" />
-            </button>
+          {/* Action buttons below media — matches main lightbox style */}
+          {hasFileUrl && (
+            <div className="mt-4 flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => handleDownload(current.file_url, fileName)}
+                className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-muted-foreground bg-card hover:text-foreground transition-colors"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Скачать
+              </button>
+              <a
+                href={current.file_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-muted-foreground bg-card hover:text-foreground transition-colors"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                Оригинал
+              </a>
+            </div>
           )}
         </div>
 
-        {/* Comments panel */}
-        <div className="hidden md:flex flex-col w-80 bg-background border-l border-border flex-shrink-0">
-          <div className="px-4 py-3 border-b border-border flex items-center gap-2">
+        {/* Comments panel — matches DetailPanel structure */}
+        <div className="w-80 border-l overflow-hidden bg-background shrink-0 hidden md:flex flex-col">
+          <div className="px-4 py-3 border-b flex items-center gap-2 shrink-0">
             <MessageCircle className="w-4 h-4 text-muted-foreground" />
             <h3 className="text-sm font-medium text-foreground">Комментарии</h3>
             {comments.length > 0 && (
@@ -227,35 +246,46 @@ export function ReviewerLightbox({
         </div>
       </div>
 
-      {/* Filmstrip */}
-      <div className="flex-shrink-0 border-t border-white/10 bg-black/50 px-4 py-2">
-        <div
-          ref={filmstripRef}
-          className="flex gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-white/20"
-        >
-          {elements.map((el, idx) => (
-            <button
-              key={el.id}
-              onClick={() => onNavigate(idx)}
-              className={`relative flex-shrink-0 w-14 h-14 rounded overflow-hidden border-2 transition-all duration-150 ${
-                idx === currentIndex
-                  ? 'border-primary opacity-100'
-                  : 'border-transparent opacity-50 hover:opacity-80'
-              }`}
-            >
-              <img
-                src={el.thumbnail_url || el.file_url}
-                alt=""
-                className="w-full h-full object-cover"
-              />
-              {el.element_type === 'VIDEO' && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Play className="w-3.5 h-3.5 text-white/80 fill-white/80" />
-                </div>
-              )}
-            </button>
-          ))}
-        </div>
+      {/* Filmstrip — matches main lightbox Filmstrip */}
+      <div className="border-t px-4 py-2 shrink-0 bg-background">
+        <ScrollArea className="w-full whitespace-nowrap">
+          <div className="flex gap-2 py-2 px-1">
+            {elements.map((el, idx) => {
+              const isActive = idx === currentIndex
+              const elIsVideo = el.element_type === 'VIDEO'
+
+              return (
+                <button
+                  key={el.id}
+                  ref={isActive ? activeThumbRef : null}
+                  onClick={() => onNavigate(idx)}
+                  className={cn(
+                    'shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all relative group',
+                    isActive
+                      ? 'border-primary ring-2 ring-primary/30'
+                      : 'border-transparent hover:border-muted-foreground/30'
+                  )}
+                >
+                  <img
+                    src={el.thumbnail_url || el.file_url}
+                    alt=""
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                  {/* Type icon */}
+                  <div className="absolute top-1 right-1 rounded-full bg-overlay-medium p-0.5">
+                    {elIsVideo ? (
+                      <Video className="w-2.5 h-2.5 text-overlay-text" />
+                    ) : (
+                      <Image className="w-2.5 h-2.5 text-overlay-text" />
+                    )}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
       </div>
     </div>
   )

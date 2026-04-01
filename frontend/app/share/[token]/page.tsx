@@ -406,11 +406,28 @@ export default function PublicSharePage() {
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="py-6">
-        <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground/50">
-          <Clapperboard className="h-3.5 w-3.5" strokeWidth={1.75} />
-          <span>Раскадровка</span>
+      {/* Footer CTA */}
+      <footer className="border-t border-border mt-auto">
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="rounded-lg bg-primary/5 border border-primary/20 p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Clapperboard className="h-8 w-8 text-primary shrink-0" strokeWidth={1.5} />
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  Генерируйте изображения и видео с помощью AI
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Создавайте раскадровки, делитесь с командой, собирайте обратную связь
+                </p>
+              </div>
+            </div>
+            <a
+              href="/register"
+              className="shrink-0 inline-flex items-center gap-2 h-9 px-5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+            >
+              Попробовать бесплатно
+            </a>
+          </div>
         </div>
       </footer>
 
