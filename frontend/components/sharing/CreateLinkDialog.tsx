@@ -52,7 +52,8 @@ export function CreateLinkDialog({
         expires_at: buildExpiresAt(expiry),
       })
 
-      await navigator.clipboard.writeText(link.url)
+      const fullUrl = `${window.location.origin}${link.url}`
+      await navigator.clipboard.writeText(fullUrl)
       toast.success('Ссылка скопирована')
       handleClose()
     } catch {

@@ -31,7 +31,8 @@ export function ShareLinksPanel({ projectId }: ShareLinksPanelProps) {
 
   async function handleCopy(url: string) {
     try {
-      await navigator.clipboard.writeText(url)
+      const fullUrl = `${window.location.origin}${url}`
+      await navigator.clipboard.writeText(fullUrl)
       toast.success('Ссылка скопирована')
     } catch {
       toast.error('Не удалось скопировать')
