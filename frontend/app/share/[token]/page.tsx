@@ -2,17 +2,47 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams } from 'next/navigation'
-import { ChevronDown, ChevronRight, MessageCircle, Play, Pencil } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronRight,
+  MessageCircle,
+  Play,
+  Pencil,
+  Download,
+  ExternalLink,
+  ImageOff,
+} from 'lucide-react'
 import { sharingApi } from '@/lib/api/sharing'
 import { ReviewerLightbox } from '@/components/sharing/ReviewerLightbox'
 import type { PublicProject, PublicElement, Comment } from '@/lib/types'
 
-// ── Error states ─────────────────────────────────────────────
+// ── Download helper ─────────────────────────────────────────
+
+async function handleDownload(url: string, filename?: string) {
+  try {
+    const response = await fetch(url)
+    const blob = await response.blob()
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = filename || 'download'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(a.href)
+  } catch {
+    window.open(url, '_blank')
+  }
+}
+
+// ── Error / Loading states ──────────────────────────────────
 
 function ErrorView({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="text-center px-6">
+        <div className="flex justify-center mb-4">
+          <ImageOff className="w-12 h-12 text-muted-foreground/50" />
+        </div>
         <h1 className="text-2xl font-semibold text-foreground mb-2">{title}</h1>
         {subtitle && <p className="text-muted-foreground">{subtitle}</p>}
       </div>
@@ -23,7 +53,10 @@ function ErrorView({ title, subtitle }: { title: string; subtitle?: string }) {
 function LoadingView() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center">
-      <div className="text-muted-foreground animate-pulse">Загрузка...</div>
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <span className="text-sm text-muted-foreground">Загрузка...</span>
+      </div>
     </div>
   )
 }
@@ -32,42 +65,75 @@ function LoadingView() {
 
 function ElementCard({
   element,
+  commentCount,
   onClick,
 }: {
   element: PublicElement
+  commentCount: number
   onClick: () => void
 }) {
   const isVideo = element.element_type === 'VIDEO'
 
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className="group relative aspect-square rounded-lg overflow-hidden bg-muted/20 border border-border hover:border-primary/50 transition-all cursor-pointer"
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick() }}
+      className="group relative aspect-square rounded-md overflow-hidden bg-muted cursor-pointer"
     >
       <img
         src={element.thumbnail_url || element.file_url}
         alt=""
-        className="w-full h-full object-cover transition-transform group-hover:scale-[1.02]"
+        className="w-full h-full object-cover transition-transform duration-150 group-hover:scale-[1.02]"
         loading="lazy"
+        decoding="async"
       />
 
-      {/* Video overlay */}
+      {/* Hover overlay */}
+      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-150" />
+
+      {/* Video play button */}
       {isVideo && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="w-10 h-10 rounded-full bg-black/50 flex items-center justify-center">
-            <Play className="w-5 h-5 text-white fill-white" />
+          <div className="w-11 h-11 rounded-full bg-overlay-button flex items-center justify-center">
+            <Play className="w-5 h-5 text-overlay-text fill-overlay-text" />
           </div>
         </div>
       )}
 
-      {/* Comment badge */}
-      {element.comment_count > 0 && (
+      {/* Hover action buttons — bottom-left */}
+      <div className="absolute bottom-2 left-2 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            handleDownload(element.file_url, `element-${element.id}`)
+          }}
+          className="w-7 h-7 rounded-full bg-overlay-button hover:bg-overlay-button-hover flex items-center justify-center transition-all duration-150"
+          aria-label="Скачать"
+        >
+          <Download className="w-3.5 h-3.5 text-overlay-text" />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            window.open(element.file_url, '_blank')
+          }}
+          className="w-7 h-7 rounded-full bg-overlay-button hover:bg-overlay-button-hover flex items-center justify-center transition-all duration-150"
+          aria-label="Открыть оригинал"
+        >
+          <ExternalLink className="w-3.5 h-3.5 text-overlay-text" />
+        </button>
+      </div>
+
+      {/* Comment badge — bottom-right */}
+      {commentCount > 0 && (
         <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/60 text-white text-xs rounded-full px-2 py-0.5">
           <MessageCircle className="w-3 h-3" />
-          {element.comment_count}
+          {commentCount}
         </div>
       )}
-    </button>
+    </div>
   )
 }
 
@@ -77,11 +143,13 @@ function SceneSection({
   name,
   elements,
   collapsible,
+  commentsMap,
   onElementClick,
 }: {
   name: string
   elements: PublicElement[]
   collapsible: boolean
+  commentsMap: Record<number, Comment[]>
   onElementClick: (element: PublicElement) => void
 }) {
   const [open, setOpen] = useState(true)
@@ -101,21 +169,26 @@ function SceneSection({
             <ChevronRight className="w-4 h-4" />
           )}
           <h2 className="text-base font-medium">{name}</h2>
-          <span className="text-xs text-muted-foreground">({elements.length})</span>
+          <span className="text-xs text-muted-foreground bg-muted rounded-full px-2 py-0.5">
+            {elements.length}
+          </span>
         </button>
       )}
 
-      {open && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {elements.map((el) => (
-            <ElementCard
-              key={el.id}
-              element={el}
-              onClick={() => onElementClick(el)}
-            />
-          ))}
-        </div>
-      )}
+      <div
+        className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 transition-all duration-200 ${
+          open ? 'opacity-100' : 'hidden'
+        }`}
+      >
+        {elements.map((el) => (
+          <ElementCard
+            key={el.id}
+            element={el}
+            commentCount={(commentsMap[el.id] || []).length}
+            onClick={() => onElementClick(el)}
+          />
+        ))}
+      </div>
     </div>
   )
 }
@@ -230,10 +303,10 @@ export default function PublicSharePage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur border-b border-border">
+      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-sm border-b border-border">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <span className="text-sm font-semibold text-foreground tracking-tight">
-            Раскадровка
+          <span className="text-sm font-semibold text-foreground tracking-tight select-none">
+            ◈ Раскадровка
           </span>
           <h1 className="text-sm font-medium text-foreground truncate mx-4 max-w-[50%] text-center">
             {project.name}
@@ -242,13 +315,18 @@ export default function PublicSharePage() {
             {reviewerName ? (
               <button
                 onClick={handleEditName}
-                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-all duration-150"
               >
                 <span className="truncate max-w-[120px]">{reviewerName}</span>
                 <Pencil className="w-3 h-3 flex-shrink-0" />
               </button>
             ) : (
-              <span className="text-sm text-muted-foreground">Гость</span>
+              <button
+                onClick={handleEditName}
+                className="text-sm text-muted-foreground hover:text-foreground transition-all duration-150"
+              >
+                Гость
+              </button>
             )}
           </div>
         </div>
@@ -258,11 +336,12 @@ export default function PublicSharePage() {
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6 space-y-6">
         {/* Ungrouped elements */}
         {hasUngrouped && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
             {project.ungrouped_elements.map((el) => (
               <ElementCard
                 key={el.id}
                 element={el}
+                commentCount={(commentsMap[el.id] || []).length}
                 onClick={() => handleElementClick(el)}
               />
             ))}
@@ -276,6 +355,7 @@ export default function PublicSharePage() {
             name={scene.name}
             elements={scene.elements}
             collapsible={showCollapsible}
+            commentsMap={commentsMap}
             onElementClick={handleElementClick}
           />
         ))}
@@ -283,6 +363,7 @@ export default function PublicSharePage() {
         {/* Empty state */}
         {allElements.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+            <ImageOff className="w-12 h-12 mb-3 opacity-40" />
             <p className="text-lg">В этой раскадровке пока нет материалов</p>
           </div>
         )}
@@ -293,7 +374,7 @@ export default function PublicSharePage() {
         <div className="text-center">
           <a
             href="/"
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="text-sm text-muted-foreground hover:text-foreground transition-all duration-150"
           >
             Создавайте свои проекты на Раскадровке &rarr;
           </a>
