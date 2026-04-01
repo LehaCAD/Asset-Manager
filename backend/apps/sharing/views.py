@@ -7,7 +7,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 
-from .models import Comment, SharedLink
+from .models import Comment, ElementReaction, SharedLink
 from .permissions import IsProjectOwner
 from .serializers import (
     CommentSerializer,
@@ -55,7 +55,9 @@ def public_share_view(request, token):
         )
 
     shared_elements = link.elements.select_related('scene').annotate(
-        comment_count=Count('comments')
+        comment_count=Count('comments'),
+        likes=Count('reactions', filter=Q(reactions__value='like')),
+        dislikes=Count('reactions', filter=Q(reactions__value='dislike')),
     ).all()
     scenes_map = {}
     ungrouped = []
@@ -68,6 +70,8 @@ def public_share_view(request, token):
             'file_url': el.file_url or '',
             'thumbnail_url': el.thumbnail_url or '',
             'comment_count': el.comment_count,  # from annotation
+            'likes': el.likes,
+            'dislikes': el.dislikes,
             'comments': CommentSerializer(el_comments, many=True).data,
         }
         if el.scene_id:
@@ -92,6 +96,7 @@ def public_share_view(request, token):
         'name': link.project.name,
         'scenes': scenes,
         'ungrouped_elements': ungrouped,
+        'display_preferences': link.display_preferences,
     })
 
 
@@ -157,6 +162,42 @@ def public_comment_view(request, token):
         pass
 
     return Response(CommentSerializer(comment).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@throttle_classes([PublicCommentThrottle])
+def public_reaction_view(request, token):
+    """POST /api/sharing/public/{token}/reactions/ — reviewer reacts to element."""
+    link = get_object_or_404(SharedLink, token=token)
+    if link.is_expired():
+        return Response({'detail': 'Срок ссылки истёк.'}, status=status.HTTP_410_GONE)
+
+    element_id = request.data.get('element_id')
+    session_id = request.data.get('session_id')
+    value = request.data.get('value')  # 'like', 'dislike', or null to remove
+
+    if not element_id or not session_id:
+        return Response({'detail': 'element_id and session_id required'}, status=400)
+
+    shared_element_ids = set(link.elements.values_list('id', flat=True))
+    if element_id not in shared_element_ids:
+        return Response({'detail': 'Element not in this shared link.'}, status=400)
+
+    if not value:
+        # Remove reaction
+        ElementReaction.objects.filter(element_id=element_id, session_id=session_id).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    if value not in ('like', 'dislike'):
+        return Response({'detail': 'value must be "like" or "dislike"'}, status=400)
+
+    reaction, _ = ElementReaction.objects.update_or_create(
+        element_id=element_id,
+        session_id=session_id,
+        defaults={'value': value},
+    )
+    return Response({'element_id': element_id, 'value': value}, status=status.HTTP_200_OK)
 
 
 @api_view(['GET', 'POST'])

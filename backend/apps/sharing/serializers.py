@@ -59,7 +59,7 @@ class SharedLinkSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'token', 'project', 'name',
             'element_ids', 'element_count', 'comment_count',
-            'expires_at', 'created_at', 'url',
+            'expires_at', 'created_at', 'url', 'display_preferences',
         ]
         read_only_fields = ['id', 'token', 'created_at', 'url']
 

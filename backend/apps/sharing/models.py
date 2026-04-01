@@ -30,6 +30,7 @@ class SharedLink(models.Model):
         blank=True,
         verbose_name='Элементы'
     )
+    display_preferences = models.JSONField(default=dict, blank=True)
     token = models.UUIDField(
         unique=True,
         default=uuid.uuid4,
@@ -117,3 +118,22 @@ class Comment(models.Model):
             if self.parent.element_id != self.element_id or self.parent.scene_id != self.scene_id:
                 from django.core.exceptions import ValidationError
                 raise ValidationError('Reply must target the same element/scene as parent.')
+
+
+class ElementReaction(models.Model):
+    class Value(models.TextChoices):
+        LIKE = 'like', '👍'
+        DISLIKE = 'dislike', '👎'
+
+    element = models.ForeignKey(
+        'elements.Element', on_delete=models.CASCADE, related_name='reactions'
+    )
+    session_id = models.CharField(max_length=36)
+    value = models.CharField(max_length=10, choices=Value.choices)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['element', 'session_id']
+
+    def __str__(self):
+        return f"{self.value} on element {self.element_id} by {self.session_id}"
