@@ -92,130 +92,120 @@ function ElementCard({
   onReact: (elementId: number, value: 'like' | 'dislike') => void
 }) {
   const isVideo = element.element_type === 'VIDEO'
+  const hasLikes = (element.likes ?? 0) > 0
+  const hasDislikes = (element.dislikes ?? 0) > 0
+  const hasReactions = hasLikes || hasDislikes
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick() }}
-      className={`group relative rounded-md overflow-hidden bg-muted cursor-pointer ${aspectRatioClass}`}
-    >
-      <img
-        src={element.thumbnail_url || element.file_url}
-        alt=""
-        className={`w-full h-full ${fitModeClass} transition-transform duration-150 group-hover:scale-[1.02]`}
-        loading="lazy"
-        decoding="async"
-      />
+    <div className="flex flex-col">
+      {/* Image area — clickable to open lightbox */}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onClick}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick() }}
+        className={`group relative rounded-t-md overflow-hidden bg-muted cursor-pointer ${aspectRatioClass}`}
+      >
+        <img
+          src={element.thumbnail_url || element.file_url}
+          alt=""
+          className={`w-full h-full ${fitModeClass} transition-transform duration-150 group-hover:scale-[1.02]`}
+          loading="lazy"
+          decoding="async"
+        />
 
-      {/* Hover overlay */}
-      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-150" />
+        {/* Hover overlay */}
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-150" />
 
-      {/* Video play button */}
-      {isVideo && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="w-11 h-11 rounded-full bg-overlay-button flex items-center justify-center">
-            <Play className="w-5 h-5 text-overlay-text fill-overlay-text" />
+        {/* Video play button */}
+        {isVideo && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="w-11 h-11 rounded-full bg-overlay-button flex items-center justify-center">
+              <Play className="w-5 h-5 text-overlay-text fill-overlay-text" />
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Hover action buttons — bottom-left */}
-      <div className="absolute bottom-2 left-2 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            handleDownload(element.file_url, `element-${element.id}`)
-          }}
-          className="w-7 h-7 rounded-full bg-overlay-button hover:bg-overlay-button-hover flex items-center justify-center transition-all duration-150"
-          aria-label="Скачать"
-        >
-          <Download className="w-3.5 h-3.5 text-overlay-text" />
-        </button>
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            window.open(element.file_url, '_blank')
-          }}
-          className="w-7 h-7 rounded-full bg-overlay-button hover:bg-overlay-button-hover flex items-center justify-center transition-all duration-150"
-          aria-label="Открыть оригинал"
-        >
-          <ExternalLink className="w-3.5 h-3.5 text-overlay-text" />
-        </button>
+        {/* Hover: download + original — top-right */}
+        <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-10">
+          <button
+            onClick={(e) => { e.stopPropagation(); handleDownload(element.file_url, `element-${element.id}`) }}
+            className="w-7 h-7 rounded-full bg-overlay-button hover:bg-overlay-button-hover flex items-center justify-center"
+            aria-label="Скачать"
+          >
+            <Download className="w-3.5 h-3.5 text-overlay-text" />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); window.open(element.file_url, '_blank') }}
+            className="w-7 h-7 rounded-full bg-overlay-button hover:bg-overlay-button-hover flex items-center justify-center"
+            aria-label="Открыть оригинал"
+          >
+            <ExternalLink className="w-3.5 h-3.5 text-overlay-text" />
+          </button>
+        </div>
+
+        {/* Comment badge — top-left */}
+        {commentCount > 0 && (
+          <div className="absolute top-2 left-2 flex items-center gap-1 bg-black/60 text-white text-xs rounded-full px-2 py-0.5 z-10">
+            <MessageCircle className="w-3 h-3" />
+            {commentCount}
+          </div>
+        )}
       </div>
 
-      {/* Bottom bar — always visible gradient with reactions + comments */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent pt-6 pb-2 px-2 flex items-center justify-between">
-        {/* Reactions counts + hover reaction buttons */}
-        <div className="flex items-center gap-1.5">
-          <span className={cn(
-            'flex items-center gap-1 text-xs font-medium',
-            (element.likes ?? 0) > 0 ? 'text-emerald-400' : 'text-white/50'
-          )}>
-            <ThumbsUp className="w-3.5 h-3.5" />
-            {(element.likes ?? 0) > 0 ? element.likes : ''}
-          </span>
-          <span className={cn(
-            'flex items-center gap-1 text-xs font-medium',
-            (element.dislikes ?? 0) > 0 ? 'text-orange-400' : 'text-white/50'
-          )}>
-            <ThumbsDown className="w-3.5 h-3.5" />
-            {(element.dislikes ?? 0) > 0 ? element.dislikes : ''}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-1.5">
-          {/* Hover reaction buttons */}
-          {hasIdentity && (
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onReact(element.id, 'like')
-                  toast('Оставьте комментарий, чтобы пояснить', {
-                    action: { label: 'Комментировать', onClick: () => onClick() },
-                  })
-                }}
-                className={cn(
-                  'w-6 h-6 rounded-full flex items-center justify-center transition-all',
-                  myReaction === 'like'
-                    ? 'bg-emerald-500/30 text-emerald-400'
-                    : 'bg-white/20 text-white hover:bg-emerald-500/30 hover:text-emerald-400'
-                )}
-                aria-label="Нравится"
-              >
-                <ThumbsUp className="w-3 h-3" />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onReact(element.id, 'dislike')
-                  toast('Оставьте комментарий, чтобы пояснить', {
-                    action: { label: 'Комментировать', onClick: () => onClick() },
-                  })
-                }}
-                className={cn(
-                  'w-6 h-6 rounded-full flex items-center justify-center transition-all',
-                  myReaction === 'dislike'
-                    ? 'bg-orange-500/30 text-orange-400'
-                    : 'bg-white/20 text-white hover:bg-orange-500/30 hover:text-orange-400'
-                )}
-                aria-label="Не нравится"
-              >
-                <ThumbsDown className="w-3 h-3" />
-              </button>
-            </div>
+      {/* Action bar BELOW the image — always visible, not overlapping */}
+      <div className="flex items-center rounded-b-md bg-card border border-t-0 border-border px-2 py-1.5">
+        {/* Like button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            if (!hasIdentity) { onClick(); return }
+            onReact(element.id, 'like')
+            toast('Оставьте комментарий', { action: { label: 'Открыть', onClick } })
+          }}
+          className={cn(
+            'flex items-center gap-1 h-7 px-2 rounded-md text-xs font-medium transition-all',
+            myReaction === 'like'
+              ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+              : 'text-muted-foreground hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-500/10'
           )}
+          aria-label="Нравится"
+        >
+          <ThumbsUp className="w-4 h-4" />
+          {hasLikes && <span>{element.likes}</span>}
+        </button>
 
-          {/* Comments */}
-          {commentCount > 0 && (
-            <span className="flex items-center gap-1 text-white text-xs">
-              <MessageCircle className="w-3 h-3" />
-              {commentCount}
-            </span>
+        {/* Dislike button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            if (!hasIdentity) { onClick(); return }
+            onReact(element.id, 'dislike')
+            toast('Оставьте комментарий', { action: { label: 'Открыть', onClick } })
+          }}
+          className={cn(
+            'flex items-center gap-1 h-7 px-2 rounded-md text-xs font-medium transition-all',
+            myReaction === 'dislike'
+              ? 'bg-orange-500/15 text-orange-600 dark:text-orange-400'
+              : 'text-muted-foreground hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-500/10'
           )}
-        </div>
+          aria-label="Не нравится"
+        >
+          <ThumbsDown className="w-4 h-4" />
+          {hasDislikes && <span>{element.dislikes}</span>}
+        </button>
+
+        <div className="flex-1" />
+
+        {/* Comment button — opens lightbox */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onClick() }}
+          className="flex items-center gap-1 h-7 px-2 rounded-md text-xs text-muted-foreground hover:text-foreground transition-colors"
+          aria-label="Комментировать"
+        >
+          <MessageCircle className="w-4 h-4" />
+          {commentCount > 0 && <span>{commentCount}</span>}
+        </button>
       </div>
     </div>
   )
@@ -368,6 +358,18 @@ export default function PublicSharePage() {
           }
         }
         setCommentsMap(map)
+
+        // Initialize reactionsMap from element reactions data
+        const sid = localStorage.getItem('reviewer_session_id') || ''
+        if (sid) {
+          const rMap: Record<number, string | null> = {}
+          const allEls = [...data.ungrouped_elements, ...data.scenes.flatMap(s => s.elements)]
+          for (const el of allEls) {
+            const myReaction = el.reactions?.find(r => r.session_id === sid)
+            rMap[el.id] = myReaction?.value ?? null
+          }
+          setReactionsMap(rMap)
+        }
       })
       .catch((err) => {
         const status = err?.response?.status || 0

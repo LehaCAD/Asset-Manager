@@ -62,9 +62,21 @@ export function ReviewerLightbox({
 
   // Load reviewer identity from localStorage
   useEffect(() => {
-    setReviewerName(localStorage.getItem('reviewer_name') || '')
-    setSessionId(localStorage.getItem('reviewer_session_id') || '')
-  }, [])
+    const name = localStorage.getItem('reviewer_name') || ''
+    const sid = localStorage.getItem('reviewer_session_id') || ''
+    setReviewerName(name)
+    setSessionId(sid)
+
+    // Initialize reactionsMap from element data
+    if (sid) {
+      const map: Record<number, string | null> = {}
+      for (const el of elements) {
+        const myReaction = el.reactions?.find(r => r.session_id === sid)
+        map[el.id] = myReaction?.value ?? null
+      }
+      setReactionsMap(map)
+    }
+  }, [elements])
 
   const current = elements[currentIndex]
   const isVideo = current?.element_type === 'VIDEO'
@@ -215,52 +227,42 @@ export function ReviewerLightbox({
             )}
           </div>
 
-          {/* Action bar below media — single row */}
-          <div className="mt-4 flex items-center gap-4 w-full max-w-[900px]">
-            {/* Reactions — left */}
-            {hasIdentity && (
-              <div className="flex items-center gap-1.5">
-                <button onClick={() => handleReaction('like')} className={cn(
-                  'flex items-center gap-1.5 h-8 px-3 rounded-lg text-sm font-medium transition-all',
-                  reactionsMap[current.id] === 'like'
-                    ? 'bg-emerald-500/20 text-emerald-500'
-                    : 'bg-card text-muted-foreground hover:text-emerald-500 hover:bg-emerald-500/10'
-                )}>
-                  <ThumbsUp className="h-4 w-4" />
-                  {(current.likes ?? 0) > 0 && <span>{current.likes}</span>}
-                </button>
-                <button onClick={() => handleReaction('dislike')} className={cn(
-                  'flex items-center gap-1.5 h-8 px-3 rounded-lg text-sm font-medium transition-all',
-                  reactionsMap[current.id] === 'dislike'
-                    ? 'bg-orange-500/20 text-orange-500'
-                    : 'bg-card text-muted-foreground hover:text-orange-500 hover:bg-orange-500/10'
-                )}>
-                  <ThumbsDown className="h-4 w-4" />
-                  {(current.dislikes ?? 0) > 0 && <span>{current.dislikes}</span>}
-                </button>
-              </div>
-            )}
+          {/* Action bar below media — compact, not wider than image */}
+          <div className="mt-3 flex items-center gap-1.5">
+            {/* Reactions */}
+            <button
+              onClick={() => hasIdentity ? handleReaction('like') : undefined}
+              className={cn(
+                'flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium transition-all',
+                reactionsMap[current.id] === 'like'
+                  ? 'bg-emerald-500/20 text-emerald-500'
+                  : 'bg-card text-muted-foreground hover:text-emerald-500 hover:bg-emerald-500/10'
+              )}
+              aria-label="Нравится"
+            >
+              <ThumbsUp className="h-4.5 w-4.5" />
+              {(current.likes ?? 0) > 0 && <span>{current.likes}</span>}
+            </button>
+            <button
+              onClick={() => hasIdentity ? handleReaction('dislike') : undefined}
+              className={cn(
+                'flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium transition-all',
+                reactionsMap[current.id] === 'dislike'
+                  ? 'bg-orange-500/20 text-orange-500'
+                  : 'bg-card text-muted-foreground hover:text-orange-500 hover:bg-orange-500/10'
+              )}
+              aria-label="Не нравится"
+            >
+              <ThumbsDown className="h-4.5 w-4.5" />
+              {(current.dislikes ?? 0) > 0 && <span>{current.dislikes}</span>}
+            </button>
 
-            {/* Who reacted — middle, scrollable */}
-            {current.reactions && current.reactions.length > 0 && (
-              <div className="flex items-center gap-1 overflow-x-auto flex-1 min-w-0">
-                {current.reactions.map((r, i) => (
-                  <span key={i} className={cn(
-                    'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs whitespace-nowrap shrink-0',
-                    r.value === 'like' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-orange-500/10 text-orange-600 dark:text-orange-400'
-                  )}>
-                    {r.value === 'like' ? '\u{1F44D}' : '\u{1F44E}'} {r.author_name || '\u0413\u043E\u0441\u0442\u044C'}
-                  </span>
-                ))}
-              </div>
-            )}
+            {/* Separator */}
+            <div className="w-px h-5 bg-border mx-1" />
 
-            {/* Spacer */}
-            <div className="flex-1" />
-
-            {/* Download/Original — right */}
+            {/* Download + Original */}
             {hasFileUrl && (
-              <div className="flex items-center gap-1.5 shrink-0">
+              <>
                 <button type="button" onClick={() => handleDownload(current.file_url, fileName)}
                   className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-muted-foreground bg-card hover:text-foreground transition-colors">
                   <Download className="h-3.5 w-3.5" /> Скачать
@@ -269,9 +271,27 @@ export function ReviewerLightbox({
                   className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-muted-foreground bg-card hover:text-foreground transition-colors">
                   <ExternalLink className="h-3.5 w-3.5" /> Оригинал
                 </a>
-              </div>
+              </>
             )}
           </div>
+
+          {/* Who reacted — pills below action bar */}
+          {current.reactions && current.reactions.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1 mt-2">
+              {current.reactions.map((r, i) => {
+                const isSelf = r.session_id === sessionId
+                return (
+                  <span key={i} className={cn(
+                    'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs',
+                    r.value === 'like' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-orange-500/10 text-orange-600 dark:text-orange-400'
+                  )}>
+                    {r.value === 'like' ? '👍' : '👎'}
+                    {isSelf ? '' : ` ${r.author_name || 'Гость'}`}
+                  </span>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {/* Comments panel — matches DetailPanel structure */}
