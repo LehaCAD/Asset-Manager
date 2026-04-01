@@ -310,6 +310,9 @@ export default function PublicSharePage() {
   const [reactionsMap, setReactionsMap] = useState<Record<number, string | null>>({})
   const [sessionId, setSessionId] = useState('')
 
+  // Authenticated user detection — skip name input & CTA
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+
   // Display preferences
   const { preferences, hydratePreferences } = useDisplayStore()
   useEffect(() => { hydratePreferences() }, [hydratePreferences])
@@ -319,8 +322,22 @@ export default function PublicSharePage() {
   const aspectRatioClass = ASPECT_RATIO_CLASSES[preferences.aspectRatio]
   const fitModeClass = FIT_MODE_CLASSES[preferences.fitMode]
 
-  // Load reviewer identity from localStorage
+  // Check if user is authenticated — use their identity and hide CTA
   useEffect(() => {
+    const hasToken = document.cookie.includes('access_token=') || !!localStorage.getItem('auth-storage')
+    setIsAuthenticated(hasToken)
+    if (hasToken) {
+      try {
+        const stored = JSON.parse(localStorage.getItem('auth-storage') || '{}')
+        const username = stored?.state?.user?.username
+        if (username) {
+          setReviewerName(username)
+          setSessionId(stored?.state?.user?.id?.toString() || crypto.randomUUID())
+          return // skip guest identity loading
+        }
+      } catch { /* ignore parse errors */ }
+    }
+    // Fallback: load guest reviewer identity from localStorage
     setReviewerName(localStorage.getItem('reviewer_name') || '')
     setSessionId(localStorage.getItem('reviewer_session_id') || '')
     const onStorage = () => {
@@ -498,11 +515,15 @@ export default function PublicSharePage() {
             <DisplaySettingsPopover />
             <ThemeToggle />
             <button
-              onClick={handleEditName}
-              className="flex items-center gap-1.5 h-9 px-3 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-150"
+              onClick={isAuthenticated ? undefined : handleEditName}
+              className={cn(
+                "flex items-center gap-1.5 h-9 px-3 rounded-md text-sm text-muted-foreground transition-all duration-150",
+                !isAuthenticated && "hover:text-foreground hover:bg-muted/50 cursor-pointer",
+                isAuthenticated && "cursor-default"
+              )}
             >
               <span className="truncate max-w-[100px]">{reviewerName || 'Гость'}</span>
-              <Pencil className="w-3 h-3 flex-shrink-0 opacity-50" />
+              {!isAuthenticated && <Pencil className="w-3 h-3 flex-shrink-0 opacity-50" />}
             </button>
           </div>
         </div>
@@ -559,30 +580,32 @@ export default function PublicSharePage() {
         )}
       </main>
 
-      {/* Footer CTA */}
-      <footer className="border-t border-border mt-auto">
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          <div className="rounded-lg bg-primary/5 border border-primary/20 p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <Clapperboard className="h-8 w-8 text-primary shrink-0" strokeWidth={1.5} />
-              <div>
-                <p className="text-sm font-medium text-foreground">
-                  Генерируйте изображения и видео с помощью AI
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Создавайте раскадровки, делитесь с командой, собирайте обратную связь
-                </p>
+      {/* Footer CTA — only for unauthenticated visitors */}
+      {!isAuthenticated && (
+        <footer className="border-t border-border mt-auto">
+          <div className="max-w-7xl mx-auto px-4 py-8">
+            <div className="rounded-lg bg-primary/5 border border-primary/20 p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <Clapperboard className="h-8 w-8 text-primary shrink-0" strokeWidth={1.5} />
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    Управляйте проектами вместе с командой
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Собирайте обратную связь, отслеживайте прогресс, храните все материалы в одном месте
+                  </p>
+                </div>
               </div>
+              <a
+                href="/register"
+                className="shrink-0 inline-flex items-center gap-2 h-9 px-5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+              >
+                Зарегистрироваться
+              </a>
             </div>
-            <a
-              href="/register"
-              className="shrink-0 inline-flex items-center gap-2 h-9 px-5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
-            >
-              Попробовать бесплатно
-            </a>
           </div>
-        </div>
-      </footer>
+        </footer>
+      )}
 
       {/* Lightbox */}
       <ReviewerLightbox

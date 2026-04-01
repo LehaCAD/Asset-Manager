@@ -97,6 +97,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   const [shareSelectedIds, setShareSelectedIds] = useState<Set<number>>(new Set());
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [linksPanelOpen, setLinksPanelOpen] = useState(false);
+  const [linksRefreshKey, setLinksRefreshKey] = useState(0);
   const [promptBarHeight, setPromptBarHeight] = useState(0);
   const promptBarRef = useRef<HTMLDivElement>(null);
   const fallbackRefetchIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -126,20 +127,23 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
 
   // Handle lightbox deep-link from URL (?lightbox=elementId)
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || elements.length === 0) return;
     const params = new URLSearchParams(window.location.search);
     const lightboxId = params.get('lightbox');
     if (lightboxId) {
       const elementId = parseInt(lightboxId, 10);
       if (!isNaN(elementId)) {
-        openLightbox(elementId);
-        // Clean URL
+        const exists = elements.some((e) => e.id === elementId);
+        if (exists) {
+          openLightbox(elementId);
+        }
+        // Clean URL regardless — avoid re-triggering
         const url = new URL(window.location.href);
         url.searchParams.delete('lightbox');
         window.history.replaceState({}, '', url.toString());
       }
     }
-  }, [isLoading, openLightbox]);
+  }, [isLoading, elements, openLightbox]);
 
   // Load models for generation
   useEffect(() => {
@@ -527,6 +531,8 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
     setLinkDialogOpen(false);
     setShareMode(false);
     setShareSelectedIds(new Set());
+    setLinksRefreshKey((k) => k + 1);
+    setLinksPanelOpen(true);
   }, []);
 
   // Measure PromptBar height dynamically
@@ -729,7 +735,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
               </button>
             </div>
             <div className="flex-1 overflow-auto">
-              <ShareLinksPanel projectId={projectId} />
+              <ShareLinksPanel projectId={projectId} refreshKey={linksRefreshKey} />
             </div>
           </div>
         )}

@@ -8,14 +8,16 @@ import type { SharedLink } from '@/lib/types'
 
 interface ShareLinksPanelProps {
   projectId: number
+  refreshKey?: number
 }
 
-export function ShareLinksPanel({ projectId }: ShareLinksPanelProps) {
+export function ShareLinksPanel({ projectId, refreshKey }: ShareLinksPanelProps) {
   const [links, setLinks] = useState<SharedLink[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   const fetchLinks = useCallback(async () => {
     try {
+      setIsLoading(true)
       const data = await sharingApi.getLinks(projectId)
       setLinks(data)
     } catch {
@@ -27,7 +29,7 @@ export function ShareLinksPanel({ projectId }: ShareLinksPanelProps) {
 
   useEffect(() => {
     fetchLinks()
-  }, [fetchLinks])
+  }, [fetchLinks, refreshKey])
 
   async function handleCopy(url: string) {
     try {
