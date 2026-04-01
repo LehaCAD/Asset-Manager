@@ -41,6 +41,8 @@ interface ReviewerLightboxProps {
   token: string
   commentsMap: Record<number, Comment[]>
   onCommentAdded: (elementId: number, comment: Comment) => void
+  reactionsMap: Record<number, string | null>
+  onReact: (elementId: number, value: 'like' | 'dislike') => void
 }
 
 // ── Component ───────────────────────────────────────────────
@@ -54,29 +56,18 @@ export function ReviewerLightbox({
   token,
   commentsMap,
   onCommentAdded,
+  reactionsMap,
+  onReact,
 }: ReviewerLightboxProps) {
   const [reviewerName, setReviewerName] = useState('')
   const [sessionId, setSessionId] = useState('')
-  const [reactionsMap, setReactionsMap] = useState<Record<number, string | null>>({}) // elementId -> 'like'|'dislike'|null
   const activeThumbRef = useRef<HTMLButtonElement>(null)
 
   // Load reviewer identity from localStorage
   useEffect(() => {
-    const name = localStorage.getItem('reviewer_name') || ''
-    const sid = localStorage.getItem('reviewer_session_id') || ''
-    setReviewerName(name)
-    setSessionId(sid)
-
-    // Initialize reactionsMap from element data
-    if (sid) {
-      const map: Record<number, string | null> = {}
-      for (const el of elements) {
-        const myReaction = el.reactions?.find(r => r.session_id === sid)
-        map[el.id] = myReaction?.value ?? null
-      }
-      setReactionsMap(map)
-    }
-  }, [elements])
+    setReviewerName(localStorage.getItem('reviewer_name') || '')
+    setSessionId(localStorage.getItem('reviewer_session_id') || '')
+  }, [])
 
   const current = elements[currentIndex]
   const isVideo = current?.element_type === 'VIDEO'
@@ -141,22 +132,9 @@ export function ReviewerLightbox({
     onCommentAdded(current.id, comment)
   }
 
-  const handleReaction = async (value: 'like' | 'dislike') => {
+  const handleReaction = (value: 'like' | 'dislike') => {
     if (!current || !sessionId) return
-    const currentValue = reactionsMap[current.id]
-    const newValue = currentValue === value ? null : value
-    setReactionsMap((prev) => ({ ...prev, [current.id]: newValue }))
-    try {
-      await sharingApi.setReaction(token, {
-        element_id: current.id,
-        session_id: sessionId,
-        value: newValue,
-        author_name: reviewerName,
-      })
-    } catch {
-      // Revert on error
-      setReactionsMap((prev) => ({ ...prev, [current.id]: currentValue ?? null }))
-    }
+    onReact(current.id, value)
   }
 
   if (!isOpen || !current) return null

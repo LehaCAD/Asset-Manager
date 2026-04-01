@@ -594,6 +594,8 @@ export default function PublicSharePage() {
         token={token}
         commentsMap={commentsMap}
         onCommentAdded={handleCommentAdded}
+        reactionsMap={reactionsMap}
+        onReact={handleCardReaction}
       />
     </div>
   )
