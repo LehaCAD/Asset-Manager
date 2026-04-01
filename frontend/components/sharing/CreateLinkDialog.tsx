@@ -11,6 +11,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { sharingApi } from '@/lib/api/sharing'
+import { useDisplayStore } from '@/lib/store/project-display'
 
 interface CreateLinkDialogProps {
   isOpen: boolean
@@ -34,6 +35,7 @@ export function CreateLinkDialog({
   const [name, setName] = useState('')
   const [expiry, setExpiry] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const { preferences } = useDisplayStore()
 
   function buildExpiresAt(days: string): string | undefined {
     if (!days) return undefined
@@ -50,6 +52,7 @@ export function CreateLinkDialog({
         element_ids: elementIds,
         name: name.trim() || undefined,
         expires_at: buildExpiresAt(expiry),
+        display_preferences: preferences,
       })
 
       const fullUrl = `${window.location.origin}${link.url}`

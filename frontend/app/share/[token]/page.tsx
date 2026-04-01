@@ -19,7 +19,7 @@ import { DisplaySettingsPopover } from '@/components/display/DisplaySettingsPopo
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
 import { useDisplayStore } from '@/lib/store/project-display'
 import { ASPECT_RATIO_CLASSES, FIT_MODE_CLASSES, DISPLAY_GRID_CONFIG, CARD_SIZES } from '@/lib/utils/constants'
-import type { PublicProject, PublicElement, Comment } from '@/lib/types'
+import type { PublicProject, PublicElement, Comment, DisplayCardSize, DisplayAspectRatio, DisplayFitMode } from '@/lib/types'
 
 // ── Download helper ─────────────────────────────────────────
 
@@ -257,6 +257,14 @@ export default function PublicSharePage() {
       .getPublicProject(token)
       .then((data) => {
         setProject(data)
+        // Apply saved display preferences from the shared link
+        if (data.display_preferences && data.display_preferences.size) {
+          useDisplayStore.getState().setPreferences({
+            size: data.display_preferences.size as DisplayCardSize,
+            aspectRatio: (data.display_preferences.aspectRatio || 'landscape') as DisplayAspectRatio,
+            fitMode: (data.display_preferences.fitMode || 'fill') as DisplayFitMode,
+          })
+        }
         // Build comments map from element-level comments returned by backend
         const map: Record<number, Comment[]> = {}
         for (const el of data.ungrouped_elements) {

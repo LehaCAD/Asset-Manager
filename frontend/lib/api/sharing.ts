@@ -14,7 +14,7 @@ export const sharingApi = {
     apiClient.get<SharedLink[]>('/api/sharing/links/', { params: { project: projectId } })
       .then(r => r.data),
 
-  createLink: (data: { project: number; element_ids: number[]; name?: string; expires_at?: string }) =>
+  createLink: (data: { project: number; element_ids: number[]; name?: string; expires_at?: string; display_preferences?: { size: string; aspectRatio: string; fitMode: string } }) =>
     apiClient.post<SharedLink>('/api/sharing/links/', data).then(r => r.data),
 
   updateLink: (id: number, data: { name?: string; element_ids?: number[]; expires_at?: string }) =>
@@ -55,4 +55,7 @@ export const sharingApi = {
     element_id?: number; scene_id?: number; parent_id?: number;
   }) =>
     publicClient.post<Comment>(`/api/sharing/public/${token}/comments/`, data).then(r => r.data),
+
+  setReaction: (token: string, data: { element_id: number; session_id: string; value: string | null }) =>
+    publicClient.post(`/api/sharing/public/${token}/reactions/`, data),
 }

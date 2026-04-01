@@ -320,6 +320,11 @@ export interface SharedLink {
   expires_at: string | null
   created_at: string
   url: string
+  display_preferences?: {
+    size?: string
+    aspectRatio?: string
+    fitMode?: string
+  }
 }
 
 export interface CreateSharedLinkPayload {
@@ -333,6 +338,11 @@ export interface PublicProject {
   name: string
   scenes: PublicScene[]
   ungrouped_elements: PublicElement[]
+  display_preferences?: {
+    size?: string
+    aspectRatio?: string
+    fitMode?: string
+  }
 }
 
 export interface PublicElement {
@@ -341,6 +351,8 @@ export interface PublicElement {
   file_url: string
   thumbnail_url: string
   comment_count: number
+  likes?: number
+  dislikes?: number
   comments?: Comment[]
 }
 

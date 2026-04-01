@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useCallback, useState, useRef } from 'react'
-import { X, Download, ExternalLink, MessageCircle, Video, Image } from 'lucide-react'
+import { X, Download, ExternalLink, MessageCircle, Video, Image, ThumbsUp, ThumbsDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { LightboxNavigation } from '@/components/lightbox/LightboxNavigation'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
@@ -57,6 +57,7 @@ export function ReviewerLightbox({
 }: ReviewerLightboxProps) {
   const [reviewerName, setReviewerName] = useState('')
   const [sessionId, setSessionId] = useState('')
+  const [reactionsMap, setReactionsMap] = useState<Record<number, string | null>>({}) // elementId -> 'like'|'dislike'|null
   const activeThumbRef = useRef<HTMLButtonElement>(null)
 
   // Load reviewer identity from localStorage
@@ -128,6 +129,23 @@ export function ReviewerLightbox({
     onCommentAdded(current.id, comment)
   }
 
+  const handleReaction = async (value: 'like' | 'dislike') => {
+    if (!current || !sessionId) return
+    const currentValue = reactionsMap[current.id]
+    const newValue = currentValue === value ? null : value
+    setReactionsMap((prev) => ({ ...prev, [current.id]: newValue }))
+    try {
+      await sharingApi.setReaction(token, {
+        element_id: current.id,
+        session_id: sessionId,
+        value: newValue,
+      })
+    } catch {
+      // Revert on error
+      setReactionsMap((prev) => ({ ...prev, [current.id]: currentValue ?? null }))
+    }
+  }
+
   if (!isOpen || !current) return null
 
   const comments = commentsMap[current.id] || []
@@ -150,11 +168,6 @@ export function ReviewerLightbox({
             {currentIndex + 1} / {elements.length}
           </span>
         </div>
-        <div className="absolute left-1/2 -translate-x-1/2 hidden sm:flex items-center gap-2 text-[11px] text-muted-foreground/60 select-none pointer-events-none">
-          <span>Горячие клавиши:</span>
-          <kbd className="px-1.5 py-0.5 rounded bg-card text-muted-foreground text-[10px] font-mono">← →</kbd>
-          <kbd className="px-1.5 py-0.5 rounded bg-card text-muted-foreground text-[10px] font-mono">Esc</kbd>
-        </div>
         <Button
           variant="ghost"
           size="icon"
@@ -170,6 +183,12 @@ export function ReviewerLightbox({
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Media area with navigation */}
         <div className="flex-1 relative flex flex-col items-center justify-center p-4 md:p-8">
+          {/* Keyboard hints — centered above media */}
+          <div className="hidden sm:flex items-center justify-center gap-2 text-[11px] text-muted-foreground/40 select-none py-1">
+            <kbd className="px-1.5 py-0.5 rounded bg-card text-muted-foreground/60 text-[10px] font-mono">&larr; &rarr;</kbd>
+            <kbd className="px-1.5 py-0.5 rounded bg-card text-muted-foreground/60 text-[10px] font-mono">Esc</kbd>
+          </div>
+
           <LightboxNavigation
             onPrev={goPrev}
             onNext={goNext}
@@ -198,27 +217,59 @@ export function ReviewerLightbox({
           </div>
 
           {/* Action buttons below media — matches main lightbox style */}
-          {hasFileUrl && (
-            <div className="mt-4 flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => handleDownload(current.file_url, fileName)}
-                className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-muted-foreground bg-card hover:text-foreground transition-colors"
-              >
-                <Download className="h-3.5 w-3.5" />
-                Скачать
-              </button>
-              <a
-                href={current.file_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-muted-foreground bg-card hover:text-foreground transition-colors"
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-                Оригинал
-              </a>
-            </div>
-          )}
+          <div className="mt-4 flex items-center gap-1.5">
+            {hasFileUrl && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => handleDownload(current.file_url, fileName)}
+                  className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-muted-foreground bg-card hover:text-foreground transition-colors"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Скачать
+                </button>
+                <a
+                  href={current.file_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-muted-foreground bg-card hover:text-foreground transition-colors"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Оригинал
+                </a>
+              </>
+            )}
+            {hasIdentity && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => handleReaction('like')}
+                  className={cn(
+                    'flex items-center gap-1 h-7 px-3 rounded text-xs font-medium transition-colors',
+                    reactionsMap[current.id] === 'like'
+                      ? 'bg-primary/10 text-primary'
+                      : 'bg-card text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  <ThumbsUp className="h-3.5 w-3.5" />
+                  {(current.likes ?? 0) > 0 && <span>{current.likes}</span>}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleReaction('dislike')}
+                  className={cn(
+                    'flex items-center gap-1 h-7 px-3 rounded text-xs font-medium transition-colors',
+                    reactionsMap[current.id] === 'dislike'
+                      ? 'bg-destructive/10 text-destructive'
+                      : 'bg-card text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  <ThumbsDown className="h-3.5 w-3.5" />
+                  {(current.dislikes ?? 0) > 0 && <span>{current.dislikes}</span>}
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Comments panel — matches DetailPanel structure */}
