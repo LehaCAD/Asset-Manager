@@ -195,17 +195,15 @@ function ElementCard({
           {hasDislikes && <span>{element.dislikes}</span>}
         </button>
 
-        <div className="flex-1" />
-
-        {/* Comment button — opens lightbox */}
-        <button
-          onClick={(e) => { e.stopPropagation(); onClick() }}
-          className="flex items-center gap-1 h-7 px-2 rounded-md text-xs text-muted-foreground hover:text-foreground transition-colors"
-          aria-label="Комментировать"
-        >
-          <MessageCircle className="w-4 h-4" />
-          {commentCount > 0 && <span>{commentCount}</span>}
-        </button>
+        {commentCount > 0 && (
+          <>
+            <div className="flex-1" />
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <MessageCircle className="w-3.5 h-3.5" />
+              {commentCount}
+            </span>
+          </>
+        )}
       </div>
     </div>
   )

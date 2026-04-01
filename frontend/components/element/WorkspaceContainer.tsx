@@ -94,6 +94,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   } | null>(null);
   const [isGroupDeleting, setIsGroupDeleting] = useState(false);
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
+  const [sharePopoverOpen, setSharePopoverOpen] = useState(false);
   const [shareMode, setShareMode] = useState(false);
   const [shareSelectedIds, setShareSelectedIds] = useState<Set<number>>(new Set());
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
@@ -637,7 +638,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
 
           {/* Right: share + filters + view */}
           <div className="flex items-center gap-1.5 shrink-0">
-            <Popover>
+            <Popover open={sharePopoverOpen} onOpenChange={setSharePopoverOpen}>
               <PopoverTrigger asChild>
                 <button
                   type="button"
@@ -650,7 +651,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
               <PopoverContent align="end" className="w-56 p-1" sideOffset={4}>
                 <button
                   type="button"
-                  onClick={() => { setShareMode(true); setShareSelectedIds(new Set()); }}
+                  onClick={() => { setSharePopoverOpen(false); setShareMode(true); setShareSelectedIds(new Set()); }}
                   className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors text-left"
                 >
                   <Plus className="h-4 w-4 text-muted-foreground" />
@@ -658,7 +659,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
                 </button>
                 <button
                   type="button"
-                  onClick={() => setLinksPanelOpen(true)}
+                  onClick={() => { setSharePopoverOpen(false); setLinksPanelOpen(true); }}
                   className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors text-left"
                 >
                   <Link2 className="h-4 w-4 text-muted-foreground" />
