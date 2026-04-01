@@ -11,10 +11,12 @@ import {
   Download,
   ExternalLink,
   ImageOff,
+  Clapperboard,
 } from 'lucide-react'
 import { sharingApi } from '@/lib/api/sharing'
 import { ReviewerLightbox } from '@/components/sharing/ReviewerLightbox'
 import { DisplaySettingsPopover } from '@/components/display/DisplaySettingsPopover'
+import { ThemeToggle } from '@/components/layout/ThemeToggle'
 import { useDisplayStore } from '@/lib/store/project-display'
 import { ASPECT_RATIO_CLASSES, FIT_MODE_CLASSES, DISPLAY_GRID_CONFIG, CARD_SIZES } from '@/lib/utils/constants'
 import type { PublicProject, PublicElement, Comment } from '@/lib/types'
@@ -172,41 +174,40 @@ function SceneSection({
   if (elements.length === 0) return null
 
   return (
-    <div>
-      {collapsible && (
-        <button
-          onClick={() => setOpen(!open)}
-          className="flex items-center gap-2 mb-3 text-foreground hover:text-foreground/80 transition-colors"
-        >
-          {open ? (
-            <ChevronDown className="w-4 h-4" />
-          ) : (
-            <ChevronRight className="w-4 h-4" />
-          )}
-          <h2 className="text-base font-medium">{name}</h2>
-          <span className="text-xs text-muted-foreground bg-muted rounded-full px-2 py-0.5">
-            {elements.length}
-          </span>
-        </button>
-      )}
-
-      <div
-        className={`grid ${gridGap} transition-all duration-200 ${
-          open ? 'opacity-100' : 'hidden'
-        }`}
-        style={gridStyle}
+    <div className="rounded-lg bg-background border border-border overflow-hidden">
+      {/* Scene header */}
+      <button
+        onClick={() => collapsible && setOpen(!open)}
+        className={`w-full flex items-center gap-2 px-4 py-3 text-left ${
+          collapsible ? 'hover:bg-muted/30 cursor-pointer' : 'cursor-default'
+        } transition-colors`}
       >
-        {elements.map((el) => (
-          <ElementCard
-            key={el.id}
-            element={el}
-            commentCount={(commentsMap[el.id] || []).length}
-            onClick={() => onElementClick(el)}
-            aspectRatioClass={aspectRatioClass}
-            fitModeClass={fitModeClass}
-          />
-        ))}
-      </div>
+        {collapsible && (
+          open ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        )}
+        <h2 className="text-sm font-medium text-foreground">{name}</h2>
+        <span className="text-xs text-muted-foreground bg-muted rounded-full px-2 py-0.5">
+          {elements.length}
+        </span>
+      </button>
+
+      {/* Elements grid */}
+      {open && (
+        <div className="px-4 pb-4">
+          <div className={`grid ${gridGap}`} style={gridStyle}>
+            {elements.map((el) => (
+              <ElementCard
+                key={el.id}
+                element={el}
+                commentCount={(commentsMap[el.id] || []).length}
+                onClick={() => onElementClick(el)}
+                aspectRatioClass={aspectRatioClass}
+                fitModeClass={fitModeClass}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -328,34 +329,34 @@ export default function PublicSharePage() {
   const showCollapsible = hasMultipleSections
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-muted/30 flex flex-col">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-sm border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <span className="text-sm font-semibold text-foreground tracking-tight select-none">
-            ◈ Раскадровка
-          </span>
-          <h1 className="text-sm font-medium text-foreground truncate mx-4 max-w-[50%] text-center">
+        <div className="max-w-7xl mx-auto px-4 py-2.5 flex items-center justify-between">
+          {/* Logo */}
+          <a href="/" className="flex items-center gap-2 shrink-0 hover:opacity-80 transition-opacity">
+            <Clapperboard className="h-5 w-5 text-primary" strokeWidth={1.75} />
+            <span className="text-sm font-semibold text-foreground tracking-tight hidden sm:inline">
+              Раскадровка
+            </span>
+          </a>
+
+          {/* Project name — center */}
+          <h1 className="text-sm font-medium text-foreground truncate mx-4 max-w-[40%] text-center">
             {project.name}
           </h1>
-          <div className="flex items-center gap-2">
+
+          {/* Controls */}
+          <div className="flex items-center gap-1">
             <DisplaySettingsPopover />
-            {reviewerName ? (
-              <button
-                onClick={handleEditName}
-                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-all duration-150"
-              >
-                <span className="truncate max-w-[120px]">{reviewerName}</span>
-                <Pencil className="w-3 h-3 flex-shrink-0" />
-              </button>
-            ) : (
-              <button
-                onClick={handleEditName}
-                className="text-sm text-muted-foreground hover:text-foreground transition-all duration-150"
-              >
-                Гость
-              </button>
-            )}
+            <ThemeToggle />
+            <button
+              onClick={handleEditName}
+              className="flex items-center gap-1.5 h-9 px-3 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-150"
+            >
+              <span className="truncate max-w-[100px]">{reviewerName || 'Гость'}</span>
+              <Pencil className="w-3 h-3 flex-shrink-0 opacity-50" />
+            </button>
           </div>
         </div>
       </header>
@@ -364,17 +365,19 @@ export default function PublicSharePage() {
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6 space-y-6">
         {/* Ungrouped elements */}
         {hasUngrouped && (
-          <div className={`grid ${gridConfig.gap}`} style={gridStyle}>
-            {project.ungrouped_elements.map((el) => (
-              <ElementCard
-                key={el.id}
-                element={el}
-                commentCount={(commentsMap[el.id] || []).length}
-                onClick={() => handleElementClick(el)}
-                aspectRatioClass={aspectRatioClass}
-                fitModeClass={fitModeClass}
-              />
-            ))}
+          <div className="rounded-lg bg-background border border-border p-4">
+            <div className={`grid ${gridConfig.gap}`} style={gridStyle}>
+              {project.ungrouped_elements.map((el) => (
+                <ElementCard
+                  key={el.id}
+                  element={el}
+                  commentCount={(commentsMap[el.id] || []).length}
+                  onClick={() => handleElementClick(el)}
+                  aspectRatioClass={aspectRatioClass}
+                  fitModeClass={fitModeClass}
+                />
+              ))}
+            </div>
           </div>
         )}
 
@@ -396,22 +399,18 @@ export default function PublicSharePage() {
 
         {/* Empty state */}
         {allElements.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-            <ImageOff className="w-12 h-12 mb-3 opacity-40" />
-            <p className="text-lg">В этой раскадровке пока нет материалов</p>
+          <div className="rounded-lg bg-background border border-border p-16 flex flex-col items-center justify-center text-muted-foreground">
+            <ImageOff className="w-12 h-12 mb-3 opacity-30" />
+            <p className="text-base">В этой раскадровке пока нет материалов</p>
           </div>
         )}
       </main>
 
-      {/* Footer CTA */}
-      <footer className="border-t border-border py-6">
-        <div className="text-center">
-          <a
-            href="/"
-            className="text-sm text-muted-foreground hover:text-foreground transition-all duration-150"
-          >
-            Создавайте свои проекты на Раскадровке &rarr;
-          </a>
+      {/* Footer */}
+      <footer className="py-6">
+        <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground/50">
+          <Clapperboard className="h-3.5 w-3.5" strokeWidth={1.75} />
+          <span>Раскадровка</span>
         </div>
       </footer>
 
