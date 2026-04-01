@@ -14,6 +14,9 @@ import {
 } from 'lucide-react'
 import { sharingApi } from '@/lib/api/sharing'
 import { ReviewerLightbox } from '@/components/sharing/ReviewerLightbox'
+import { DisplaySettingsPopover } from '@/components/display/DisplaySettingsPopover'
+import { useDisplayStore } from '@/lib/store/project-display'
+import { ASPECT_RATIO_CLASSES, FIT_MODE_CLASSES, DISPLAY_GRID_CONFIG, CARD_SIZES } from '@/lib/utils/constants'
 import type { PublicProject, PublicElement, Comment } from '@/lib/types'
 
 // ── Download helper ─────────────────────────────────────────
@@ -67,10 +70,14 @@ function ElementCard({
   element,
   commentCount,
   onClick,
+  aspectRatioClass,
+  fitModeClass,
 }: {
   element: PublicElement
   commentCount: number
   onClick: () => void
+  aspectRatioClass: string
+  fitModeClass: string
 }) {
   const isVideo = element.element_type === 'VIDEO'
 
@@ -80,12 +87,12 @@ function ElementCard({
       tabIndex={0}
       onClick={onClick}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick() }}
-      className="group relative aspect-square rounded-md overflow-hidden bg-muted cursor-pointer"
+      className={`group relative rounded-md overflow-hidden bg-muted cursor-pointer ${aspectRatioClass}`}
     >
       <img
         src={element.thumbnail_url || element.file_url}
         alt=""
-        className="w-full h-full object-cover transition-transform duration-150 group-hover:scale-[1.02]"
+        className={`w-full h-full ${fitModeClass} transition-transform duration-150 group-hover:scale-[1.02]`}
         loading="lazy"
         decoding="async"
       />
@@ -145,12 +152,20 @@ function SceneSection({
   collapsible,
   commentsMap,
   onElementClick,
+  gridStyle,
+  gridGap,
+  aspectRatioClass,
+  fitModeClass,
 }: {
   name: string
   elements: PublicElement[]
   collapsible: boolean
   commentsMap: Record<number, Comment[]>
   onElementClick: (element: PublicElement) => void
+  gridStyle: React.CSSProperties
+  gridGap: string
+  aspectRatioClass: string
+  fitModeClass: string
 }) {
   const [open, setOpen] = useState(true)
 
@@ -176,9 +191,10 @@ function SceneSection({
       )}
 
       <div
-        className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 transition-all duration-200 ${
+        className={`grid ${gridGap} transition-all duration-200 ${
           open ? 'opacity-100' : 'hidden'
         }`}
+        style={gridStyle}
       >
         {elements.map((el) => (
           <ElementCard
@@ -186,6 +202,8 @@ function SceneSection({
             element={el}
             commentCount={(commentsMap[el.id] || []).length}
             onClick={() => onElementClick(el)}
+            aspectRatioClass={aspectRatioClass}
+            fitModeClass={fitModeClass}
           />
         ))}
       </div>
@@ -212,6 +230,15 @@ export default function PublicSharePage() {
 
   // Comments map: elementId -> Comment[]
   const [commentsMap, setCommentsMap] = useState<Record<number, Comment[]>>({})
+
+  // Display preferences
+  const { preferences, hydratePreferences } = useDisplayStore()
+  useEffect(() => { hydratePreferences() }, [hydratePreferences])
+  const gridConfig = DISPLAY_GRID_CONFIG[preferences.size][preferences.aspectRatio]
+  const minWidth = CARD_SIZES[preferences.size][preferences.aspectRatio].width
+  const gridStyle: React.CSSProperties = { gridTemplateColumns: `repeat(auto-fill, minmax(${minWidth}px, 1fr))` }
+  const aspectRatioClass = ASPECT_RATIO_CLASSES[preferences.aspectRatio]
+  const fitModeClass = FIT_MODE_CLASSES[preferences.fitMode]
 
   // Load reviewer name from localStorage
   useEffect(() => {
@@ -311,7 +338,8 @@ export default function PublicSharePage() {
           <h1 className="text-sm font-medium text-foreground truncate mx-4 max-w-[50%] text-center">
             {project.name}
           </h1>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
+            <DisplaySettingsPopover />
             {reviewerName ? (
               <button
                 onClick={handleEditName}
@@ -336,13 +364,15 @@ export default function PublicSharePage() {
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6 space-y-6">
         {/* Ungrouped elements */}
         {hasUngrouped && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
+          <div className={`grid ${gridConfig.gap}`} style={gridStyle}>
             {project.ungrouped_elements.map((el) => (
               <ElementCard
                 key={el.id}
                 element={el}
                 commentCount={(commentsMap[el.id] || []).length}
                 onClick={() => handleElementClick(el)}
+                aspectRatioClass={aspectRatioClass}
+                fitModeClass={fitModeClass}
               />
             ))}
           </div>
@@ -357,6 +387,10 @@ export default function PublicSharePage() {
             collapsible={showCollapsible}
             commentsMap={commentsMap}
             onElementClick={handleElementClick}
+            gridStyle={gridStyle}
+            gridGap={gridConfig.gap}
+            aspectRatioClass={aspectRatioClass}
+            fitModeClass={fitModeClass}
           />
         ))}
 
