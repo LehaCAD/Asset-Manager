@@ -61,12 +61,14 @@ def public_share_view(request, token):
     ungrouped = []
 
     for el in shared_elements:
+        el_comments = el.comments.filter(parent__isnull=True).prefetch_related('replies')
         el_data = {
             'id': el.id,
             'element_type': el.element_type,
             'file_url': el.file_url or '',
             'thumbnail_url': el.thumbnail_url or '',
             'comment_count': el.comment_count,  # from annotation
+            'comments': CommentSerializer(el_comments, many=True).data,
         }
         if el.scene_id:
             if el.scene_id not in scenes_map:

@@ -156,21 +156,14 @@ export default function PublicSharePage() {
       .getPublicProject(token)
       .then((data) => {
         setProject(data)
-        // Build initial comments map from scene comments (element-level)
+        // Build comments map from element-level comments returned by backend
         const map: Record<number, Comment[]> = {}
-        // Gather all elements and init empty arrays
         for (const el of data.ungrouped_elements) {
-          map[el.id] = []
+          map[el.id] = el.comments || []
         }
         for (const scene of data.scenes) {
           for (const el of scene.elements) {
-            map[el.id] = []
-          }
-          // Scene comments may have element references
-          for (const comment of scene.comments || []) {
-            if (comment.element && map[comment.element] !== undefined) {
-              map[comment.element].push(comment)
-            }
+            map[el.id] = el.comments || []
           }
         }
         setCommentsMap(map)

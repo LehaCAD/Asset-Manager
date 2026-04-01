@@ -341,6 +341,7 @@ export interface PublicElement {
   file_url: string
   thumbnail_url: string
   comment_count: number
+  comments?: Comment[]
 }
 
 export interface PublicScene {
