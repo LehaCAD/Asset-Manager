@@ -16,6 +16,7 @@ import { useDisplayStore } from '@/lib/store/project-display'
 interface CreateLinkDialogProps {
   isOpen: boolean
   onClose: () => void
+  onCreated?: () => void
   projectId: number
   elementIds: number[]
 }
@@ -29,6 +30,7 @@ const EXPIRY_OPTIONS = [
 export function CreateLinkDialog({
   isOpen,
   onClose,
+  onCreated,
   projectId,
   elementIds,
 }: CreateLinkDialogProps) {
@@ -59,6 +61,7 @@ export function CreateLinkDialog({
       await navigator.clipboard.writeText(fullUrl)
       toast.success('Ссылка скопирована')
       handleClose()
+      onCreated?.()
     } catch {
       toast.error('Не удалось создать ссылку')
     } finally {

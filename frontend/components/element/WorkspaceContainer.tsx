@@ -26,6 +26,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ShareSelectionMode } from '@/components/sharing/ShareSelectionMode';
 import { CreateLinkDialog } from '@/components/sharing/CreateLinkDialog';
 import { ShareLinksPanel } from '@/components/sharing/ShareLinksPanel';
+import { sharingApi } from '@/lib/api/sharing';
 import { CreateSceneDialog } from '@/components/scene/CreateSceneDialog';
 import {
   Dialog,
@@ -95,8 +96,36 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   const [isGroupDeleting, setIsGroupDeleting] = useState(false);
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
   const [sharePopoverOpen, setSharePopoverOpen] = useState(false);
-  const [shareMode, setShareMode] = useState(false);
-  const [shareSelectedIds, setShareSelectedIds] = useState<Set<number>>(new Set());
+
+  // Share mode persisted in sessionStorage to survive group navigation
+  const [shareMode, _setShareMode] = useState(() => {
+    if (typeof sessionStorage === 'undefined') return false;
+    return sessionStorage.getItem('shareMode') === 'true';
+  });
+  const setShareMode = useCallback((v: boolean) => {
+    _setShareMode(v);
+    if (typeof sessionStorage !== 'undefined') {
+      if (v) sessionStorage.setItem('shareMode', 'true');
+      else sessionStorage.removeItem('shareMode');
+    }
+  }, []);
+
+  const [shareSelectedIds, _setShareSelectedIds] = useState<Set<number>>(() => {
+    if (typeof sessionStorage === 'undefined') return new Set();
+    try {
+      const stored = sessionStorage.getItem('shareSelectedIds');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch { return new Set(); }
+  });
+  const setShareSelectedIds = useCallback((updater: Set<number> | ((prev: Set<number>) => Set<number>)) => {
+    _setShareSelectedIds((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem('shareSelectedIds', JSON.stringify([...next]));
+      }
+      return next;
+    });
+  }, []);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [linksPanelOpen, setLinksPanelOpen] = useState(false);
   const [linksRefreshKey, setLinksRefreshKey] = useState(0);
@@ -527,12 +556,23 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   const handleShareCancel = useCallback(() => {
     setShareMode(false);
     setShareSelectedIds(new Set());
-  }, []);
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.removeItem('shareMode');
+      sessionStorage.removeItem('shareSelectedIds');
+    }
+  }, [setShareMode, setShareSelectedIds]);
 
-  const handleLinkCreated = useCallback(() => {
+  const handleLinkDialogClose = useCallback(() => {
     setLinkDialogOpen(false);
     setShareMode(false);
     setShareSelectedIds(new Set());
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.removeItem('shareMode');
+      sessionStorage.removeItem('shareSelectedIds');
+    }
+  }, [setShareMode, setShareSelectedIds]);
+
+  const handleLinkCreated = useCallback(() => {
     setLinksRefreshKey((k) => k + 1);
     setLinksPanelOpen(true);
   }, []);
@@ -651,12 +691,47 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
               <PopoverContent align="end" className="w-56 p-1" sideOffset={4}>
                 <button
                   type="button"
+                  onClick={async () => {
+                    setSharePopoverOpen(false);
+                    try {
+                      const ids = await sharingApi.getProjectElementIds(projectId);
+                      if (ids.length === 0) { toast.error('В проекте нет элементов'); return; }
+                      setShareSelectedIds(new Set(ids));
+                      setLinkDialogOpen(true);
+                    } catch { toast.error('Не удалось загрузить элементы'); }
+                  }}
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors text-left"
+                >
+                  <FolderPlus className="h-4 w-4 text-muted-foreground" />
+                  Весь проект
+                </button>
+                {groupId && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setSharePopoverOpen(false);
+                      try {
+                        const ids = await sharingApi.getGroupElementIds(groupId);
+                        if (ids.length === 0) { toast.error('В группе нет элементов'); return; }
+                        setShareSelectedIds(new Set(ids));
+                        setLinkDialogOpen(true);
+                      } catch { toast.error('Не удалось загрузить элементы'); }
+                    }}
+                    className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors text-left"
+                  >
+                    <FolderPlus className="h-4 w-4 text-muted-foreground" />
+                    Текущая группа
+                  </button>
+                )}
+                <button
+                  type="button"
                   onClick={() => { setSharePopoverOpen(false); setShareMode(true); setShareSelectedIds(new Set()); }}
                   className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors text-left"
                 >
                   <Plus className="h-4 w-4 text-muted-foreground" />
-                  Создать ссылку
+                  Выбрать вручную
                 </button>
+                <div className="h-px bg-border my-1" />
                 <button
                   type="button"
                   onClick={() => { setSharePopoverOpen(false); setLinksPanelOpen(true); }}
@@ -731,7 +806,8 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
         {/* Create link dialog */}
         <CreateLinkDialog
           isOpen={linkDialogOpen}
-          onClose={handleLinkCreated}
+          onClose={handleLinkDialogClose}
+          onCreated={handleLinkCreated}
           projectId={projectId}
           elementIds={Array.from(shareSelectedIds)}
         />
