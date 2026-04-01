@@ -47,7 +47,10 @@ function NotificationItem({ notification, onClose }: NotificationItemProps) {
       markRead(notification.id).catch(() => {})
     }
     if (notification.project) {
-      router.push(`/projects/${notification.project}`)
+      const url = notification.element
+        ? `/projects/${notification.project}?lightbox=${notification.element}`
+        : `/projects/${notification.project}`
+      router.push(url)
     }
     onClose()
   }

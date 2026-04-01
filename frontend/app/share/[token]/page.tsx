@@ -12,9 +12,13 @@ import {
   ExternalLink,
   ImageOff,
   Clapperboard,
+  ThumbsUp,
+  ThumbsDown,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { sharingApi } from '@/lib/api/sharing'
 import { ReviewerLightbox } from '@/components/sharing/ReviewerLightbox'
+import { cn } from '@/lib/utils'
 import { DisplaySettingsPopover } from '@/components/display/DisplaySettingsPopover'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
 import { useDisplayStore } from '@/lib/store/project-display'
@@ -74,12 +78,18 @@ function ElementCard({
   onClick,
   aspectRatioClass,
   fitModeClass,
+  hasIdentity,
+  myReaction,
+  onReact,
 }: {
   element: PublicElement
   commentCount: number
   onClick: () => void
   aspectRatioClass: string
   fitModeClass: string
+  hasIdentity: boolean
+  myReaction: string | null
+  onReact: (elementId: number, value: 'like' | 'dislike') => void
 }) {
   const isVideo = element.element_type === 'VIDEO'
 
@@ -135,13 +145,78 @@ function ElementCard({
         </button>
       </div>
 
-      {/* Comment badge — bottom-right */}
-      {commentCount > 0 && (
-        <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/60 text-white text-xs rounded-full px-2 py-0.5">
-          <MessageCircle className="w-3 h-3" />
-          {commentCount}
+      {/* Bottom bar — always visible gradient with reactions + comments */}
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent pt-6 pb-2 px-2 flex items-center justify-between">
+        {/* Reactions counts + hover reaction buttons */}
+        <div className="flex items-center gap-1.5">
+          <span className={cn(
+            'flex items-center gap-1 text-xs font-medium',
+            (element.likes ?? 0) > 0 ? 'text-emerald-400' : 'text-white/50'
+          )}>
+            <ThumbsUp className="w-3.5 h-3.5" />
+            {(element.likes ?? 0) > 0 ? element.likes : ''}
+          </span>
+          <span className={cn(
+            'flex items-center gap-1 text-xs font-medium',
+            (element.dislikes ?? 0) > 0 ? 'text-orange-400' : 'text-white/50'
+          )}>
+            <ThumbsDown className="w-3.5 h-3.5" />
+            {(element.dislikes ?? 0) > 0 ? element.dislikes : ''}
+          </span>
         </div>
-      )}
+
+        <div className="flex items-center gap-1.5">
+          {/* Hover reaction buttons */}
+          {hasIdentity && (
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onReact(element.id, 'like')
+                  toast('Оставьте комментарий, чтобы пояснить', {
+                    action: { label: 'Комментировать', onClick: () => onClick() },
+                  })
+                }}
+                className={cn(
+                  'w-6 h-6 rounded-full flex items-center justify-center transition-all',
+                  myReaction === 'like'
+                    ? 'bg-emerald-500/30 text-emerald-400'
+                    : 'bg-white/20 text-white hover:bg-emerald-500/30 hover:text-emerald-400'
+                )}
+                aria-label="Нравится"
+              >
+                <ThumbsUp className="w-3 h-3" />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onReact(element.id, 'dislike')
+                  toast('Оставьте комментарий, чтобы пояснить', {
+                    action: { label: 'Комментировать', onClick: () => onClick() },
+                  })
+                }}
+                className={cn(
+                  'w-6 h-6 rounded-full flex items-center justify-center transition-all',
+                  myReaction === 'dislike'
+                    ? 'bg-orange-500/30 text-orange-400'
+                    : 'bg-white/20 text-white hover:bg-orange-500/30 hover:text-orange-400'
+                )}
+                aria-label="Не нравится"
+              >
+                <ThumbsDown className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+
+          {/* Comments */}
+          {commentCount > 0 && (
+            <span className="flex items-center gap-1 text-white text-xs">
+              <MessageCircle className="w-3 h-3" />
+              {commentCount}
+            </span>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -158,6 +233,9 @@ function SceneSection({
   gridGap,
   aspectRatioClass,
   fitModeClass,
+  hasIdentity,
+  reactionsMap,
+  onReact,
 }: {
   name: string
   elements: PublicElement[]
@@ -168,6 +246,9 @@ function SceneSection({
   gridGap: string
   aspectRatioClass: string
   fitModeClass: string
+  hasIdentity: boolean
+  reactionsMap: Record<number, string | null>
+  onReact: (elementId: number, value: 'like' | 'dislike') => void
 }) {
   const [open, setOpen] = useState(true)
 
@@ -203,6 +284,9 @@ function SceneSection({
                 onClick={() => onElementClick(el)}
                 aspectRatioClass={aspectRatioClass}
                 fitModeClass={fitModeClass}
+                hasIdentity={hasIdentity}
+                myReaction={reactionsMap[el.id] ?? null}
+                onReact={onReact}
               />
             ))}
           </div>
@@ -232,6 +316,10 @@ export default function PublicSharePage() {
   // Comments map: elementId -> Comment[]
   const [commentsMap, setCommentsMap] = useState<Record<number, Comment[]>>({})
 
+  // Reactions state: elementId -> 'like' | 'dislike' | null
+  const [reactionsMap, setReactionsMap] = useState<Record<number, string | null>>({})
+  const [sessionId, setSessionId] = useState('')
+
   // Display preferences
   const { preferences, hydratePreferences } = useDisplayStore()
   useEffect(() => { hydratePreferences() }, [hydratePreferences])
@@ -241,10 +329,14 @@ export default function PublicSharePage() {
   const aspectRatioClass = ASPECT_RATIO_CLASSES[preferences.aspectRatio]
   const fitModeClass = FIT_MODE_CLASSES[preferences.fitMode]
 
-  // Load reviewer name from localStorage
+  // Load reviewer identity from localStorage
   useEffect(() => {
     setReviewerName(localStorage.getItem('reviewer_name') || '')
-    const onStorage = () => setReviewerName(localStorage.getItem('reviewer_name') || '')
+    setSessionId(localStorage.getItem('reviewer_session_id') || '')
+    const onStorage = () => {
+      setReviewerName(localStorage.getItem('reviewer_name') || '')
+      setSessionId(localStorage.getItem('reviewer_session_id') || '')
+    }
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
   }, [])
@@ -326,6 +418,51 @@ export default function PublicSharePage() {
     }
   }
 
+  const hasIdentity = !!reviewerName && !!sessionId
+
+  const handleCardReaction = useCallback(async (elementId: number, value: 'like' | 'dislike') => {
+    if (!sessionId) return
+    const currentValue = reactionsMap[elementId]
+    const newValue = currentValue === value ? null : value
+
+    // Optimistic update of reactionsMap
+    setReactionsMap((prev) => ({ ...prev, [elementId]: newValue }))
+
+    // Optimistic update of element counts in project
+    setProject((prev) => {
+      if (!prev) return prev
+      const updateEl = (el: PublicElement): PublicElement => {
+        if (el.id !== elementId) return el
+        let likes = el.likes ?? 0
+        let dislikes = el.dislikes ?? 0
+        // Remove old reaction
+        if (currentValue === 'like') likes = Math.max(0, likes - 1)
+        if (currentValue === 'dislike') dislikes = Math.max(0, dislikes - 1)
+        // Add new reaction
+        if (newValue === 'like') likes++
+        if (newValue === 'dislike') dislikes++
+        return { ...el, likes, dislikes }
+      }
+      return {
+        ...prev,
+        ungrouped_elements: prev.ungrouped_elements.map(updateEl),
+        scenes: prev.scenes.map((s) => ({ ...s, elements: s.elements.map(updateEl) })),
+      }
+    })
+
+    try {
+      await sharingApi.setReaction(token, {
+        element_id: elementId,
+        session_id: sessionId,
+        value: newValue,
+        author_name: reviewerName,
+      })
+    } catch {
+      // Revert on error
+      setReactionsMap((prev) => ({ ...prev, [elementId]: currentValue ?? null }))
+    }
+  }, [sessionId, reactionsMap, token, reviewerName])
+
   // Render states
   if (loading) return <LoadingView />
   if (error) return <ErrorView title={error.message} />
@@ -383,6 +520,9 @@ export default function PublicSharePage() {
                   onClick={() => handleElementClick(el)}
                   aspectRatioClass={aspectRatioClass}
                   fitModeClass={fitModeClass}
+                  hasIdentity={hasIdentity}
+                  myReaction={reactionsMap[el.id] ?? null}
+                  onReact={handleCardReaction}
                 />
               ))}
             </div>
@@ -402,6 +542,9 @@ export default function PublicSharePage() {
             gridGap={gridConfig.gap}
             aspectRatioClass={aspectRatioClass}
             fitModeClass={fitModeClass}
+            hasIdentity={hasIdentity}
+            reactionsMap={reactionsMap}
+            onReact={handleCardReaction}
           />
         ))}
 

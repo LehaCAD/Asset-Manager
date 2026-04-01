@@ -124,6 +124,23 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
     };
   }, [projectId, groupId, loadWorkspace, resetWorkspace]);
 
+  // Handle lightbox deep-link from URL (?lightbox=elementId)
+  useEffect(() => {
+    if (isLoading) return;
+    const params = new URLSearchParams(window.location.search);
+    const lightboxId = params.get('lightbox');
+    if (lightboxId) {
+      const elementId = parseInt(lightboxId, 10);
+      if (!isNaN(elementId)) {
+        openLightbox(elementId);
+        // Clean URL
+        const url = new URL(window.location.href);
+        url.searchParams.delete('lightbox');
+        window.history.replaceState({}, '', url.toString());
+      }
+    }
+  }, [isLoading, openLightbox]);
+
   // Load models for generation
   useEffect(() => {
     loadModels();
@@ -136,7 +153,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
     const hasPendingOrProcessingElements = () =>
       useSceneWorkspaceStore
         .getState()
-        .elements.some((element) => element.status === 'PENDING' || element.status === 'PROCESSING');
+        .elements.some((element) => element.status === 'PENDING' || element.status === 'PROCESSING' || element.status === 'UPLOADING');
 
     const hasSubmittingGenerationElements = () =>
       useSceneWorkspaceStore
@@ -191,6 +208,9 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
             updateElement(event.element_id, {
               status: 'FAILED',
               error_message: event.error_message ?? '',
+              // Clear upload progress tracking
+              client_upload_phase: undefined,
+              client_upload_progress: undefined,
             });
             void useCreditsStore.getState().loadBalance();
           }
@@ -218,6 +238,10 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
 
     const unsubscribeConnect = wsManager.onConnect(() => {
       stopFallbackRefetch();
+      // After reconnect, refresh state to catch up on any WS events missed during disconnect
+      if (hasPendingOrProcessingElements() || hasSubmittingGenerationElements()) {
+        useSceneWorkspaceStore.getState().loadWorkspace(projectId, groupId);
+      }
     });
     const unsubscribeDisconnect = wsManager.onDisconnect(() => {
       if (disconnectDebounceTimerRef.current) {

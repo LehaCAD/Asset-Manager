@@ -139,6 +139,7 @@ export function ReviewerLightbox({
         element_id: current.id,
         session_id: sessionId,
         value: newValue,
+        author_name: reviewerName,
       })
     } catch {
       // Revert on error
@@ -168,6 +169,10 @@ export function ReviewerLightbox({
             {currentIndex + 1} / {elements.length}
           </span>
         </div>
+        <div className="absolute left-1/2 -translate-x-1/2 hidden sm:flex items-center gap-2 text-[11px] text-muted-foreground/60 select-none pointer-events-none">
+          <kbd className="px-1.5 py-0.5 rounded bg-card text-muted-foreground text-[10px] font-mono">&larr; &rarr;</kbd>
+          <kbd className="px-1.5 py-0.5 rounded bg-card text-muted-foreground text-[10px] font-mono">Esc</kbd>
+        </div>
         <Button
           variant="ghost"
           size="icon"
@@ -183,12 +188,6 @@ export function ReviewerLightbox({
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Media area with navigation */}
         <div className="flex-1 relative flex flex-col items-center justify-center p-4 md:p-8">
-          {/* Keyboard hints — centered above media */}
-          <div className="hidden sm:flex items-center justify-center gap-2 text-[11px] text-muted-foreground/40 select-none py-1">
-            <kbd className="px-1.5 py-0.5 rounded bg-card text-muted-foreground/60 text-[10px] font-mono">&larr; &rarr;</kbd>
-            <kbd className="px-1.5 py-0.5 rounded bg-card text-muted-foreground/60 text-[10px] font-mono">Esc</kbd>
-          </div>
-
           <LightboxNavigation
             onPrev={goPrev}
             onNext={goNext}
@@ -216,58 +215,61 @@ export function ReviewerLightbox({
             )}
           </div>
 
-          {/* Action buttons below media — matches main lightbox style */}
-          <div className="mt-4 flex items-center gap-1.5">
-            {hasFileUrl && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => handleDownload(current.file_url, fileName)}
-                  className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-muted-foreground bg-card hover:text-foreground transition-colors"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  Скачать
-                </button>
-                <a
-                  href={current.file_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-muted-foreground bg-card hover:text-foreground transition-colors"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  Оригинал
-                </a>
-              </>
-            )}
+          {/* Action bar below media — single row */}
+          <div className="mt-4 flex items-center gap-4 w-full max-w-[900px]">
+            {/* Reactions — left */}
             {hasIdentity && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => handleReaction('like')}
-                  className={cn(
-                    'flex items-center gap-1 h-7 px-3 rounded text-xs font-medium transition-colors',
-                    reactionsMap[current.id] === 'like'
-                      ? 'bg-primary/10 text-primary'
-                      : 'bg-card text-muted-foreground hover:text-foreground'
-                  )}
-                >
-                  <ThumbsUp className="h-3.5 w-3.5" />
+              <div className="flex items-center gap-1.5">
+                <button onClick={() => handleReaction('like')} className={cn(
+                  'flex items-center gap-1.5 h-8 px-3 rounded-lg text-sm font-medium transition-all',
+                  reactionsMap[current.id] === 'like'
+                    ? 'bg-emerald-500/20 text-emerald-500'
+                    : 'bg-card text-muted-foreground hover:text-emerald-500 hover:bg-emerald-500/10'
+                )}>
+                  <ThumbsUp className="h-4 w-4" />
                   {(current.likes ?? 0) > 0 && <span>{current.likes}</span>}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => handleReaction('dislike')}
-                  className={cn(
-                    'flex items-center gap-1 h-7 px-3 rounded text-xs font-medium transition-colors',
-                    reactionsMap[current.id] === 'dislike'
-                      ? 'bg-destructive/10 text-destructive'
-                      : 'bg-card text-muted-foreground hover:text-foreground'
-                  )}
-                >
-                  <ThumbsDown className="h-3.5 w-3.5" />
+                <button onClick={() => handleReaction('dislike')} className={cn(
+                  'flex items-center gap-1.5 h-8 px-3 rounded-lg text-sm font-medium transition-all',
+                  reactionsMap[current.id] === 'dislike'
+                    ? 'bg-orange-500/20 text-orange-500'
+                    : 'bg-card text-muted-foreground hover:text-orange-500 hover:bg-orange-500/10'
+                )}>
+                  <ThumbsDown className="h-4 w-4" />
                   {(current.dislikes ?? 0) > 0 && <span>{current.dislikes}</span>}
                 </button>
-              </>
+              </div>
+            )}
+
+            {/* Who reacted — middle, scrollable */}
+            {current.reactions && current.reactions.length > 0 && (
+              <div className="flex items-center gap-1 overflow-x-auto flex-1 min-w-0">
+                {current.reactions.map((r, i) => (
+                  <span key={i} className={cn(
+                    'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs whitespace-nowrap shrink-0',
+                    r.value === 'like' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-orange-500/10 text-orange-600 dark:text-orange-400'
+                  )}>
+                    {r.value === 'like' ? '\u{1F44D}' : '\u{1F44E}'} {r.author_name || '\u0413\u043E\u0441\u0442\u044C'}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Spacer */}
+            <div className="flex-1" />
+
+            {/* Download/Original — right */}
+            {hasFileUrl && (
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button type="button" onClick={() => handleDownload(current.file_url, fileName)}
+                  className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-muted-foreground bg-card hover:text-foreground transition-colors">
+                  <Download className="h-3.5 w-3.5" /> Скачать
+                </button>
+                <a href={current.file_url} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-muted-foreground bg-card hover:text-foreground transition-colors">
+                  <ExternalLink className="h-3.5 w-3.5" /> Оригинал
+                </a>
+              </div>
             )}
           </div>
         </div>
