@@ -129,6 +129,7 @@ class ElementReaction(models.Model):
         'elements.Element', on_delete=models.CASCADE, related_name='reactions'
     )
     session_id = models.CharField(max_length=36)
+    author_name = models.CharField(max_length=100, default='')
     value = models.CharField(max_length=10, choices=Value.choices)
     created_at = models.DateTimeField(auto_now_add=True)
 

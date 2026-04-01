@@ -7,14 +7,6 @@ from apps.scenes.models import Scene
 from .models import SharedLink, Comment
 from .services import (
     create_shared_link,
-    revoke_shared_link,
-    get_project_by_token,
-    get_active_links,
-    create_comment,
-    mark_comment_as_read,
-    get_scene_comments,
-    get_project_comments,
-    get_unread_count
 )
 
 User = get_user_model()
