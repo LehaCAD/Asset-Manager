@@ -47,9 +47,14 @@ function NotificationItem({ notification, onClose }: NotificationItemProps) {
       markRead(notification.id).catch(() => {})
     }
     if (notification.project) {
-      const url = notification.element
-        ? `/projects/${notification.project}?lightbox=${notification.element}`
-        : `/projects/${notification.project}`
+      // Build URL: navigate to group if element has a scene, then open lightbox
+      let url = `/projects/${notification.project}`
+      if (notification.scene) {
+        url += `/groups/${notification.scene}`
+      }
+      if (notification.element) {
+        url += `?lightbox=${notification.element}`
+      }
       router.push(url)
     }
     onClose()

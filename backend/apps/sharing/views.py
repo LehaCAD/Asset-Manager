@@ -54,7 +54,7 @@ def public_share_view(request, token):
             status=status.HTTP_410_GONE,
         )
 
-    shared_elements = link.elements.select_related('scene').annotate(
+    shared_elements = link.elements.select_related('scene').prefetch_related('reactions').annotate(
         comment_count=Count('comments'),
         likes=Count('reactions', filter=Q(reactions__value='like')),
         dislikes=Count('reactions', filter=Q(reactions__value='dislike')),
@@ -72,6 +72,10 @@ def public_share_view(request, token):
             'comment_count': el.comment_count,  # from annotation
             'likes': el.likes,
             'dislikes': el.dislikes,
+            'reactions': [
+                {'session_id': r.session_id, 'author_name': r.author_name, 'value': r.value}
+                for r in el.reactions.all()
+            ],
             'comments': CommentSerializer(el_comments, many=True).data,
         }
         if el.scene_id:
@@ -176,6 +180,7 @@ def public_reaction_view(request, token):
     element_id = request.data.get('element_id')
     session_id = request.data.get('session_id')
     value = request.data.get('value')  # 'like', 'dislike', or null to remove
+    author_name = request.data.get('author_name', '')
 
     if not element_id or not session_id:
         return Response({'detail': 'element_id and session_id required'}, status=400)
@@ -192,11 +197,32 @@ def public_reaction_view(request, token):
     if value not in ('like', 'dislike'):
         return Response({'detail': 'value must be "like" or "dislike"'}, status=400)
 
-    reaction, _ = ElementReaction.objects.update_or_create(
+    reaction, created = ElementReaction.objects.update_or_create(
         element_id=element_id,
         session_id=session_id,
-        defaults={'value': value},
+        defaults={'value': value, 'author_name': author_name},
     )
+
+    # Notify only on FIRST reaction from this session (not toggles/changes)
+    if created:
+        try:
+            from apps.notifications.services import create_notification
+            from apps.notifications.models import Notification
+            from apps.elements.models import Element
+            el = Element.objects.select_related('project__user').get(id=element_id)
+            emoji = '\U0001f44d' if value == 'like' else '\U0001f44e'
+            display_name = author_name or 'Гость'
+            create_notification(
+                user=el.project.user,
+                type=Notification.Type.COMMENT_NEW,
+                project=el.project,
+                title=f'{display_name} {emoji}',
+                message='Реакция на элемент',
+                element=el,
+            )
+        except Exception:
+            pass
+
     return Response({'element_id': element_id, 'value': value}, status=status.HTTP_200_OK)
 
 
@@ -246,6 +272,17 @@ def scene_comments_view(request, scene_id):
         parent_id=serializer.validated_data.get('parent_id'),
     )
     return Response(CommentSerializer(comment).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def element_reactions_view(request, element_id):
+    """GET /api/sharing/elements/{id}/reactions/"""
+    from apps.elements.models import Element
+    element = get_object_or_404(Element, id=element_id, project__user=request.user)
+    reactions = ElementReaction.objects.filter(element=element)
+    data = [{'session_id': r.session_id, 'author_name': r.author_name, 'value': r.value} for r in reactions]
+    return Response(data)
 
 
 @api_view(['PATCH'])

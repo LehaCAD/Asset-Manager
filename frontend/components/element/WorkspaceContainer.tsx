@@ -21,7 +21,8 @@ import { DetailPanel } from '@/components/lightbox/DetailPanel';
 import { useKeyboard } from '@/lib/hooks/use-keyboard';
 import { scenesApi } from '@/lib/api/scenes';
 import { MoveToGroupDialog } from '@/components/element/MoveToGroupDialog';
-import { Upload, ChevronLeft, ChevronRight, FolderPlus, Share2 } from 'lucide-react';
+import { Upload, ChevronLeft, ChevronRight, FolderPlus, Share2, Link2, Plus } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ShareSelectionMode } from '@/components/sharing/ShareSelectionMode';
 import { CreateLinkDialog } from '@/components/sharing/CreateLinkDialog';
 import { ShareLinksPanel } from '@/components/sharing/ShareLinksPanel';
@@ -636,22 +637,35 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
 
           {/* Right: share + filters + view */}
           <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              type="button"
-              onClick={() => setLinksPanelOpen((v) => !v)}
-              className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shrink-0"
-              title="Управление ссылками"
-            >
-              <Share2 className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => { setShareMode(true); setShareSelectedIds(new Set()); }}
-              className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors shrink-0"
-            >
-              <Share2 className="h-3.5 w-3.5" />
-              Поделиться
-            </button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors shrink-0"
+                >
+                  <Share2 className="h-3.5 w-3.5" />
+                  Поделиться
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-56 p-1" sideOffset={4}>
+                <button
+                  type="button"
+                  onClick={() => { setShareMode(true); setShareSelectedIds(new Set()); }}
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors text-left"
+                >
+                  <Plus className="h-4 w-4 text-muted-foreground" />
+                  Создать ссылку
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLinksPanelOpen(true)}
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors text-left"
+                >
+                  <Link2 className="h-4 w-4 text-muted-foreground" />
+                  Все ссылки
+                </button>
+              </PopoverContent>
+            </Popover>
             <ElementFilters
               filter={filter}
               onFilterChange={setFilter}
