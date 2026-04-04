@@ -61,7 +61,7 @@ export default function CabinetLayout({
   return (
     <div className="flex flex-1 min-h-0 p-3 gap-3">
       {/* Sidebar — floating rounded card */}
-      <nav className="w-[260px] shrink-0 rounded-xl border border-border bg-card flex flex-col p-3 justify-between">
+      <nav className="w-[260px] shrink-0 rounded-md border border-border bg-sidebar flex flex-col p-3 justify-between">
         <div>
           {/* Logo → projects */}
           <Link
@@ -76,7 +76,7 @@ export default function CabinetLayout({
 
           {/* User card */}
           <div className="flex items-center gap-2.5 px-3 py-2.5 mb-3">
-            <div className="h-8 w-8 rounded-full bg-primary/80 flex items-center justify-center shrink-0">
+            <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center shrink-0">
               <span className="text-[11px] font-bold text-primary-foreground">{initials}</span>
             </div>
             <div className="min-w-0">
@@ -102,13 +102,13 @@ export default function CabinetLayout({
                         key={href}
                         href={href}
                         className={cn(
-                          "flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors",
+                          "flex items-center gap-2.5 rounded-md px-3 py-2 text-[13px] font-medium transition-colors",
                           active
-                            ? "bg-muted text-foreground"
+                            ? "bg-primary/10 text-primary"
                             : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                         )}
                       >
-                        <Icon className="h-4 w-4 shrink-0" />
+                        <Icon className={cn("h-4 w-4 shrink-0", active && "text-primary")} />
                         {label}
                       </Link>
                     );
@@ -120,7 +120,7 @@ export default function CabinetLayout({
         </div>
 
         {/* Bottom: balance */}
-        <div className="mt-4 rounded-lg bg-muted/30 px-3 py-2.5">
+        <div className="mt-4 rounded-md bg-card border border-border px-3 py-2.5">
           <p className="text-[11px] text-muted-foreground mb-1">Баланс</p>
           <div className="flex items-center gap-1.5">
             <ChargeIcon size="sm" className="relative top-[-0.5px]" />
@@ -130,7 +130,7 @@ export default function CabinetLayout({
       </nav>
 
       {/* Content — also in a rounded card */}
-      <div className="flex-1 rounded-xl border border-border bg-card overflow-y-auto">
+      <div className="flex-1 rounded-md border border-border bg-background shadow-[var(--shadow-card)] overflow-y-auto">
         <div className="max-w-5xl mx-auto p-8 space-y-6">{children}</div>
       </div>
     </div>
