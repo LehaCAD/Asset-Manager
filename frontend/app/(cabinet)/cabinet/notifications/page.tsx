@@ -80,7 +80,7 @@ function NotificationItem({
   return (
     <button
       onClick={() => onRead(notification)}
-      className={`w-full flex items-start gap-3 px-4 py-3 rounded-xl text-left transition-colors hover:bg-muted/30 ${
+      className={`w-full flex items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30 ${
         !notification.is_read ? "bg-primary/5" : ""
       }`}
     >
@@ -183,7 +183,7 @@ export default function NotificationsPage() {
       </div>
 
       {/* List */}
-      <div className="rounded-xl border border-border bg-card/80 overflow-hidden">
+      <div className="rounded-md border border-border bg-card shadow-[var(--shadow-card)] overflow-hidden">
         {isLoading && notifications.length === 0 ? (
           <div className="divide-y divide-border/50">
             {[...Array(5)].map((_, i) => (
@@ -211,7 +211,7 @@ export default function NotificationsPage() {
         <div className="flex justify-center">
           <button
             onClick={handleLoadMore}
-            className="px-4 py-2 text-xs text-muted-foreground hover:text-foreground bg-muted/60 hover:bg-muted rounded-lg transition-colors"
+            className="px-4 py-2 text-xs text-muted-foreground hover:text-foreground bg-muted/60 hover:bg-muted rounded-md transition-colors"
           >
             Загрузить ещё
           </button>
