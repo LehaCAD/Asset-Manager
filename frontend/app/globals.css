@@ -74,6 +74,9 @@
   --color-overlay-button-hover: var(--overlay-button-hover);
   --color-overlay-text: var(--overlay-text);
   --color-overlay-text-muted: var(--overlay-text-muted);
+
+  /* Card shadow token */
+  --shadow-card: var(--shadow-card);
 }
 
 /* ── Light theme ─────────────────────────────────────────── */
@@ -81,7 +84,7 @@
   --radius: 0.5rem;
 
   /* shadcn/ui standard vars — purple accent */
-  --background:         oklch(0.985 0.003 265);    /* #F9FAFB — subtle off-white, content area */
+  --background:         oklch(0.965 0.005 265);    /* ~#F5F6F8 — tinted bg, white cards float above */
   --foreground:         oklch(0.12 0.015 265);     /* #111318 — brandbook text-primary */
   --card:               oklch(0.925 0.008 265);    /* #E5E6EC — pills/cards darker than bg */
   --card-foreground:    oklch(0.12 0.015 265);
@@ -101,7 +104,7 @@
   --ring:               oklch(0.541 0.211 281.4);
 
   /* Sidebar */
-  --sidebar:            oklch(0.965 0.005 265);    /* #F2F3F6 — matches surface */
+  --sidebar:            oklch(0.94 0.007 265);     /* ~#EEEEF2 — darker than page bg, navigation depth */
   --sidebar-foreground: oklch(0.12 0.015 265);
   --sidebar-primary:    oklch(0.541 0.211 281.4);
   --sidebar-primary-foreground: oklch(0.985 0 0);
@@ -150,6 +153,9 @@
   --overlay-button-hover: oklch(1 0 0 / 0.25);
   --overlay-text:         oklch(1 0 0 / 0.85);
   --overlay-text-muted:   oklch(1 0 0 / 0.6);
+
+  /* Card shadow */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.03), 0 4px 8px rgba(18, 42, 66, 0.015);
 }
 
 /* ── Dark theme ──────────────────────────────────────────── */
@@ -224,6 +230,9 @@
   --overlay-button-hover: oklch(1 0 0 / 0.25);
   --overlay-text:         oklch(1 0 0 / 0.85);
   --overlay-text-muted:   oklch(1 0 0 / 0.6);
+
+  /* Card shadow */
+  --shadow-card: none;
 }
 
 @layer base {
