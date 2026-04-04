@@ -149,7 +149,7 @@ export default function AnalyticsPage() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <Skeleton className="h-7 w-36" />
-          <Skeleton className="h-8 w-52 rounded-lg" />
+          <Skeleton className="h-8 w-52 rounded-md" />
         </div>
         <div className="grid grid-cols-3 gap-4">
           {[...Array(3)].map((_, i) => (
