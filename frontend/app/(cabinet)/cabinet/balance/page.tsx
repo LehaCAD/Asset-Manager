@@ -60,15 +60,15 @@ export default function BalancePage() {
       </div>
 
       {/* Balance + Top up */}
-      <div className="rounded-xl border border-border bg-card/80 p-6">
+      <div className="rounded-md border border-border bg-card shadow-[var(--shadow-card)] p-5">
         <p className="text-sm text-muted-foreground mb-2">Баланс</p>
         <div className="flex items-center gap-3 mb-5">
           <ChargeIcon size="xl" />
-          <span className="text-4xl font-bold font-mono text-foreground">{formatCurrency(balance)}</span>
+          <span className="text-2xl font-bold font-mono text-foreground">{formatCurrency(balance)}</span>
         </div>
         <button
           disabled
-          className="px-6 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold opacity-40 cursor-not-allowed"
+          className="px-4 py-2 rounded-sm bg-primary text-primary-foreground text-sm font-semibold opacity-40 cursor-not-allowed"
         >
           Пополнить баланс
         </button>
@@ -81,7 +81,7 @@ export default function BalancePage() {
         <DateRangePicker value={dateRange} onChange={setDateRange} />
       </div>
 
-      <div className="rounded-xl border border-border bg-card/80 overflow-hidden">
+      <div className="rounded-md border border-border bg-card shadow-[var(--shadow-card)] overflow-hidden">
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-border">
@@ -146,7 +146,7 @@ export default function BalancePage() {
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                className="p-2 rounded-lg bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30"
+                className="p-2 rounded-md bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
@@ -154,7 +154,7 @@ export default function BalancePage() {
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
-                className="p-2 rounded-lg bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30"
+                className="p-2 rounded-md bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
