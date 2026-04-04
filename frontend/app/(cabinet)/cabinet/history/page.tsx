@@ -137,7 +137,7 @@ export default function HistoryPage() {
       </div>
 
       {/* Table */}
-      <div className="rounded-xl border border-border bg-card/80 overflow-hidden">
+      <div className="rounded-md border border-border bg-card shadow-[var(--shadow-card)] overflow-hidden">
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-border">
@@ -186,7 +186,7 @@ export default function HistoryPage() {
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                className="p-2 rounded-lg bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30"
+                className="p-2 rounded-md bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
@@ -194,7 +194,7 @@ export default function HistoryPage() {
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
-                className="p-2 rounded-lg bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30"
+                className="p-2 rounded-md bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
@@ -248,7 +248,7 @@ function HistoryRow({ entry }: { entry: CabinetHistoryEntry }) {
 
       {/* Status */}
       <td className="px-3 py-2.5">
-        <span className={`inline-block px-2.5 py-1 rounded-md text-[10px] font-semibold ${STATUS_STYLES[entry.status] ?? "bg-muted text-muted-foreground"}`}>
+        <span className={`inline-block px-1.5 py-0.5 rounded-sm text-[11px] font-medium ${STATUS_STYLES[entry.status] ?? "bg-muted text-muted-foreground"}`}>
           {entry.status_display}
         </span>
       </td>
@@ -401,7 +401,7 @@ function ResultPreview({ thumbnailUrl, fileUrl, isVideo }: { thumbnailUrl: strin
           )}
           <button
             onClick={handleDownload}
-            className="absolute bottom-2 right-2 p-2 rounded-lg bg-background/80 backdrop-blur-sm border border-border text-foreground hover:bg-background transition-colors opacity-0 group-hover/preview:opacity-100"
+            className="absolute bottom-2 right-2 p-2 rounded-md bg-background/80 backdrop-blur-sm border border-border text-foreground hover:bg-background transition-colors opacity-0 group-hover/preview:opacity-100"
             title="Скачать оригинал"
           >
             <Download className="h-4 w-4" />
