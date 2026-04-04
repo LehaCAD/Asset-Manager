@@ -10,7 +10,7 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
-import { TrendingUp, Image, Layers, Wallet } from "lucide-react";
+import { TrendingUp, Image, Layers, Wallet, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import { useTheme } from "next-themes";
@@ -95,6 +95,7 @@ export default function AnalyticsPage() {
   const chartColors = useChartColors();
   const [data, setData] = useState<CabinetAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(defaultRange);
   const [modelId, setModelId] = useState<number | undefined>();
   const [projectId, setProjectId] = useState<number | undefined>();
@@ -106,18 +107,42 @@ export default function AnalyticsPage() {
     apiClient.get("/api/projects/").then((r) => setProjects(r.data));
   }, []);
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     setLoading(true);
-    getAnalytics({
-      ...dateRangeToParams(dateRange),
-      ai_model_id: modelId,
-      project_id: projectId,
-    })
-      .then(setData)
-      .finally(() => setLoading(false));
+    setError(false);
+    try {
+      const result = await getAnalytics({
+        ...dateRangeToParams(dateRange),
+        ai_model_id: modelId,
+        project_id: projectId,
+      });
+      setData(result);
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
   }, [dateRange, modelId, projectId]);
 
   useEffect(() => { load(); }, [load]);
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="h-10 w-10 rounded-md bg-destructive/10 flex items-center justify-center mb-3">
+          <AlertCircle className="h-5 w-5 text-destructive" />
+        </div>
+        <p className="text-sm font-medium text-foreground">Не удалось загрузить данные</p>
+        <p className="text-xs text-muted-foreground mt-1">Попробуйте обновить страницу</p>
+        <button
+          onClick={() => { setError(false); load(); }}
+          className="mt-3 px-3 py-1.5 text-xs rounded-sm bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+        >
+          Повторить
+        </button>
+      </div>
+    );
+  }
 
   if (loading || !data) {
     return (
@@ -259,7 +284,7 @@ export default function AnalyticsPage() {
                   if (isNaN(d.getTime())) return v;
                   return `${d.getDate()}.${String(d.getMonth() + 1).padStart(2, "0")}`;
                 }}
-                axisLine={false}
+                axisLine={{ stroke: chartColors.grid, strokeWidth: 1 }}
                 tickLine={false}
                 dy={8}
               />

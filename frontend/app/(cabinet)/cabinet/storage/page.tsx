@@ -1,26 +1,58 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { getStorage } from "@/lib/api/cabinet";
 import { formatStorage } from "@/lib/utils/format";
 import type { CabinetStorage } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
-import { HardDrive, FolderOpen } from "lucide-react";
+import { HardDrive, FolderOpen, AlertCircle } from "lucide-react";
 
 export default function StoragePage() {
   const [data, setData] = useState<CabinetStorage | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(false);
+    try {
+      const result = await getStorage();
+      setData(result);
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    getStorage().then(setData).finally(() => setLoading(false));
-  }, []);
+    loadData();
+  }, [loadData]);
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="h-10 w-10 rounded-md bg-destructive/10 flex items-center justify-center mb-3">
+          <AlertCircle className="h-5 w-5 text-destructive" />
+        </div>
+        <p className="text-sm font-medium text-foreground">Не удалось загрузить данные</p>
+        <p className="text-xs text-muted-foreground mt-1">Попробуйте обновить страницу</p>
+        <button
+          onClick={() => { setError(false); loadData(); }}
+          className="mt-3 px-3 py-1.5 text-xs rounded-sm bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+        >
+          Повторить
+        </button>
+      </div>
+    );
+  }
 
   if (loading || !data) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-7 w-36" />
-        <Skeleton className="h-32 rounded-xl" />
-        <Skeleton className="h-64 rounded-xl" />
+        <Skeleton className="h-32 rounded-md" />
+        <Skeleton className="h-64 rounded-md" />
       </div>
     );
   }
@@ -32,12 +64,7 @@ export default function StoragePage() {
   const totalUsed = data.storage_used_bytes;
   const totalFiles = data.by_project.reduce((sum, p) => sum + p.elements_count, 0);
 
-  /* Progress bar color: green normally, orange >70%, red >90% */
-  const barColor = usagePercent >= 90
-    ? "bg-destructive"
-    : usagePercent >= 70
-      ? "bg-warning"
-      : "bg-primary";
+  const barColor = "bg-primary";
 
   return (
     <div className="space-y-6">
@@ -47,7 +74,7 @@ export default function StoragePage() {
       </div>
 
       {/* Usage card */}
-      <div className="rounded-xl border border-border bg-card/80 p-6 space-y-4">
+      <div className="rounded-md border border-border bg-card shadow-[var(--shadow-card)] p-5 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <HardDrive className="h-5 w-5 text-muted-foreground" />
@@ -65,14 +92,14 @@ export default function StoragePage() {
           </div>
           <span className="text-2xl font-bold font-mono text-foreground">{usagePercent}%</span>
         </div>
-        <div className="h-2.5 rounded-full bg-muted/60 overflow-hidden">
+        <div className="h-3 rounded-full bg-border/40 dark:bg-muted/40 overflow-hidden">
           <div
             className={`h-full rounded-full ${barColor} transition-all`}
             style={{ width: `${Math.max(Math.min(usagePercent, 100), totalUsed > 0 ? 1 : 0)}%` }}
           />
         </div>
         {usagePercent >= 90 && (
-          <p className="text-[11px] text-destructive">Хранилище почти заполнено. Удалите ненужные файлы или обратитесь в поддержку.</p>
+          <p className="text-[11px] text-muted-foreground">Хранилище почти заполнено. Удалите ненужные файлы или обратитесь в поддержку.</p>
         )}
       </div>
 
@@ -80,7 +107,7 @@ export default function StoragePage() {
       <h2 className="text-base font-semibold text-foreground">По проектам</h2>
 
       {data.by_project.length > 0 ? (
-        <div className="rounded-xl border border-border bg-card/80 overflow-hidden divide-y divide-border/50">
+        <div className="rounded-md border border-border bg-card shadow-[var(--shadow-card)] overflow-hidden divide-y divide-border/50">
           {data.by_project.map((p) => {
             const sharePercent = totalUsed > 0
               ? (p.storage_bytes / totalUsed) * 100
@@ -101,9 +128,9 @@ export default function StoragePage() {
                     {formatStorage(p.storage_bytes)}
                   </span>
                 </div>
-                <div className="h-1.5 rounded-full bg-muted/50 overflow-hidden">
+                <div className="h-1.5 rounded-full bg-border/50 dark:bg-muted/50 overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-primary/70 transition-all"
+                    className="h-full rounded-full bg-primary transition-all"
                     style={{ width: `${Math.max(limitPercent, 0.5)}%` }}
                   />
                 </div>
@@ -115,7 +142,7 @@ export default function StoragePage() {
           })}
         </div>
       ) : (
-        <div className="rounded-xl border border-border bg-card/80 px-4 py-16 text-center text-muted-foreground">
+        <div className="rounded-md border border-border bg-card shadow-[var(--shadow-card)] px-4 py-16 text-center text-muted-foreground">
           Нет проектов с файлами
         </div>
       )}
