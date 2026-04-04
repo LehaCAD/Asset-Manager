@@ -25,7 +25,7 @@ import { apiClient } from "@/lib/api/client";
 /* ── Colors ─────────────────────────────────────────────── */
 /* SVG fill/stroke attrs don't resolve CSS vars — we read   */
 /* actual computed values from the DOM at runtime instead.  */
-const BAR_COLOR = "#7C8CF5"; /* accent bar — intentionally fixed */
+const BAR_FALLBACK = "#8B7CF7";
 
 function resolveCssVar(varName: string): string {
   const raw = getComputedStyle(document.documentElement)
@@ -44,12 +44,13 @@ function resolveCssVar(varName: string): string {
 
 function useChartColors() {
   const { resolvedTheme } = useTheme();
-  const [colors, setColors] = useState({ axis: "", grid: "" });
+  const [colors, setColors] = useState({ axis: "", grid: "", bar: BAR_FALLBACK });
 
   useEffect(() => {
     setColors({
       axis: resolveCssVar("--muted-foreground"),
       grid: resolveCssVar("--border"),
+      bar: resolveCssVar("--primary") || BAR_FALLBACK,
     });
   }, [resolvedTheme]);
 
@@ -127,10 +128,10 @@ export default function AnalyticsPage() {
         </div>
         <div className="grid grid-cols-3 gap-4">
           {[...Array(3)].map((_, i) => (
-            <Skeleton key={i} className="h-24 rounded-xl" />
+            <Skeleton key={i} className="h-24 rounded-md" />
           ))}
         </div>
-        <Skeleton className="h-80 rounded-xl" />
+        <Skeleton className="h-80 rounded-md" />
       </div>
     );
   }
@@ -182,8 +183,8 @@ export default function AnalyticsPage() {
       {/* Summary Cards — 3 columns */}
       <div className="grid grid-cols-3 gap-4">
         {/* Balance */}
-        <div className="rounded-xl border border-border bg-card/80 p-4 flex items-center gap-3">
-          <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+        <div className="rounded-md border border-border bg-card shadow-[var(--shadow-card)] p-3 flex items-center gap-3">
+          <div className="h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
             <Wallet className="h-4 w-4 text-primary" />
           </div>
           <div>
@@ -193,8 +194,8 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Spent */}
-        <div className="rounded-xl border border-border bg-card/80 p-4 flex items-center gap-3">
-          <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+        <div className="rounded-md border border-border bg-card shadow-[var(--shadow-card)] p-3 flex items-center gap-3">
+          <div className="h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
             <Layers className="h-4 w-4 text-primary" />
           </div>
           <div>
@@ -206,8 +207,8 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Generations */}
-        <div className="rounded-xl border border-border bg-card/80 p-4 flex items-center gap-3">
-          <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+        <div className="rounded-md border border-border bg-card shadow-[var(--shadow-card)] p-3 flex items-center gap-3">
+          <div className="h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
             <Image className="h-4 w-4 text-primary" />
           </div>
           <div>
@@ -221,11 +222,11 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Main Chart */}
-      <div className="rounded-xl border border-border bg-card/80 p-6">
+      <div className="rounded-md border border-border bg-card shadow-[var(--shadow-card)] p-4">
         <div className="flex items-baseline justify-between mb-5">
           <div className="space-y-1">
             <h2 className="text-sm font-medium text-muted-foreground">Расходы за период</h2>
-            <p className="text-3xl font-bold font-mono text-foreground">
+            <p className="text-2xl font-bold font-mono text-foreground">
               {formatCurrency(summary.total_spent)}
             </p>
           </div>
@@ -276,7 +277,7 @@ export default function AnalyticsPage() {
               />
               <Bar
                 dataKey="amount"
-                fill={BAR_COLOR}
+                fill={chartColors.bar}
                 radius={[4, 4, 0, 0]}
                 maxBarSize={48}
               />
@@ -309,7 +310,7 @@ export default function AnalyticsPage() {
 
       {/* Stats footer */}
       {generation_stats.top_model && (
-        <div className="rounded-xl border border-border bg-card/80 p-5 flex items-center justify-between">
+        <div className="rounded-md border border-border bg-card shadow-[var(--shadow-card)] p-3 flex items-center justify-between">
           <div>
             <p className="text-[11px] text-muted-foreground">Самая используемая модель</p>
             <p className="text-sm font-semibold text-foreground mt-0.5">{generation_stats.top_model}</p>
@@ -336,7 +337,7 @@ function BreakdownCard({
   maxAmount: number;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-card/80 p-5 space-y-4">
+    <div className="rounded-md border border-border bg-card shadow-[var(--shadow-card)] p-3 space-y-4">
       <h2 className="text-sm font-semibold text-foreground">{title}</h2>
       {items.length === 0 ? (
         <p className="text-xs text-muted-foreground py-4 text-center">Нет данных</p>
@@ -353,8 +354,8 @@ function BreakdownCard({
               </div>
               <div className="h-1.5 rounded-full bg-muted/50 overflow-hidden">
                 <div
-                  className="h-full rounded-full transition-all"
-                  style={{ width: `${Math.max(pct, 2)}%`, background: BAR_COLOR }}
+                  className="h-full rounded-full transition-all bg-primary"
+                  style={{ width: `${Math.max(pct, 2)}%` }}
                 />
               </div>
             </div>
