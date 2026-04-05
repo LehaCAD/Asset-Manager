@@ -354,7 +354,7 @@ export function ElementCard({
               "rounded-md bg-black/60 backdrop-blur-sm flex items-center gap-1",
               element.comment_count > 1 ? "h-6 px-1.5" : "h-6 w-6 justify-center"
             )}>
-              <MessageCircle className="h-3.5 w-3.5 text-white" />
+              <MessageCircle className={cn(BADGE_SM.icon, "text-white")} />
               {element.comment_count > 1 && (
                 <span className="text-[11px] font-semibold text-white">
                   {element.comment_count > 99 ? '99+' : element.comment_count}
@@ -370,7 +370,7 @@ export function ElementCard({
             type="button"
             onPointerDown={handleControlPointerDown}
             onClick={(e) => { e.stopPropagation(); onDelete(element.id); }}
-            className="absolute top-2 right-2 z-50 rounded-full bg-black/70 hover:bg-error/70 p-1 transition-colors"
+            className="absolute top-2 right-2 z-50 rounded-md bg-black/70 hover:bg-error/70 p-1 transition-colors"
             title="Отменить загрузку"
           >
             <X className={BADGE_SM.icon} />
