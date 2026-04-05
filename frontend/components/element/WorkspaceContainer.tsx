@@ -65,6 +65,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
     clearSelection,
     toggleSelectAll,
     getFilteredElements,
+    getVisibleElementsForLightbox,
     updateElement,
     enqueueUploads,
   } = useSceneWorkspaceStore();
@@ -370,7 +371,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   };
 
   const handleLightboxDelete = (id: number) => {
-    const filteredElements = getFilteredElements();
+    const filteredElements = getVisibleElementsForLightbox();
     const currentIndex = filteredElements.findIndex((e) => e.id === id);
 
     let nextId: number | null = null;
@@ -939,7 +940,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
 
         {/* Lightbox Modal */}
         <LightboxModal
-          elements={getFilteredElements()}
+          elements={getVisibleElementsForLightbox()}
           currentElementId={lightboxElementId}
           isOpen={lightboxOpen}
           onClose={closeLightbox}
