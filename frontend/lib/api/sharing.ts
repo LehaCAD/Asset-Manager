@@ -59,6 +59,9 @@ export const sharingApi = {
   setReaction: (token: string, data: { element_id: number; session_id: string; value: string | null; author_name?: string }) =>
     publicClient.post(`/api/sharing/public/${token}/reactions/`, data),
 
+  submitReview: (token: string, data: { element_id: number; action: string; session_id: string; author_name: string }) =>
+    publicClient.post(`/api/sharing/public/${token}/review/`, data).then(r => r.data),
+
   // Reactions — authenticated (creator workspace)
   getElementReactions: (elementId: number) =>
     apiClient.get<PublicElementReaction[]>(`/api/sharing/elements/${elementId}/reactions/`).then(r => r.data),

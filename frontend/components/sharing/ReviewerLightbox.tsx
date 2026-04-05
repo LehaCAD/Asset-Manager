@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useCallback, useState, useRef } from 'react'
-import { X, Download, ExternalLink, MessageCircle, Video, Image, ThumbsUp, ThumbsDown } from 'lucide-react'
+import { X, Download, ExternalLink, MessageCircle, Video, Image, ThumbsUp, ThumbsDown, Check, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { LightboxNavigation } from '@/components/lightbox/LightboxNavigation'
@@ -142,6 +142,30 @@ export function ReviewerLightbox({
     onReact(current.id, value)
   }
 
+  const handleReview = async (action: string) => {
+    if (!reviewerName) {
+      toast.error('Введите имя для оценки')
+      return
+    }
+    if (!current) return
+    try {
+      await sharingApi.submitReview(token, {
+        element_id: current.id,
+        action,
+        session_id: sessionId,
+        author_name: reviewerName,
+      })
+      const actionLabels: Record<string, string> = {
+        approved: 'Согласовано',
+        changes_requested: 'Отправлено на доработку',
+        rejected: 'Отклонено',
+      }
+      toast.success(actionLabels[action] || action)
+    } catch {
+      toast.error('Ошибка при отправке оценки')
+    }
+  }
+
   if (!isOpen || !current) return null
 
   const comments = commentsMap[current.id] || []
@@ -214,20 +238,20 @@ export function ReviewerLightbox({
           <div className="mt-3 flex items-center gap-1.5">
             {/* Reactions */}
             <button
-              onClick={() => hasIdentity ? handleReaction('like') : undefined}
+              onClick={() => handleReaction('like')}
               className={cn(
                 'flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium transition-all',
                 reactionsMap[current.id] === 'like'
                   ? 'bg-emerald-500/20 text-emerald-500'
                   : 'bg-card text-muted-foreground hover:text-emerald-500 hover:bg-emerald-500/10'
               )}
-              aria-label="Нравится"
+              aria-label="Нравитс��"
             >
               <ThumbsUp className="h-4.5 w-4.5" />
               {(current.likes ?? 0) > 0 && <span>{current.likes}</span>}
             </button>
             <button
-              onClick={() => hasIdentity ? handleReaction('dislike') : undefined}
+              onClick={() => handleReaction('dislike')}
               className={cn(
                 'flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium transition-all',
                 reactionsMap[current.id] === 'dislike'
@@ -256,6 +280,31 @@ export function ReviewerLightbox({
                 </a>
               </>
             )}
+
+            {/* Review actions */}
+            <div className="flex items-center gap-1.5 ml-4 border-l border-border pl-4">
+              <button
+                onClick={() => handleReview('approved')}
+                className="rounded-md px-3 py-1.5 text-xs font-medium bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+              >
+                <Check className="w-3.5 h-3.5 inline mr-1" />
+                Согласовано
+              </button>
+              <button
+                onClick={() => handleReview('changes_requested')}
+                className="rounded-md px-3 py-1.5 text-xs font-medium bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 transition-colors"
+              >
+                <RotateCcw className="w-3.5 h-3.5 inline mr-1" />
+                На доработку
+              </button>
+              <button
+                onClick={() => handleReview('rejected')}
+                className="rounded-md px-3 py-1.5 text-xs font-medium bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
+              >
+                <X className="w-3.5 h-3.5 inline mr-1" />
+                Отклонено
+              </button>
+            </div>
           </div>
 
         </div>

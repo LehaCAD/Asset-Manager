@@ -93,6 +93,7 @@ function ElementCard({
   myReaction: string | null
   onReact: (elementId: number, value: 'like' | 'dislike') => void
 }) {
+  const [imgError, setImgError] = useState(false)
   const isVideo = element.element_type === 'VIDEO'
   const hasLikes = (element.likes ?? 0) > 0
   const hasDislikes = (element.dislikes ?? 0) > 0
@@ -108,13 +109,20 @@ function ElementCard({
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick() }}
         className={`group relative rounded-t-md overflow-hidden bg-muted cursor-pointer ${aspectRatioClass}`}
       >
-        <img
-          src={element.thumbnail_url || element.file_url}
-          alt=""
-          className={`w-full h-full ${fitModeClass} transition-transform duration-150 group-hover:scale-[1.02]`}
-          loading="lazy"
-          decoding="async"
-        />
+        {imgError ? (
+          <div className="w-full h-full flex items-center justify-center bg-muted">
+            <ImageOff className="w-8 h-8 text-muted-foreground/30" />
+          </div>
+        ) : (
+          <img
+            src={element.thumbnail_url || element.file_url}
+            alt=""
+            className={`w-full h-full ${fitModeClass} transition-transform duration-150 group-hover:scale-[1.02]`}
+            loading="lazy"
+            decoding="async"
+            onError={() => setImgError(true)}
+          />
+        )}
 
         {/* Hover overlay */}
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-150" />
@@ -146,14 +154,28 @@ function ElementCard({
           </button>
         </div>
 
-        {/* Comment badge — top-left */}
-        {commentCount > 0 && (
-          <div className="absolute top-2 left-2 flex items-center gap-1 bg-black/60 text-white text-xs rounded-full px-2 py-0.5 z-10">
-            <MessageCircle className="w-3 h-3" />
-            {commentCount}
-          </div>
-        )}
+        {/* Top-left badges */}
+        <div className="absolute top-2 left-2 flex items-center gap-1 z-10">
+          {element.source_type === 'GENERATED' && (
+            <div className="bg-black/60 text-white text-xs rounded-full px-2 py-0.5 font-medium">
+              AI
+            </div>
+          )}
+          {commentCount > 0 && (
+            <div className="flex items-center gap-1 bg-black/60 text-white text-xs rounded-full px-2 py-0.5">
+              <MessageCircle className="w-3 h-3" />
+              {commentCount}
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Filename below image */}
+      {element.original_filename && (
+        <div className="px-2 py-1 text-xs text-muted-foreground truncate bg-card border border-t-0 border-border border-b-0">
+          {element.original_filename}
+        </div>
+      )}
 
       {/* Action bar BELOW the image — always visible, not overlapping */}
       <div className="flex items-center rounded-b-md bg-card border border-t-0 border-border px-2 py-1.5">
@@ -328,7 +350,7 @@ export default function PublicSharePage() {
 
   // Check if user is authenticated — use their identity and hide CTA
   useEffect(() => {
-    const hasToken = document.cookie.includes('access_token=') || !!localStorage.getItem('auth-storage')
+    const hasToken = /(?:^|;\s*)access_token=/.test(document.cookie) || !!localStorage.getItem('auth-storage')
     setIsAuthenticated(hasToken)
     if (hasToken) {
       try {
