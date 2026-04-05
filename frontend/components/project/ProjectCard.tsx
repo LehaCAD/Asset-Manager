@@ -145,8 +145,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="cursor-pointer"
-                  onSelect={async (e) => {
-                    e.preventDefault();
+                  onSelect={async () => {
                     setShareLoading(true);
                     try {
                       const els = await sharingApi.getProjectElements(project.id);
