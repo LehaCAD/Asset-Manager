@@ -157,7 +157,7 @@ function ElementCard({
         {/* Top-left badges */}
         <div className="absolute top-2 left-2 flex items-center gap-1 z-10">
           {element.source_type === 'GENERATED' && (
-            <div className="bg-black/60 text-white text-xs rounded-full px-2 py-0.5 font-medium">
+            <div className="bg-black/60 text-white text-[11px] rounded-md px-2 py-1 font-bold leading-none">
               AI
             </div>
           )}
@@ -223,15 +223,6 @@ function ElementCard({
           {hasDislikes && <span>{element.dislikes}</span>}
         </button>
 
-        {commentCount > 0 && (
-          <>
-            <div className="flex-1" />
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <MessageCircle className="w-3.5 h-3.5" />
-              {commentCount}
-            </span>
-          </>
-        )}
       </div>
     </div>
   )
