@@ -52,7 +52,7 @@ class PublicCommentThrottle(AnonRateThrottle):
 
 
 class PublicReactionThrottle(AnonRateThrottle):
-    rate = '60/min'
+    rate = '600/min'  # Practically unlimited — reactions are lightweight toggle operations
 
 
 @api_view(['GET'])

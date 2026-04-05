@@ -394,13 +394,21 @@ export default function PublicSharePage() {
         }
         setCommentsMap(map)
 
-        // Initialize reactionsMap from element reactions data
-        const sid = localStorage.getItem('reviewer_session_id') || ''
-        if (sid) {
+        // Initialize reactionsMap — resolve effective session_id the same way
+        // as the identity effect: auth user → user.id, guest → reviewer_session_id
+        let effectiveSid = ''
+        try {
+          const authData = JSON.parse(localStorage.getItem('auth-storage') || '{}')
+          effectiveSid = authData?.state?.user?.id?.toString() || ''
+        } catch { /* ignore */ }
+        if (!effectiveSid) {
+          effectiveSid = localStorage.getItem('reviewer_session_id') || ''
+        }
+        if (effectiveSid) {
           const rMap: Record<number, string | null> = {}
           const allEls = [...data.ungrouped_elements, ...data.scenes.flatMap(s => s.elements)]
           for (const el of allEls) {
-            const myReaction = el.reactions?.find(r => r.session_id === sid)
+            const myReaction = el.reactions?.find(r => r.session_id === effectiveSid)
             rMap[el.id] = myReaction?.value ?? null
           }
           setReactionsMap(rMap)
