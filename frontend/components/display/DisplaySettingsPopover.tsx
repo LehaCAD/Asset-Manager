@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Eye, Grid3x3, LayoutGrid, Square, RectangleHorizontal, RectangleVertical, Maximize, Shrink } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useDisplayStore } from "@/lib/store/project-display";
 import { cn } from "@/lib/utils";
@@ -153,6 +154,19 @@ export function DisplaySettingsPopover() {
                 <span className="text-[9px] font-medium">Целиком</span>
               </OptionButton>
             </div>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-border" />
+
+          {/* Metadata toggle */}
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Доп. данные</span>
+            <Switch
+              checked={preferences.showMetadata}
+              onCheckedChange={(checked) => updatePreferences({ showMetadata: checked })}
+              className="scale-75"
+            />
           </div>
         </div>
       </PopoverContent>
