@@ -166,7 +166,7 @@ SceneWorkspace
 - `docs/COMPONENT_INVENTORY.md` — инвентаризация всех 60 React-компонентов
 - `docs/BACKLOG_IDEAS.md` — бэклог UI/UX идей
 - `.claude/skills/pen-to-code/` — скилл переноса дизайна из pen в код
-- `.claude/skills/ux-analysis/` — скилл UX-анализа перед реализацией
+- `.claude/skills/ux-analysis/` — автономный UX-лид: impact analysis, research, mockup'ы в pen, gate перед writing-plans
 
 ## Документация
 

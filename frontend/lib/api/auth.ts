@@ -46,4 +46,50 @@ export const authApi = {
       throw normalizeError(error);
     }
   },
+
+  async verifyEmail(token: string): Promise<{ message: string }> {
+    try {
+      const { data } = await apiClient.get<{ message: string }>(
+        `/api/auth/verify-email/?token=${token}`
+      );
+      return data;
+    } catch (error) {
+      throw normalizeError(error);
+    }
+  },
+
+  async resendVerification(): Promise<{ message: string }> {
+    try {
+      const { data } = await apiClient.post<{ message: string }>(
+        '/api/auth/resend-verification/'
+      );
+      return data;
+    } catch (error) {
+      throw normalizeError(error);
+    }
+  },
+
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    try {
+      const { data } = await apiClient.post<{ message: string }>(
+        '/api/auth/forgot-password/',
+        { email }
+      );
+      return data;
+    } catch (error) {
+      throw normalizeError(error);
+    }
+  },
+
+  async resetPassword(token: string, password: string, password_confirm: string): Promise<{ message: string }> {
+    try {
+      const { data } = await apiClient.post<{ message: string }>(
+        '/api/auth/reset-password/',
+        { token, password, password_confirm }
+      );
+      return data;
+    } catch (error) {
+      throw normalizeError(error);
+    }
+  },
 };

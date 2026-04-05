@@ -41,6 +41,9 @@ services:
     container_name: apom_backend
     restart: always
     command: daphne -b 0.0.0.0 -p 8000 config.asgi:application
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     volumes:
       - upload_staging:/app/tmp_uploads
     expose:
@@ -69,6 +72,14 @@ services:
       - REDIS_HOST=${REDIS_HOST}
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
       - SENTRY_DSN=${SENTRY_DSN:-}
+      - EMAIL_BACKEND=${EMAIL_BACKEND:-django.core.mail.backends.smtp.EmailBackend}
+      - EMAIL_HOST=${EMAIL_HOST:-smtp.yandex.ru}
+      - EMAIL_PORT=${EMAIL_PORT:-587}
+      - EMAIL_USE_TLS=${EMAIL_USE_TLS:-True}
+      - EMAIL_HOST_USER=${EMAIL_HOST_USER:-}
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD:-}
+      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL:-}
+      - FRONTEND_URL=${FRONTEND_URL:-https://raskadrawka.ru}
     depends_on:
       db:
         condition: service_healthy
@@ -84,6 +95,9 @@ services:
     container_name: apom_celery
     restart: always
     command: celery -A config worker -l info --concurrency=2 --max-memory-per-child=300000
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     volumes:
       - upload_staging:/app/tmp_uploads
     deploy:
@@ -108,6 +122,14 @@ services:
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
       - REDIS_HOST=${REDIS_HOST}
       - SENTRY_DSN=${SENTRY_DSN:-}
+      - EMAIL_BACKEND=${EMAIL_BACKEND:-django.core.mail.backends.smtp.EmailBackend}
+      - EMAIL_HOST=${EMAIL_HOST:-smtp.yandex.ru}
+      - EMAIL_PORT=${EMAIL_PORT:-587}
+      - EMAIL_USE_TLS=${EMAIL_USE_TLS:-True}
+      - EMAIL_HOST_USER=${EMAIL_HOST_USER:-}
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD:-}
+      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL:-}
+      - FRONTEND_URL=${FRONTEND_URL:-https://raskadrawka.ru}
     depends_on:
       - backend
       - redis

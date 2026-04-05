@@ -19,7 +19,7 @@ import { useScenesStore } from "@/lib/store/scenes";
 import { useSceneWorkspaceStore } from "@/lib/store/scene-workspace";
 import { useUIStore } from "@/lib/store/ui";
 import { toast } from "sonner";
-import { Upload, Plus, X, Folder, FolderOpen, ChevronRight, ChevronDown } from "lucide-react";
+import { Upload, Plus, X, Folder, FolderOpen, ChevronRight, ChevronDown, FileImage } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MAX_FILE_SIZE_MB } from "@/lib/utils/constants";
 import type { Element, ElementType, ModalSelectionByScene, ElementFilter, Scene } from "@/lib/types";
@@ -241,12 +241,12 @@ export function ElementSelectionModal({
     }
   }, [isOpen, currentSceneId, initialSelection]);
 
-  // Load elements when active scene changes
+  // Load elements when active scene changes (0 = project root)
   useEffect(() => {
-    if (isOpen && activeSceneId) {
-      void loadElements(activeSceneId);
+    if (isOpen && (activeSceneId || activeSceneId === 0)) {
+      void loadElements(activeSceneId, projectId);
     }
-  }, [isOpen, activeSceneId, loadElements]);
+  }, [isOpen, activeSceneId, projectId, loadElements]);
 
   // Calculate filter counts
   const filterCounts = useMemo(() => {
@@ -359,10 +359,10 @@ export function ElementSelectionModal({
 
       enqueueUploads(activeSceneId, validFiles);
       setTimeout(() => {
-        void loadElements(activeSceneId);
+        void loadElements(activeSceneId, projectId);
       }, 500);
     },
-    [activeSceneId, enqueueUploads, loadElements]
+    [activeSceneId, projectId, enqueueUploads, loadElements]
   );
 
   // Dropzone setup
@@ -428,6 +428,23 @@ export function ElementSelectionModal({
             <p className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider px-2 mb-1.5">
               Группы
             </p>
+            {/* Project root entry */}
+            <button
+              type="button"
+              onClick={() => setActiveSceneId(0)}
+              className={cn(
+                "w-full flex items-center gap-1.5 py-1.5 rounded-md text-xs transition-colors text-left",
+                activeSceneId === 0
+                  ? "bg-primary/15 text-foreground font-medium"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              )}
+              style={{ paddingLeft: "8px", paddingRight: "8px" }}
+            >
+              <span className="w-4 shrink-0" />
+              <FileImage className={cn("w-3.5 h-3.5 shrink-0", activeSceneId === 0 && "text-primary")} />
+              <span className="truncate">Корень проекта</span>
+            </button>
+
             {groupTree.length === 0 ? (
               <p className="text-xs text-muted-foreground px-2 py-4">Нет групп</p>
             ) : (
@@ -450,9 +467,13 @@ export function ElementSelectionModal({
             {/* Active group name + filters */}
             <div className="px-4 py-2.5 border-b shrink-0 flex items-center gap-3">
               <div className="flex items-center gap-1.5 mr-2">
-                <Folder className="w-3.5 h-3.5 text-muted-foreground" />
+                {activeSceneId === 0 ? (
+                  <FileImage className="w-3.5 h-3.5 text-muted-foreground" />
+                ) : (
+                  <Folder className="w-3.5 h-3.5 text-muted-foreground" />
+                )}
                 <span className="text-sm font-medium truncate max-w-[200px]">
-                  {activeGroup?.name ?? "..."}
+                  {activeSceneId === 0 ? "Корень проекта" : (activeGroup?.name ?? "...")}
                 </span>
               </div>
               <ElementFilters

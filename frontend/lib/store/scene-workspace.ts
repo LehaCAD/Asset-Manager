@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { scenesApi } from "@/lib/api/scenes";
 import { elementsApi } from "@/lib/api/elements";
 import { projectsApi } from "@/lib/api/projects";
-import { clientUploadFile, PresignOrphanError } from "@/lib/utils/client-upload";
+import { clientUploadFile, PresignOrphanError, preloadImage } from "@/lib/utils/client-upload";
 import { toast } from "sonner";
 import type {
   Scene,
@@ -123,123 +123,151 @@ interface QueuedUpload {
   objectUrl: string;
 }
 
-let uploadQueue: QueuedUpload[] = [];
-let currentUploadController: AbortController | null = null;
-let isProcessingQueue = false;
+const MAX_CONCURRENT_UPLOADS = 10;
+let activeUploads = 0;
+let pendingQueue: QueuedUpload[] = [];
+/** Maps tempId → AbortController for in-flight uploads (enables per-element cancel) */
+const uploadControllers = new Map<number, AbortController>();
 
-async function processUploadQueue() {
-  if (isProcessingQueue) return;
-  isProcessingQueue = true;
-
-  while (uploadQueue.length > 0) {
-    const item = uploadQueue[0];
-    const controller = new AbortController();
-    currentUploadController = controller;
-
-    try {
-      let element;
-      // Track which ID to update — starts as tempId, switches to real after _replaceOptimistic
-      let trackingId = item.tempId;
-      try {
-        // New presigned upload flow
-        element = await clientUploadFile(
-          item.file,
-          {
-            sceneId: item.sceneId > 0 ? item.sceneId : undefined,
-            projectId: item.projectId,
-            signal: controller.signal,
-          },
-          (thumbElement) => {
-            // Replace optimistic element as soon as thumbnail is ready
-            useSceneWorkspaceStore.getState()._replaceOptimistic(item.tempId, thumbElement);
-            trackingId = thumbElement.id;
-          },
-          (phase, progress) => {
-            useSceneWorkspaceStore.getState().updateElement(trackingId, {
-              client_upload_phase: phase,
-              client_upload_progress: Math.round(progress),
-            });
-          },
-        );
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          throw error; // Don't fallback on cancel
-        }
-        // Clean up orphaned presign element before fallback
-        if (error instanceof PresignOrphanError) {
-          elementsApi.delete(error.elementId).catch(() => {});
-        }
-        // Fallback to old FormData flow (with progress tracking)
-        console.warn("Client upload failed, falling back to server upload:", error);
-        const fallbackProgress = (pct: number) => {
-          useSceneWorkspaceStore.getState().updateElement(trackingId, {
-            client_upload_phase: "upload_full",
-            client_upload_progress: Math.round(pct * 0.9), // 0–90%, last 10% = server processing
-          });
-        };
-        element = item.sceneId > 0
-          ? await scenesApi.upload(item.sceneId, item.file, { signal: controller.signal, onUploadProgress: fallbackProgress })
-          : await projectsApi.uploadToProject(item.projectId, item.file, { signal: controller.signal, onUploadProgress: fallbackProgress });
-      }
-      // Use trackingId: after presigned thumbnail it's the real ID, otherwise still tempId
-      useSceneWorkspaceStore.getState()._replaceOptimistic(trackingId, element);
-
-      // Race condition fix: WS COMPLETED may have arrived while we waited for HTTP response
-      // (element still had tempId → WS event was ignored), or WS event may be lost entirely.
-      // Poll with increasing delays to catch up.
-      if (element.status === "PROCESSING" || element.status === "UPLOADING") {
-        const pollId = element.id;
-        const delays = [500, 3000, 8000, 15000]; // escalating poll
-        const pollOnce = (attempt: number) => {
-          if (attempt >= delays.length) return;
-          setTimeout(() => {
-            const current = useSceneWorkspaceStore.getState().elements.find((e) => e.id === pollId);
-            // Stop polling if element is already terminal or gone
-            if (!current || current.status === "COMPLETED" || current.status === "FAILED") return;
-            elementsApi.getById(pollId).then((fresh) => {
-              if (fresh.status === "COMPLETED" || fresh.status === "FAILED") {
-                useSceneWorkspaceStore.getState().updateElement(fresh.id, {
-                  ...fresh,
-                  client_upload_phase: undefined,
-                  client_upload_progress: undefined,
-                });
-              } else {
-                pollOnce(attempt + 1);
-              }
-            }).catch(() => pollOnce(attempt + 1));
-          }, delays[attempt]);
-        };
-        pollOnce(0);
-      }
-      // Blob URL revocation is handled by the store (updateElement/removeElement)
-    } catch (error) {
-      if (isAbortLikeError(error)) {
-        break;
-      }
-      useSceneWorkspaceStore.getState().removeElement(item.tempId);
-      const message =
-        error instanceof Error ? error.message : "Не удалось загрузить файл";
-      toast.error(message);
-    } finally {
-      currentUploadController = null;
-      uploadQueue.shift();
-    }
-  }
-
-  isProcessingQueue = false;
+export function getActiveUploadCount(): number {
+  return activeUploads + pendingQueue.length;
 }
 
-function cancelUploadQueue() {
-  const pendingItems = [...uploadQueue];
-  uploadQueue = [];
-  if (currentUploadController) {
-    currentUploadController.abort();
-    currentUploadController = null;
+function tryStartNext() {
+  while (activeUploads < MAX_CONCURRENT_UPLOADS && pendingQueue.length > 0) {
+    const item = pendingQueue.shift()!;
+    activeUploads++;
+    const controller = new AbortController();
+    uploadControllers.set(item.tempId, controller);
+    processOneUpload(item, controller).finally(() => {
+      activeUploads = Math.max(0, activeUploads - 1);
+      uploadControllers.delete(item.tempId);
+      tryStartNext();
+    });
   }
+}
 
+/** Cancel a single upload by tempId. Called from deleteElements for negative IDs. */
+function cancelSingleUpload(tempId: number) {
+  // Check pending queue first
+  const pendingIdx = pendingQueue.findIndex((q) => q.tempId === tempId);
+  if (pendingIdx !== -1) {
+    pendingQueue.splice(pendingIdx, 1);
+    return;
+  }
+  // Check in-flight uploads
+  const controller = uploadControllers.get(tempId);
+  if (controller) {
+    controller.abort();
+  }
+}
+
+async function processOneUpload(item: QueuedUpload, controller: AbortController) {
+  try {
+    let element;
+    let trackingId = item.tempId;
+    try {
+      element = await clientUploadFile(
+        item.file,
+        {
+          sceneId: item.sceneId > 0 ? item.sceneId : undefined,
+          projectId: item.projectId,
+          signal: controller.signal,
+        },
+        (thumbElement) => {
+          // Update trackingId to real server ID, but keep blob URLs visible
+          // (no visual swap until final complete)
+          const store = useSceneWorkspaceStore.getState();
+          const current = store.elements.find((e) => e.id === item.tempId);
+          store._replaceOptimistic(item.tempId, {
+            ...thumbElement,
+            // Preserve blob URLs — they look the same as S3 thumbnails
+            file_url: current?.file_url || thumbElement.file_url,
+            thumbnail_url: current?.thumbnail_url || thumbElement.thumbnail_url,
+            preview_url: current?.preview_url || thumbElement.preview_url,
+          });
+          trackingId = thumbElement.id;
+        },
+        (phase, progress) => {
+          useSceneWorkspaceStore.getState().updateElement(trackingId, {
+            client_upload_phase: phase,
+            client_upload_progress: Math.round(progress),
+          });
+        },
+      );
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw error;
+      }
+      if (error instanceof PresignOrphanError) {
+        elementsApi.delete(error.elementId).catch(() => {});
+      }
+      console.warn("Client upload failed, falling back to server upload:", error);
+      const fallbackProgress = (pct: number) => {
+        useSceneWorkspaceStore.getState().updateElement(trackingId, {
+          client_upload_phase: "upload_full",
+          client_upload_progress: Math.round(pct * 0.9),
+        });
+      };
+      element = item.sceneId > 0
+        ? await scenesApi.upload(item.sceneId, item.file, { signal: controller.signal, onUploadProgress: fallbackProgress })
+        : await projectsApi.uploadToProject(item.projectId, item.file, { signal: controller.signal, onUploadProgress: fallbackProgress });
+    }
+
+    // Preload S3 preview into browser cache BEFORE swapping — eliminates flash
+    if (element.status === "COMPLETED" && element.preview_url) {
+      await preloadImage(element.preview_url);
+    }
+
+    useSceneWorkspaceStore.getState()._replaceOptimistic(trackingId, element);
+
+    // Race condition fix: WS COMPLETED may have arrived while we waited for HTTP response
+    if (element.status === "PROCESSING" || element.status === "UPLOADING") {
+      const pollId = element.id;
+      const delays = [500, 3000, 8000, 15000];
+      const pollOnce = (attempt: number) => {
+        if (attempt >= delays.length) return;
+        setTimeout(() => {
+          const current = useSceneWorkspaceStore.getState().elements.find((e) => e.id === pollId);
+          if (!current || current.status === "COMPLETED" || current.status === "FAILED") return;
+          elementsApi.getById(pollId).then((fresh) => {
+            if (fresh.status === "COMPLETED" || fresh.status === "FAILED") {
+              useSceneWorkspaceStore.getState().updateElement(fresh.id, {
+                ...fresh,
+                client_upload_phase: undefined,
+                client_upload_progress: undefined,
+              });
+            } else {
+              pollOnce(attempt + 1);
+            }
+          }).catch(() => pollOnce(attempt + 1));
+        }, delays[attempt]);
+      };
+      pollOnce(0);
+    }
+  } catch (error) {
+    if (isAbortLikeError(error)) return;
+    useSceneWorkspaceStore.getState().removeElement(item.tempId);
+    const message = error instanceof Error ? error.message : "Не удалось загрузить файл";
+    toast.error(message);
+  }
+}
+
+function cancelUploadQueue(showToast = false) {
+  const totalCancelled = pendingQueue.length + uploadControllers.size;
+  const pending = [...pendingQueue];
+  pendingQueue = [];
   const store = useSceneWorkspaceStore.getState();
-  for (const item of pendingItems) {
+  for (const item of pending) {
     store.removeElement(item.tempId);
+  }
+  for (const [, ctrl] of uploadControllers) {
+    ctrl.abort();
+  }
+  if (showToast && totalCancelled > 0) {
+    toast.info(totalCancelled === 1
+      ? "Загрузка файла отменена"
+      : `Загрузка ${totalCancelled} файлов отменена`);
   }
 }
 // ── End upload queue ────────────────────────────────────────────────────
@@ -284,7 +312,7 @@ interface SceneWorkspaceState {
   reorderElements: (ids: number[]) => Promise<void>;
   enqueueUploads: (sceneId: number, files: File[], projectId?: number) => void;
   cancelUploads: () => void;
-  resetWorkspace: () => void;
+  resetWorkspace: (showToast?: boolean) => void;
 
   /** @internal replace optimistic element with server response */
   _replaceOptimistic: (tempId: number, real: Element) => void;
@@ -423,12 +451,6 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
     set((state) => ({
       elements: state.elements.map((e) => {
         if (e.id !== id) return e;
-        if (updates.file_url && e.file_url?.startsWith("blob:")) {
-          URL.revokeObjectURL(e.file_url);
-        }
-        if (updates.thumbnail_url && e.thumbnail_url?.startsWith("blob:")) {
-          URL.revokeObjectURL(e.thumbnail_url);
-        }
         return { ...e, ...updates };
       }),
     }));
@@ -467,6 +489,8 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
       source_type: "GENERATED",
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+      approval_status: null,
+      original_filename: "",
       client_optimistic_kind: "generation",
       client_generation_submit_state: "submitting",
     };
@@ -570,6 +594,13 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
     const localIds = elementIds.filter((id) => id < 0);
     const remoteIds = elementIds.filter((id) => id >= 0);
 
+    // Cancel uploads for local (optimistic) elements before removing
+    if (localIds.length > 0) {
+      for (const id of localIds) {
+        cancelSingleUpload(id);
+      }
+    }
+
     if (localIds.length > 0 && remoteIds.length === 0) {
       // All local — just remove from state
       const idsSet = new Set(localIds);
@@ -580,7 +611,7 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
         selectedIds: nextSelected,
         isMultiSelectMode: nextSelected.size > 0,
       });
-      if (!options?.silent) toast.success(localIds.length === 1 ? "Элемент удалён" : `Удалено: ${localIds.length}`);
+      if (!options?.silent) toast.success(localIds.length === 1 ? "Загрузка отменена" : `Отменено: ${localIds.length}`);
       return;
     }
 
@@ -699,7 +730,6 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
     for (const file of files) {
       const tempId = -Date.now() - Math.floor(Math.random() * 10000);
       const isVideo = file.type.startsWith("video/");
-      const objectUrl = URL.createObjectURL(file);
       currentOrderMax += 1;
 
       const optimistic: WorkspaceElement = {
@@ -708,8 +738,8 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
         project: get().projectId ?? 0,
         element_type: isVideo ? "VIDEO" : "IMAGE",
         order_index: currentOrderMax,
-        file_url: objectUrl,
-        thumbnail_url: isVideo ? "" : objectUrl,
+        file_url: "",
+        thumbnail_url: "",
         preview_url: "",
         is_favorite: false,
         prompt_text: "",
@@ -721,37 +751,26 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
         source_type: "UPLOADED",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
+        approval_status: null,
+        original_filename: file.name,
         client_optimistic_kind: "upload",
         client_upload_phase: "resize",
         client_upload_progress: 0,
       };
 
       get().addElement(optimistic);
-      uploadQueue.push({ sceneId, projectId: projectId ?? get().projectId ?? 0, file, tempId, objectUrl });
-
-      if (isVideo) {
-        const tid = tempId;
-        captureVideoFrame(file).then((dataUrl) => {
-          if (dataUrl) {
-            get().updateElement(tid, { thumbnail_url: dataUrl });
-          }
-        });
-      }
+      pendingQueue.push({ sceneId, projectId: projectId ?? get().projectId ?? 0, file, tempId, objectUrl: "" });
     }
 
-    processUploadQueue();
+    tryStartNext();
   },
 
   cancelUploads: () => {
     cancelUploadQueue();
   },
 
-  resetWorkspace: () => {
-    cancelUploadQueue();
-    for (const el of get().elements) {
-      if (el.file_url?.startsWith("blob:")) URL.revokeObjectURL(el.file_url);
-      if (el.thumbnail_url?.startsWith("blob:")) URL.revokeObjectURL(el.thumbnail_url);
-    }
+  resetWorkspace: (showToast?: boolean) => {
+    cancelUploadQueue(showToast);
     set({
       scene: null,
       elements: [],

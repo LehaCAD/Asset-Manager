@@ -10,7 +10,8 @@ import { ChargeIcon } from "@/components/ui/charge-icon";
 import type { CabinetTransaction, PaginatedResponse } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, CheckCircle2, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
 
 function defaultRange(): DateRange {
   const now = new Date();
@@ -27,6 +28,7 @@ function dateRangeToParams(range: DateRange | undefined) {
 export default function BalancePage() {
   const [data, setData] = useState<PaginatedResponse<CabinetTransaction> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [page, setPage] = useState(1);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(defaultRange);
   const balance = useCreditsStore((s) => s.balance);
@@ -35,15 +37,25 @@ export default function BalancePage() {
   useEffect(() => { loadBalance(); }, [loadBalance]);
 
   /* Only fetch top-up transactions */
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     setLoading(true);
-    getTransactions({
-      page,
-      reason: "admin_topup",
-      ...dateRangeToParams(dateRange),
-    })
-      .then(setData)
-      .finally(() => setLoading(false));
+    if (page === 1) setError(false);
+    try {
+      const result = await getTransactions({
+        page,
+        reason: "admin_topup",
+        ...dateRangeToParams(dateRange),
+      });
+      setData(result);
+    } catch {
+      if (page === 1) {
+        setError(true);
+      } else {
+        toast.error("Не удалось загрузить данные");
+      }
+    } finally {
+      setLoading(false);
+    }
   }, [page, dateRange]);
 
   useEffect(() => { load(); }, [load]);
@@ -80,6 +92,22 @@ export default function BalancePage() {
         <h2 className="text-base font-semibold text-foreground">История пополнений</h2>
         <DateRangePicker value={dateRange} onChange={setDateRange} />
       </div>
+
+      {error ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="h-10 w-10 rounded-md bg-destructive/10 flex items-center justify-center mb-3">
+            <AlertCircle className="h-5 w-5 text-destructive" />
+          </div>
+          <p className="text-sm font-medium text-foreground">Не удалось загрузить данные</p>
+          <p className="text-xs text-muted-foreground mt-1">Попробуйте обновить страницу</p>
+          <button
+            onClick={() => { setError(false); load(); }}
+            className="mt-3 px-3 py-1.5 text-xs rounded-sm bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            Повторить
+          </button>
+        </div>
+      ) : <>
 
       <div className="rounded-md border border-border bg-card shadow-[var(--shadow-card)] overflow-hidden">
         <table className="w-full text-xs">
@@ -162,6 +190,8 @@ export default function BalancePage() {
           )}
         </div>
       )}
+
+      </>}
     </div>
   );
 }

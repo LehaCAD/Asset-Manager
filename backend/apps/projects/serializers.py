@@ -44,7 +44,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         return getattr(obj, '_storage_bytes', None) or 0
 
     def get_preview_thumbnails(self, obj) -> list[str]:
-        """First 4 element thumbnail URLs across all project scenes."""
+        """First 4 element preview URLs (800px) across all project scenes."""
         from apps.elements.models import Element
         if hasattr(obj, '_preview_elements'):
             elements = obj._preview_elements[:4]
@@ -56,7 +56,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 file_url=''
             ).order_by('-created_at')[:4]
         return [
-            e.thumbnail_url or e.file_url
+            e.preview_url or e.thumbnail_url or e.file_url
             for e in elements
             if e.file_url
         ]

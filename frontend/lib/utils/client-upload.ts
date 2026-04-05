@@ -84,6 +84,8 @@ export async function clientUploadFile(
     const thumbnailElement = await uploadApi.complete(element_id, "thumbnail");
     report("upload_thumb", 25);
 
+    // Pass server element to caller for ID tracking only — don't swap URLs yet.
+    // Blob URL stays visible until final complete (no intermediate flash).
     if (onThumbnailReady) {
       onThumbnailReady(thumbnailElement);
     }
@@ -125,8 +127,27 @@ export async function clientUploadFile(
 }
 
 /**
- * Upload blob to S3 via presigned PUT using XHR (supports progress events).
+ * Preload an image URL into browser cache.
+ * Resolves when loaded or after 5s timeout. Non-critical — always resolves.
  */
+export function preloadImage(url: string): Promise<void> {
+  return new Promise((resolve) => {
+    if (!url) { resolve(); return; }
+    const img = new Image();
+    img.onload = () => resolve();
+    img.onerror = () => resolve();
+    setTimeout(() => resolve(), 5000);
+    img.src = url;
+  });
+}
+
+/**
+ * Upload blob to S3 via presigned PUT using XHR.
+ * Retries up to 3 times with exponential backoff on transient errors.
+ * HTTP 403 (expired URL) and abort are never retried.
+ */
+const RETRY_DELAYS = [1000, 3000, 5000];
+
 function putToS3(
   url: string,
   body: Blob | File,
@@ -134,40 +155,74 @@ function putToS3(
   signal?: AbortSignal,
   onProgress?: (percent: number) => void,
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("PUT", url);
-    xhr.setRequestHeader("Content-Type", contentType);
+  let attempt = 0;
 
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable && onProgress) {
-        onProgress((e.loaded / e.total) * 100);
+  const tryOnce = (): Promise<void> =>
+    new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", url);
+      xhr.setRequestHeader("Content-Type", contentType);
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && onProgress) {
+          onProgress((e.loaded / e.total) * 100);
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          onProgress?.(100);
+          resolve();
+        } else {
+          reject(new Error(`S3 upload failed: ${xhr.status}`));
+        }
+      };
+
+      xhr.onerror = () => reject(new Error("S3 upload network error"));
+      xhr.ontimeout = () => reject(new Error("S3 upload timeout"));
+
+      if (signal) {
+        if (signal.aborted) {
+          xhr.abort();
+          reject(new DOMException("Aborted", "AbortError"));
+          return;
+        }
+        signal.addEventListener("abort", () => xhr.abort(), { once: true });
+        xhr.onabort = () => reject(new DOMException("Aborted", "AbortError"));
       }
-    };
 
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        onProgress?.(100);
-        resolve();
-      } else {
-        reject(new Error(`S3 upload failed: ${xhr.status}`));
+      xhr.send(body);
+    });
+
+  const run = async (): Promise<void> => {
+    while (true) {
+      try {
+        return await tryOnce();
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") throw err;
+        // Don't retry non-retriable HTTP errors (403 = expired URL)
+        const msg = err instanceof Error ? err.message : "";
+        if (msg.includes("403") || msg.includes("401")) throw err;
+
+        if (attempt < RETRY_DELAYS.length) {
+          const delay = RETRY_DELAYS[attempt];
+          attempt++;
+          onProgress?.(0);
+          // Abort-aware sleep
+          await new Promise<void>((resolve, reject) => {
+            const timer = setTimeout(resolve, delay);
+            if (signal) {
+              const onAbort = () => { clearTimeout(timer); reject(new DOMException("Aborted", "AbortError")); };
+              if (signal.aborted) { clearTimeout(timer); reject(new DOMException("Aborted", "AbortError")); return; }
+              signal.addEventListener("abort", onAbort, { once: true });
+            }
+          });
+        } else {
+          throw err;
+        }
       }
-    };
-
-    xhr.onerror = () => reject(new Error("S3 upload network error"));
-    xhr.ontimeout = () => reject(new Error("S3 upload timeout"));
-
-    // Wire up AbortSignal
-    if (signal) {
-      if (signal.aborted) {
-        xhr.abort();
-        reject(new DOMException("Aborted", "AbortError"));
-        return;
-      }
-      signal.addEventListener("abort", () => xhr.abort(), { once: true });
-      xhr.onabort = () => reject(new DOMException("Aborted", "AbortError"));
     }
+  };
 
-    xhr.send(body);
-  });
+  return run();
 }

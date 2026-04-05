@@ -18,6 +18,7 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [tosAccepted, setTosAccepted] = useState(false);
 
   const setTokens = useAuthStore((s) => s.setTokens);
   const setUser = useAuthStore((s) => s.setUser);
@@ -47,6 +48,7 @@ export default function RegisterPage() {
         username: username.trim(),
         email: email.trim(),
         password,
+        tos_accepted: tosAccepted,
       });
       setTokens(tokens.access, tokens.refresh);
 
@@ -147,10 +149,31 @@ export default function RegisterPage() {
               />
             </div>
 
+            <div className="flex items-start gap-2.5">
+              <input
+                type="checkbox"
+                id="tos"
+                checked={tosAccepted}
+                onChange={(e) => setTosAccepted(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-border accent-primary cursor-pointer"
+                disabled={isLoading}
+              />
+              <label htmlFor="tos" className="text-sm text-muted-foreground cursor-pointer leading-snug">
+                Я принимаю{' '}
+                <Link href="/terms" className="text-foreground underline hover:no-underline" target="_blank">
+                  Условия использования
+                </Link>
+                {' '}и{' '}
+                <Link href="/privacy" className="text-foreground underline hover:no-underline" target="_blank">
+                  Политику конфиденциальности
+                </Link>
+              </label>
+            </div>
+
             <Button
               type="submit"
               className="w-full mt-2"
-              disabled={isLoading}
+              disabled={!tosAccepted || isLoading}
             >
               {isLoading ? (
                 <>

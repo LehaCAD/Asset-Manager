@@ -18,14 +18,20 @@ class RegisterSerializer(serializers.ModelSerializer):
         required=False,
         style={'input_type': 'password'},
     )
+    tos_accepted = serializers.BooleanField(write_only=True)
 
     class Meta:
         model = User
-        fields = ('username', 'email', 'password', 'password_confirm')
+        fields = ('username', 'email', 'password', 'password_confirm', 'tos_accepted')
 
     def validate_email(self, value: str) -> str:
         if User.objects.filter(email=value).exists():
             raise serializers.ValidationError("Пользователь с таким email уже существует.")
+        return value
+
+    def validate_tos_accepted(self, value):
+        if not value:
+            raise serializers.ValidationError('Необходимо принять условия использования')
         return value
 
     def validate(self, attrs: dict) -> dict:
@@ -36,18 +42,20 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data: dict) -> User:
         validated_data.pop('password_confirm', None)
+        validated_data.pop('tos_accepted', None)
         user = User.objects.create_user(**validated_data)
         return user
 
 
 class UserSerializer(serializers.ModelSerializer):
     """Сериализатор данных пользователя."""
-    
+
     quota = serializers.SerializerMethodField()
+    is_email_verified = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'quota', 'created_at', 'updated_at')
+        fields = ('id', 'username', 'email', 'is_email_verified', 'quota', 'created_at', 'updated_at')
         read_only_fields = ('id', 'created_at', 'updated_at')
     
     def get_quota(self, obj: User) -> dict:
@@ -96,3 +104,19 @@ class UserSerializer(serializers.ModelSerializer):
             'storage_limit_bytes': user_quota.storage_limit_bytes,
             'storage_used_bytes': storage_used,
         }
+
+
+class ForgotPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    token = serializers.UUIDField()
+    password = serializers.CharField(min_length=8, write_only=True)
+    password_confirm = serializers.CharField(min_length=8, write_only=True)
+
+    def validate(self, data):
+        if data['password'] != data['password_confirm']:
+            raise serializers.ValidationError({'password_confirm': 'Пароли не совпадают'})
+        validate_password(data['password'])
+        return data

@@ -137,6 +137,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
             upload_keys=result['upload_keys'],
             prompt_text=request.data.get('prompt_text', ''),
             order_index=current_count,
+            original_filename=request.data.get('filename', ''),
         )
 
         return Response({

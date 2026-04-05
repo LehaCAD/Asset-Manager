@@ -265,7 +265,7 @@ def get_analytics(
         tx_qs.filter(element__ai_model__isnull=False)
         .values('element__ai_model_id', 'element__ai_model__name')
         .annotate(amount=Sum(Abs('amount')), count=Count('id'))
-        .order_by('-amount')[:5]
+        .order_by('-amount')
     )
     spending_by_model = [
         ModelSpending(
@@ -288,7 +288,7 @@ def get_analytics(
                 0,
             ),
         )
-        .order_by('-amount')[:5]
+        .order_by('-amount')
     )
     spending_by_project = [
         ProjectSpending(
