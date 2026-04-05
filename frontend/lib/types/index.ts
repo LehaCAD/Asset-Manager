@@ -149,6 +149,7 @@ export interface Element {
   updated_at: string;
   approval_status: ApprovalStatus | null;
   original_filename: string;
+  review_summary?: { action: string; author_name: string } | null;
 }
 
 export type UploadPhase = "resize" | "presign" | "upload_thumb" | "upload_full" | "completing";
@@ -370,6 +371,12 @@ export interface PublicElementReaction {
   value: 'like' | 'dislike'
 }
 
+export interface PublicElementReview {
+  session_id: string
+  author_name: string
+  action: 'approved' | 'changes_requested' | 'rejected'
+}
+
 export interface PublicElement {
   id: number
   element_type: ElementType
@@ -380,6 +387,7 @@ export interface PublicElement {
   likes?: number
   dislikes?: number
   reactions?: PublicElementReaction[]
+  reviews?: PublicElementReview[]
   comments?: Comment[]
   source_type?: ElementSource;
   original_filename?: string;

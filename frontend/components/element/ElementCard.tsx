@@ -29,10 +29,10 @@ import {
 
 const PHASE_LABELS: Record<string, string> = {
   resize: "Подготовка...",
-  presign: "Подключение...",
-  upload_thumb: "Миниатюра...",
-  upload_full: "Загрузка...",
-  completing: "Сохранение...",
+  presign: "Подготовка...",
+  upload_thumb: "Загружаем...",
+  upload_full: "Загружаем...",
+  completing: "Почти готово...",
 };
 
 const APPROVAL_STATUSES = [
@@ -92,6 +92,8 @@ export interface ElementCardProps {
   onUpdateStatus?: (id: number, status: string | null) => void;
   onRename?: (id: number, currentName: string) => void;
   onMove?: (id: number) => void;
+  // Review indicator from reviewer
+  reviewSummary?: { action: string; author_name: string } | null;
 }
 
 export function ElementCard({
@@ -113,6 +115,7 @@ export function ElementCard({
   onUpdateStatus,
   onRename,
   onMove,
+  reviewSummary,
 }: ElementCardProps) {
   const isProcessing = element.status === "PENDING" || element.status === "PROCESSING";
   const hasUploadProgress = element.client_upload_phase != null && (element.client_upload_progress ?? 0) < 100;
@@ -236,33 +239,39 @@ export function ElementCard({
     >
       {/* Thumbnail area — has aspect ratio */}
       <div className={cn("relative overflow-hidden", aspectClass)}>
-        {/* Media layer — never render <video> elements; use thumbnail or placeholder */}
-        {isVideo ? (
-          videoThumbnailSrc ? (
+        {/* Media layer — show image only when COMPLETED, gray placeholder otherwise */}
+        {element.status === "COMPLETED" ? (
+          isVideo ? (
+            videoThumbnailSrc ? (
+              <img
+                src={videoThumbnailSrc}
+                alt={`Видео ${index + 1}`}
+                loading="lazy"
+                decoding="async"
+                className={cn("absolute inset-0 w-full h-full bg-muted", fitClass)}
+              />
+            ) : (
+              <div className="absolute inset-0 bg-muted flex items-center justify-center">
+                <Video className="w-12 h-12 text-muted-foreground/30" />
+              </div>
+            )
+          ) : mediaSrc ? (
             <img
-              src={videoThumbnailSrc}
-              alt={`Видео ${index + 1}`}
+              src={mediaSrc}
+              alt={`Элемент ${index + 1}`}
               loading="lazy"
               decoding="async"
               className={cn("absolute inset-0 w-full h-full bg-muted", fitClass)}
             />
           ) : (
             <div className="absolute inset-0 bg-muted flex items-center justify-center">
-              <Video className="w-12 h-12 text-muted-foreground/30" />
+              <Image className="w-8 h-8 text-muted-foreground/40" />
             </div>
           )
-        ) : mediaSrc ? (
-          <img
-            src={mediaSrc}
-            alt={`Элемент ${index + 1}`}
-            loading="lazy"
-            decoding="async"
-            className={cn("absolute inset-0 w-full h-full bg-muted", fitClass)}
-          />
+        ) : isFailed ? (
+          <div className="absolute inset-0 bg-muted" />
         ) : (
-          <div className="absolute inset-0 bg-muted flex items-center justify-center">
-            <Image className="w-8 h-8 text-muted-foreground/40" />
-          </div>
+          <div className="absolute inset-0 bg-muted" />
         )}
 
         {/* Selection overlay - checkbox badge */}
@@ -563,7 +572,7 @@ export function ElementCard({
             </DropdownMenu>
           </div>
 
-          {/* Row 2: status dropdown */}
+          {/* Row 2: status dropdown + review indicator */}
           <div className="flex items-center gap-2">
             <span className="text-[11px] text-muted-foreground shrink-0">Статус</span>
             <DropdownMenu>
@@ -589,6 +598,18 @@ export function ElementCard({
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
+            {/* Review indicator from reviewer */}
+            {reviewSummary && (
+              <div className={cn(
+                "ml-auto inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium",
+                reviewSummary.action === 'approved' && "bg-[#22C55E]/10 text-[#4ADE80]",
+                reviewSummary.action === 'changes_requested' && "bg-[#F97316]/10 text-[#FB923C]",
+                reviewSummary.action === 'rejected' && "bg-[#EF4444]/10 text-[#F87171]",
+              )}>
+                <span>{reviewSummary.action === 'approved' ? '✓' : reviewSummary.action === 'changes_requested' ? '↻' : '✕'}</span>
+                <span className="truncate max-w-[60px]">{reviewSummary.author_name || 'Гость'}</span>
+              </div>
+            )}
           </div>
         </div>
       )}

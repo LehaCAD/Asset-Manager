@@ -45,6 +45,13 @@ interface ReviewerLightboxProps {
   onCommentAdded: (elementId: number, comment: Comment) => void
   reactionsMap: Record<number, string | null>
   onReact: (elementId: number, value: 'like' | 'dislike') => void
+  // Identity — single source of truth from parent
+  reviewerName: string
+  sessionId: string
+  onIdentitySaved?: (name: string, sid: string) => void
+  // Review state
+  reviewMap: Record<number, string | null>
+  onReviewChanged: (elementId: number, action: string | null) => void
 }
 
 // ── Component ───────────────────────────────────────────────
@@ -60,20 +67,15 @@ export function ReviewerLightbox({
   onCommentAdded,
   reactionsMap,
   onReact,
+  reviewerName,
+  sessionId,
+  onIdentitySaved,
+  reviewMap,
+  onReviewChanged,
 }: ReviewerLightboxProps) {
-  const [reviewerName, setReviewerName] = useState('')
-  const [sessionId, setSessionId] = useState('')
   const [mobileCommentsOpen, setMobileCommentsOpen] = useState(false)
   const [reviewLoading, setReviewLoading] = useState(false)
-  // Track review decision per element: elementId → 'approved' | 'changes_requested' | 'rejected' | null
-  const [reviewMap, setReviewMap] = useState<Record<number, string | null>>({})
   const activeThumbRef = useRef<HTMLButtonElement>(null)
-
-  // Load reviewer identity from localStorage
-  useEffect(() => {
-    setReviewerName(localStorage.getItem('reviewer_name') || '')
-    setSessionId(localStorage.getItem('reviewer_session_id') || '')
-  }, [])
 
   const current = elements[currentIndex]
   const isVideo = current?.element_type === 'VIDEO'
@@ -122,8 +124,7 @@ export function ReviewerLightbox({
   }, [currentIndex])
 
   const handleNameSave = (name: string, sid: string) => {
-    setReviewerName(name)
-    setSessionId(sid)
+    onIdentitySaved?.(name, sid)
   }
 
   const handleCommentSubmit = async (text: string, parentId?: number) => {
@@ -154,23 +155,16 @@ export function ReviewerLightbox({
     }
     if (!current || reviewLoading) return
 
-    // Toggle: if same action is already active, deselect (no API call)
-    const currentReview = reviewMap[current.id] ?? null
-    if (currentReview === action) {
-      setReviewMap((prev) => ({ ...prev, [current.id]: null }))
-      return
-    }
-
     setReviewLoading(true)
     try {
-      await sharingApi.submitReview(token, {
+      const res = await sharingApi.submitReview(token, {
         element_id: current.id,
         action,
         session_id: sessionId,
         author_name: reviewerName,
       })
-      // Set active state — mutually exclusive
-      setReviewMap((prev) => ({ ...prev, [current.id]: action }))
+      // Use server response as source of truth
+      onReviewChanged(current.id, res.action ?? null)
     } catch {
       toast.error('Ошибка при отправке оценки')
     } finally {

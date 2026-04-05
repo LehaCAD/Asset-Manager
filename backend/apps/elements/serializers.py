@@ -13,6 +13,7 @@ class ElementSerializer(serializers.ModelSerializer):
     source_type_display = serializers.SerializerMethodField()
     file_size = serializers.IntegerField(read_only=True, allow_null=True)
     generation_cost = serializers.SerializerMethodField()
+    review_summary = serializers.SerializerMethodField()
 
     class Meta:
         model = Element
@@ -43,11 +44,12 @@ class ElementSerializer(serializers.ModelSerializer):
             'generation_cost',
             'approval_status',
             'original_filename',
+            'review_summary',
             'preview_url',
             'created_at',
             'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'external_task_id']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'external_task_id', 'review_summary']
 
     def get_scene_name(self, obj) -> str:
         """Получение названия сцены."""
@@ -78,6 +80,15 @@ class ElementSerializer(serializers.ModelSerializer):
     def get_generation_cost(self, obj) -> str | None:
         val = getattr(obj, '_generation_cost', None)
         return str(val) if val else None
+
+    def get_review_summary(self, obj):
+        """Return worst-wins review: rejected > changes_requested > approved."""
+        reviews = list(obj.reviews.all())  # uses prefetch cache
+        if not reviews:
+            return None
+        priority = {'rejected': 0, 'changes_requested': 1, 'approved': 2}
+        worst = min(reviews, key=lambda r: priority.get(r.action, 99))
+        return {'action': worst.action, 'author_name': worst.author_name}
 
 
 class ReorderSerializer(serializers.Serializer):

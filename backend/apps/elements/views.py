@@ -64,7 +64,7 @@ class ElementViewSet(viewsets.ModelViewSet):
         """Возвращает только элементы проектов текущего пользователя с фильтрацией."""
         queryset = Element.objects.filter(
             project__user=self.request.user
-        ).select_related('project', 'scene', 'ai_model')
+        ).select_related('project', 'scene', 'ai_model').prefetch_related('reviews')
 
         # Фильтрация по scene через query params
         scene_id = self.request.query_params.get('scene')

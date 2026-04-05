@@ -327,6 +327,9 @@ export default function PublicSharePage() {
   const [reactionsMap, setReactionsMap] = useState<Record<number, string | null>>({})
   const [sessionId, setSessionId] = useState('')
 
+  // Review state: elementId -> 'approved' | 'changes_requested' | 'rejected' | null
+  const [reviewMap, setReviewMap] = useState<Record<number, string | null>>({})
+
   // Authenticated user detection — skip name input & CTA
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
@@ -412,6 +415,14 @@ export default function PublicSharePage() {
             rMap[el.id] = myReaction?.value ?? null
           }
           setReactionsMap(rMap)
+
+          // Initialize reviewMap from element reviews data
+          const rvMap: Record<number, string | null> = {}
+          for (const el of allEls) {
+            const myReview = el.reviews?.find(r => r.session_id === effectiveSid)
+            rvMap[el.id] = myReview?.action ?? null
+          }
+          setReviewMap(rvMap)
         }
       })
       .catch((err) => {
@@ -449,10 +460,36 @@ export default function PublicSharePage() {
   )
 
   const handleCommentAdded = useCallback((elementId: number, comment: Comment) => {
-    setCommentsMap((prev) => ({
-      ...prev,
-      [elementId]: [...(prev[elementId] || []), comment],
-    }))
+    setCommentsMap((prev) => {
+      const existing = prev[elementId] || []
+
+      // If reply, nest under parent comment
+      if (comment.parent) {
+        const nestReply = (comments: Comment[]): Comment[] =>
+          comments.map((c) => {
+            if (c.id === comment.parent) {
+              return { ...c, replies: [...(c.replies || []), comment] }
+            }
+            if (c.replies?.length) {
+              return { ...c, replies: nestReply(c.replies) }
+            }
+            return c
+          })
+        return { ...prev, [elementId]: nestReply(existing) }
+      }
+
+      // Top-level comment — append
+      return { ...prev, [elementId]: [...existing, comment] }
+    })
+  }, [])
+
+  const handleReviewChanged = useCallback((elementId: number, action: string | null) => {
+    setReviewMap((prev) => ({ ...prev, [elementId]: action }))
+  }, [])
+
+  const handleIdentitySaved = useCallback((name: string, sid: string) => {
+    setReviewerName(name)
+    setSessionId(sid)
   }, [])
 
   const hasIdentity = !!reviewerName && !!sessionId
@@ -642,6 +679,11 @@ export default function PublicSharePage() {
         onCommentAdded={handleCommentAdded}
         reactionsMap={reactionsMap}
         onReact={handleCardReaction}
+        reviewerName={reviewerName}
+        sessionId={sessionId}
+        onIdentitySaved={handleIdentitySaved}
+        reviewMap={reviewMap}
+        onReviewChanged={handleReviewChanged}
       />
     </div>
   )

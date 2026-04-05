@@ -33,7 +33,7 @@ import { toDndId, parseDndId } from "@/lib/utils/dnd";
 import { elementsApi } from "@/lib/api/elements";
 import { scenesApi } from "@/lib/api/scenes";
 import { cn } from "@/lib/utils";
-import { DISPLAY_GRID_CONFIG, CARD_SIZES } from "@/lib/utils/constants";
+import { DISPLAY_GRID_CONFIG, CARD_SIZES, GROUP_CARD_SIZES } from "@/lib/utils/constants";
 import type { DragItem, DisplayCardSize, DisplayAspectRatio, Scene } from "@/lib/types";
 import { toast } from "sonner";
 
@@ -52,6 +52,8 @@ function SortableGroupCard({
   onSelect,
   onClick,
   onDelete,
+  onRename,
+  onShare,
   size,
 }: {
   dndId: string;
@@ -62,6 +64,8 @@ function SortableGroupCard({
   onSelect: (id: number, add: boolean) => void;
   onClick: (id: number) => void;
   onDelete: (id: number) => void;
+  onRename?: (id: number) => void;
+  onShare?: (id: number) => void;
   size: DisplayCardSize;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: dndId });
@@ -69,7 +73,6 @@ function SortableGroupCard({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.4 : 1,
-    flexShrink: 0,
   };
 
   return (
@@ -82,6 +85,8 @@ function SortableGroupCard({
         onSelect={onSelect}
         onClick={onClick}
         onDelete={onDelete}
+        onRename={onRename}
+        onShare={onShare}
         size={size}
       />
     </div>
@@ -124,6 +129,8 @@ interface ElementGridProps {
   groups?: Scene[];
   onGroupClick?: (id: number) => void;
   onGroupDelete?: (id: number) => void;
+  onGroupRename?: (id: number) => void;
+  onGroupShare?: (id: number) => void;
   shareMode?: boolean;
   shareSelectedIds?: Set<number>;
   onShareToggle?: (id: number) => void;
@@ -131,7 +138,7 @@ interface ElementGridProps {
   onMove?: (id: number) => void;
 }
 
-export function ElementGrid({ className, onRequestDelete, groups = [], onGroupClick, onGroupDelete, shareMode, shareSelectedIds, onShareToggle, onRename, onMove }: ElementGridProps) {
+export function ElementGrid({ className, onRequestDelete, groups = [], onGroupClick, onGroupDelete, onGroupRename, onGroupShare, shareMode, shareSelectedIds, onShareToggle, onRename, onMove }: ElementGridProps) {
   const {
     getFilteredElements,
     selectedIds,
@@ -159,6 +166,7 @@ export function ElementGrid({ className, onRequestDelete, groups = [], onGroupCl
   // Get display configuration в зависимости от size И aspect ratio
   const gridConfig = DISPLAY_GRID_CONFIG[preferences.size][preferences.aspectRatio];
   const cardSize = preferences.size;
+  const groupDims = GROUP_CARD_SIZES[preferences.size];
 
   // DnD sensors
   const sensors = useSensors(
@@ -375,7 +383,10 @@ export function ElementGrid({ className, onRequestDelete, groups = [], onGroupCl
             />
             {!collapsedSections.groups && (
               <SortableContext items={prefixedGroupIds} strategy={rectSortingStrategy}>
-                <div className="flex gap-3 overflow-x-auto overflow-y-hidden py-1">
+                <div
+                  className="grid gap-4 py-1"
+                  style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${groupDims.stackWidth}px, 1fr))` }}
+                >
                   {sortedGroups.map((group) => {
                     const dndId = toDndId('group', group.id);
                     return (
@@ -391,6 +402,8 @@ export function ElementGrid({ className, onRequestDelete, groups = [], onGroupCl
                         }}
                         onClick={onGroupClick ?? (() => {})}
                         onDelete={onGroupDelete ?? (() => {})}
+                        onRename={onGroupRename}
+                        onShare={onGroupShare}
                         size={preferences.size}
                       />
                     );
@@ -431,6 +444,7 @@ export function ElementGrid({ className, onRequestDelete, groups = [], onGroupCl
                       aspectRatio={preferences.aspectRatio}
                       fitMode={preferences.fitMode}
                       showMetadata={preferences.showMetadata}
+                      reviewSummary={element.review_summary}
                       isSelected={shareMode ? (shareSelectedIds?.has(element.id) ?? false) : selectedIds.has(element.id)}
                       isMultiSelectMode={shareMode || isMultiSelectMode}
                       {...cardCallbacks}
