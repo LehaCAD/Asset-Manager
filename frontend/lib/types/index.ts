@@ -210,6 +210,19 @@ export interface ReorderItem {
   id: number;
 }
 
+// DnD prefixed ID types — prevent collision between group.id and element.id
+export type DragItemType = 'element' | 'group';
+
+export interface DragItem {
+  type: DragItemType;
+  id: number;
+}
+
+export interface SectionCollapseState {
+  groups: boolean;
+  elements: boolean;
+}
+
 export interface SetHeadlinerPayload {
   element_id: number;
 }
@@ -345,6 +358,12 @@ export interface PublicProject {
   }
 }
 
+export interface PublicElementReaction {
+  session_id: string
+  author_name: string
+  value: 'like' | 'dislike'
+}
+
 export interface PublicElement {
   id: number
   element_type: ElementType
@@ -353,6 +372,7 @@ export interface PublicElement {
   comment_count: number
   likes?: number
   dislikes?: number
+  reactions?: PublicElementReaction[]
   comments?: Comment[]
 }
 

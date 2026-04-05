@@ -101,6 +101,14 @@ export const CARD_SIZES = {
   },
 } as const;
 
+// GroupCard sizes — scales with display size setting, but ignores aspect ratio.
+// Always landscape-ish proportions for consistent group row height.
+export const GROUP_CARD_SIZES = {
+  compact: { width: 180, height: 130 },
+  medium:  { width: 220, height: 155 },
+  large:   { width: 280, height: 190 },
+} as const;
+
 // Размеры иконок для каждого размера карточки
 export const CARD_ICON_SIZES = {
   compact: {
