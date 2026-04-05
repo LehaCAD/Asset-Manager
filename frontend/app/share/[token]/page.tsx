@@ -115,7 +115,7 @@ function ElementCard({
           </div>
         ) : (
           <img
-            src={element.thumbnail_url || element.file_url}
+            src={element.preview_url || element.thumbnail_url || element.file_url}
             alt=""
             className={`w-full h-full ${fitModeClass} transition-transform duration-150 group-hover:scale-[1.02]`}
             loading="lazy"

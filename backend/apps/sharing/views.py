@@ -96,6 +96,7 @@ def public_share_view(request, token):
             'element_type': el.element_type,
             'file_url': el.file_url or '',
             'thumbnail_url': el.thumbnail_url or '',
+            'preview_url': el.preview_url or '',
             'comment_count': el.comment_count,  # from annotation
             'source_type': el.source_type,
             'original_filename': getattr(el, 'original_filename', ''),

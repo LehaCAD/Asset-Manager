@@ -375,6 +375,7 @@ export interface PublicElement {
   element_type: ElementType
   file_url: string
   thumbnail_url: string
+  preview_url?: string
   comment_count: number
   likes?: number
   dislikes?: number
