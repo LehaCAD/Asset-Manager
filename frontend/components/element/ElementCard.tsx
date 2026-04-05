@@ -306,60 +306,45 @@ export function ElementCard({
 
         {/* Top-right badges: star + type + AI (hidden during upload — Cancel × takes this spot) */}
         <div className={cn("absolute top-2 right-2 z-40 flex items-center gap-1", isUploading && "hidden")}>
+          {/* AI badge - only for GENERATED */}
+          {element.source_type === "GENERATED" && (
+            <div className="rounded-md bg-black/60 backdrop-blur-sm h-6 w-6 flex items-center justify-center">
+              <span className="text-white font-bold leading-none text-[10px]">AI</span>
+            </div>
+          )}
+
           {/* Star - hover for empty, always for filled */}
           <button
             type="button"
             onPointerDown={handleControlPointerDown}
             onClick={handleToggleFavoriteClick}
             className={cn(
-              "rounded-md bg-black/60 p-1.5 transition-opacity duration-150",
-              element.is_favorite ? "opacity-100" : "hidden"
+              "rounded-md bg-black/60 backdrop-blur-sm h-6 w-6 flex items-center justify-center transition-opacity duration-150",
+              element.is_favorite ? "opacity-100" : "opacity-0 group-hover:opacity-100"
             )}
             title={element.is_favorite ? "Убрать из избранного" : "В избранное"}
           >
-            <Star className={cn(BADGE_MD.icon, "text-white", element.is_favorite && "fill-amber-400 text-amber-400")} />
+            <Star className={cn(BADGE_SM.icon, "text-white", element.is_favorite && "fill-amber-400 text-amber-400")} />
           </button>
 
           {/* Media type - always visible */}
-          <div className="rounded-md bg-black/60 p-1.5">
+          <div className="rounded-md bg-black/60 backdrop-blur-sm h-6 w-6 flex items-center justify-center">
             {isVideo ? (
               <Video className={cn(BADGE_SM.icon, "text-white")} />
             ) : (
               <Image className={cn(BADGE_SM.icon, "text-white")} />
             )}
           </div>
-
-          {/* AI pill - only for GENERATED */}
-          {element.source_type === "GENERATED" && (
-            <div className="rounded-md bg-black/60 p-1.5 flex items-center">
-              <span className="text-white font-bold leading-none text-[11px]">AI</span>
-            </div>
-          )}
         </div>
-
-        {/* Bottom-left: Play for video */}
-        {isVideo && element.status === 'COMPLETED' && (
-          <div className="absolute bottom-2 left-2 z-30 rounded-md bg-black/60 p-1.5">
-            <Play className={cn(BADGE_SM.icon, "text-white fill-white")} />
-          </div>
-        )}
 
         {/* Comment count badge — always visible */}
         {element.comment_count != null && element.comment_count > 0 && element.status === 'COMPLETED' && (
-          <div className={cn(
-            "absolute bottom-2 z-30 flex items-center gap-1",
-            isVideo && element.status === 'COMPLETED' ? "left-10" : "left-2"
-          )}>
-            <div className={cn(
-              "rounded-md bg-black/60 backdrop-blur-sm flex items-center gap-1",
-              element.comment_count > 1 ? "h-6 px-1.5" : "h-6 w-6 justify-center"
-            )}>
+          <div className="absolute bottom-2 left-2 z-30">
+            <div className="rounded-md bg-black/60 backdrop-blur-sm h-6 px-1.5 flex items-center gap-1">
               <MessageCircle className={cn(BADGE_SM.icon, "text-white")} />
-              {element.comment_count > 1 && (
-                <span className="text-[11px] font-semibold text-white">
-                  {element.comment_count > 99 ? '99+' : element.comment_count}
-                </span>
-              )}
+              <span className="text-[11px] font-semibold text-white">
+                {element.comment_count > 99 ? '99+' : element.comment_count}
+              </span>
             </div>
           </div>
         )}

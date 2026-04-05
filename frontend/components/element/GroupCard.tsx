@@ -146,64 +146,62 @@ export function GroupCard({
           </div>
         </div>
 
-        {/* ⋯ Menu — top right on preview, on hover */}
-        <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-20" data-no-navigate>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="secondary"
-                size="icon"
-                className="h-7 w-7 bg-background/80 backdrop-blur-sm hover:bg-background shadow-sm"
-                aria-label="Действия"
-                onPointerDown={handleControlPointerDown}
-                onClick={blockNav}
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44" onClick={blockNav}>
-              {onRename && (
-                <DropdownMenuItem
-                  className="cursor-pointer"
-                  onSelect={(e) => { e.preventDefault(); e.stopPropagation(); onRename(group.id); }}
-                >
-                  <Pencil className="mr-2 h-3.5 w-3.5" />
-                  Переименовать
-                </DropdownMenuItem>
-              )}
-              {onShare && (
-                <DropdownMenuItem
-                  className="cursor-pointer"
-                  onSelect={() => { onShare(group.id); }}
-                >
-                  <Share2 className="mr-2 h-3.5 w-3.5" />
-                  Поделиться
-                </DropdownMenuItem>
-              )}
-              {(onRename || onShare) && onDelete && <DropdownMenuSeparator />}
-              {onDelete && (
-                <DropdownMenuItem
-                  className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
-                  onSelect={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(group.id); }}
-                >
-                  <Trash2 className="mr-2 h-3.5 w-3.5" />
-                  Удалить
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-
         {/* Footer */}
-        <div className="p-3 space-y-1.5 border-t border-border">
-          <span
-            className="block text-sm font-medium line-clamp-1 text-foreground group-hover:text-primary transition-colors"
-          >
-            {group.name}
-          </span>
-          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-muted-foreground">
+        <div className="px-3.5 py-3 space-y-1.5 border-t border-border">
+          <div className="flex items-center justify-between gap-2 min-w-0">
+            <span className="block text-base font-medium line-clamp-1 text-foreground group-hover:text-primary transition-colors flex-1 min-w-0">
+              {group.name}
+            </span>
+            <div className="shrink-0" data-no-navigate>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 hover:bg-muted"
+                    aria-label="Действия"
+                    onPointerDown={handleControlPointerDown}
+                    onClick={blockNav}
+                  >
+                    <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44" onClick={blockNav}>
+                  {onRename && (
+                    <DropdownMenuItem
+                      className="cursor-pointer"
+                      onSelect={(e) => { e.preventDefault(); e.stopPropagation(); onRename(group.id); }}
+                    >
+                      <Pencil className="mr-2 h-3.5 w-3.5" />
+                      Переименовать
+                    </DropdownMenuItem>
+                  )}
+                  {onShare && (
+                    <DropdownMenuItem
+                      className="cursor-pointer"
+                      onSelect={() => { onShare(group.id); }}
+                    >
+                      <Share2 className="mr-2 h-3.5 w-3.5" />
+                      Поделиться
+                    </DropdownMenuItem>
+                  )}
+                  {(onRename || onShare) && onDelete && <DropdownMenuSeparator />}
+                  {onDelete && (
+                    <DropdownMenuItem
+                      className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
+                      onSelect={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(group.id); }}
+                    >
+                      <Trash2 className="mr-2 h-3.5 w-3.5" />
+                      Удалить
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
             <span className="flex items-center gap-0.5">
-              <Layers className="h-2.5 w-2.5" />
+              <Layers className="h-3 w-3" />
               {elementCount}
             </span>
             {group.total_spent && parseFloat(group.total_spent) > 0 && (
@@ -219,7 +217,7 @@ export function GroupCard({
               <>
                 <span className="text-muted-foreground/40">·</span>
                 <span className="flex items-center gap-0.5">
-                  <HardDrive className="h-2.5 w-2.5" />
+                  <HardDrive className="h-3 w-3" />
                   {formatStorage(group.storage_bytes!)}
                 </span>
               </>

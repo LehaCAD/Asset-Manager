@@ -112,75 +112,76 @@ export function ProjectCard({ project }: ProjectCardProps) {
             );
           })()}
 
-          {/* Actions menu */}
-          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity" data-no-navigate>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  className="h-7 w-7 bg-background/80 backdrop-blur-sm hover:bg-background shadow-sm"
-                  aria-label="Действия"
-                  onPointerDown={blockCardNavigation}
-                  onClick={blockCardNavigation}
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="w-44"
-                onClick={blockCardNavigation}
-              >
-                <DropdownMenuItem
-                  className="cursor-pointer"
-                  onSelect={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setSettingsOpen(true);
-                  }}
-                >
-                  <Pencil className="mr-2 h-3.5 w-3.5" />
-                  Редактировать
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="cursor-pointer"
-                  onSelect={async () => {
-                    setShareLoading(true);
-                    try {
-                      const els = await sharingApi.getProjectElements(project.id);
-                      if (els.length === 0) { toast.error('В проекте нет элементов'); return; }
-                      setShareElements(els);
-                      setShareOpen(true);
-                    } catch { toast.error('Не удалось загрузить элементы'); }
-                    finally { setShareLoading(false); }
-                  }}
-                >
-                  <Share2 className="mr-2 h-3.5 w-3.5" />
-                  {shareLoading ? 'Загрузка...' : 'Поделиться'}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
-                  onSelect={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setDeleteOpen(true);
-                  }}
-                >
-                  <Trash2 className="mr-2 h-3.5 w-3.5" />
-                  Удалить
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
         </div>
 
         {/* Footer */}
         <div className="px-3.5 py-3 space-y-1.5 border-t border-border">
-          <h3 className="text-base font-medium leading-tight line-clamp-1 group-hover:text-primary transition-colors">
-            {project.name}
-          </h3>
+          <div className="flex items-center justify-between gap-2 min-w-0">
+            <h3 className="text-base font-medium leading-tight line-clamp-1 group-hover:text-primary transition-colors flex-1 min-w-0">
+              {project.name}
+            </h3>
+            <div data-no-navigate className="shrink-0">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 hover:bg-muted"
+                    aria-label="Действия"
+                    onPointerDown={blockCardNavigation}
+                    onClick={blockCardNavigation}
+                  >
+                    <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  className="w-44"
+                  onClick={blockCardNavigation}
+                >
+                  <DropdownMenuItem
+                    className="cursor-pointer"
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setSettingsOpen(true);
+                    }}
+                  >
+                    <Pencil className="mr-2 h-3.5 w-3.5" />
+                    Редактировать
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="cursor-pointer"
+                    onSelect={async () => {
+                      setShareLoading(true);
+                      try {
+                        const els = await sharingApi.getProjectElements(project.id);
+                        if (els.length === 0) { toast.error('В проекте нет элементов'); return; }
+                        setShareElements(els);
+                        setShareOpen(true);
+                      } catch { toast.error('Не удалось загрузить элементы'); }
+                      finally { setShareLoading(false); }
+                    }}
+                  >
+                    <Share2 className="mr-2 h-3.5 w-3.5" />
+                    {shareLoading ? 'Загрузка...' : 'Поделиться'}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setDeleteOpen(true);
+                    }}
+                  >
+                    <Trash2 className="mr-2 h-3.5 w-3.5" />
+                    Удалить
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
           <div className="flex flex-wrap gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground items-center">
             <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${statusConfig?.color ?? "bg-muted-foreground"}`} />
             <span>{statusConfig?.label ?? project.status}</span>
