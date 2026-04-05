@@ -93,6 +93,7 @@ class Comment(models.Model):
     session_id = models.CharField(max_length=36, default='')
     text = models.TextField(max_length=2000)
     is_read = models.BooleanField(default=False)
+    is_system = models.BooleanField(default=False, verbose_name='Системный комментарий')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

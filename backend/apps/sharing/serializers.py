@@ -10,9 +10,9 @@ class CommentSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'scene', 'element', 'parent',
             'author_name', 'author_user', 'session_id',
-            'text', 'is_read', 'created_at', 'replies',
+            'text', 'is_read', 'is_system', 'created_at', 'replies',
         ]
-        read_only_fields = ['id', 'created_at', 'is_read', 'replies']
+        read_only_fields = ['id', 'created_at', 'is_read', 'is_system', 'replies']
 
     def get_replies(self, obj):
         if obj.replies.exists():
@@ -89,6 +89,8 @@ class PublicElementSerializer(serializers.Serializer):
     file_url = serializers.CharField()
     thumbnail_url = serializers.CharField()
     comment_count = serializers.IntegerField()
+    source_type = serializers.CharField()
+    original_filename = serializers.CharField()
 
 
 class PublicSceneSerializer(serializers.Serializer):

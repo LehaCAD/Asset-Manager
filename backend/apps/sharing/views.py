@@ -97,6 +97,8 @@ def public_share_view(request, token):
             'file_url': el.file_url or '',
             'thumbnail_url': el.thumbnail_url or '',
             'comment_count': el.comment_count,  # from annotation
+            'source_type': el.source_type,
+            'original_filename': getattr(el, 'original_filename', ''),
             'likes': el.likes,
             'dislikes': el.dislikes,
             'reactions': [
@@ -197,6 +199,60 @@ def public_comment_view(request, token):
         logger.warning(f'Failed to send comment notification: {e}')
 
     return Response(CommentSerializer(comment).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@throttle_classes([PublicCommentThrottle])
+def public_review_action(request, token):
+    """Reviewer submits approval action — creates system comment."""
+    try:
+        link = SharedLink.objects.select_related('project').get(token=token)
+    except SharedLink.DoesNotExist:
+        return Response({'error': 'Ссылка не найдена'}, status=404)
+
+    if link.is_expired():
+        return Response({'error': 'Ссылка истекла'}, status=410)
+
+    element_id = request.data.get('element_id')
+    action = request.data.get('action')
+    session_id = request.data.get('session_id', '')
+    author_name = request.data.get('author_name', '')
+
+    if not element_id or not action:
+        return Response({'error': 'element_id and action required'}, status=400)
+
+    if action not in ('approved', 'changes_requested', 'rejected'):
+        return Response({'error': 'Invalid action'}, status=400)
+
+    # Verify element belongs to shared link's project
+    from apps.elements.models import Element
+    try:
+        element = Element.objects.get(id=element_id, project=link.project)
+    except Element.DoesNotExist:
+        return Response({'error': 'Element not found'}, status=404)
+
+    # Check if element is in the link (if link has specific elements)
+    if link.elements.exists() and not link.elements.filter(id=element_id).exists():
+        return Response({'error': 'Element not in shared link'}, status=400)
+
+    action_map = {
+        'approved': '✓ Согласовано',
+        'changes_requested': '↻ На доработку',
+        'rejected': '✕ Отклонено',
+    }
+
+    text = f"{action_map[action]} — {author_name}" if author_name else action_map[action]
+
+    comment = Comment.objects.create(
+        element=element,
+        author_name=author_name,
+        session_id=session_id,
+        text=text,
+        is_system=True,
+    )
+
+    return Response({'id': comment.id, 'text': comment.text}, status=201)
 
 
 @api_view(['POST'])
