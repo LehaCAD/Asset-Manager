@@ -9,7 +9,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
-from .models import Comment, ElementReaction, SharedLink
+from .models import Comment, ElementReaction, ElementReview, SharedLink
 from .permissions import IsProjectOwner
 from .serializers import (
     CommentSerializer,
@@ -62,7 +62,7 @@ def public_share_view(request, token):
             status=status.HTTP_410_GONE,
         )
 
-    shared_elements = link.elements.select_related('scene').prefetch_related('reactions').annotate(
+    shared_elements = link.elements.select_related('scene').prefetch_related('reactions', 'reviews').annotate(
         comment_count=Count('comments', distinct=True),
         likes=Count('reactions', filter=Q(reactions__value='like'), distinct=True),
         dislikes=Count('reactions', filter=Q(reactions__value='dislike'), distinct=True),
@@ -72,7 +72,7 @@ def public_share_view(request, token):
     element_ids = list(shared_elements.values_list('id', flat=True))
     comments_by_element = {}
     all_element_comments = Comment.objects.filter(
-        element_id__in=element_ids, parent__isnull=True
+        element_id__in=element_ids, parent__isnull=True, is_system=False
     ).prefetch_related('replies').order_by('created_at')
     for c in all_element_comments:
         comments_by_element.setdefault(c.element_id, []).append(c)
@@ -105,6 +105,10 @@ def public_share_view(request, token):
             'reactions': [
                 {'session_id': r.session_id, 'author_name': r.author_name, 'value': r.value}
                 for r in el.reactions.all()
+            ],
+            'reviews': [
+                {'session_id': rv.session_id, 'author_name': rv.author_name, 'action': rv.action}
+                for rv in el.reviews.all()
             ],
             'comments': CommentSerializer(comments_by_element.get(el.id, []), many=True).data,
         }
@@ -208,14 +212,10 @@ def public_comment_view(request, token):
 @permission_classes([AllowAny])
 @throttle_classes([PublicCommentThrottle])
 def public_review_action(request, token):
-    """Reviewer submits approval action — creates system comment."""
-    try:
-        link = SharedLink.objects.select_related('project').get(token=token)
-    except SharedLink.DoesNotExist:
-        return Response({'error': 'Ссылка не найдена'}, status=404)
-
+    """POST /api/sharing/public/{token}/review/ — reviewer submits review decision."""
+    link = get_object_or_404(SharedLink, token=token)
     if link.is_expired():
-        return Response({'error': 'Ссылка истекла'}, status=410)
+        return Response({'detail': 'Срок ссылки истёк.'}, status=status.HTTP_410_GONE)
 
     element_id = request.data.get('element_id')
     action = request.data.get('action')
@@ -228,34 +228,31 @@ def public_review_action(request, token):
     if action not in ('approved', 'changes_requested', 'rejected'):
         return Response({'error': 'Invalid action'}, status=400)
 
-    # Verify element belongs to shared link's project
-    from apps.elements.models import Element
-    try:
-        element = Element.objects.get(id=element_id, project=link.project)
-    except Element.DoesNotExist:
-        return Response({'error': 'Element not found'}, status=404)
+    shared_element_ids = set(link.elements.values_list('id', flat=True))
+    if element_id not in shared_element_ids:
+        return Response({'detail': 'Element not in this shared link.'}, status=400)
 
-    # Check if element is in the link (if link has specific elements)
-    if link.elements.exists() and not link.elements.filter(id=element_id).exists():
-        return Response({'error': 'Element not in shared link'}, status=400)
+    # Check if same action already set — toggle off
+    existing = ElementReview.objects.filter(
+        element_id=element_id, session_id=session_id
+    ).first()
 
-    action_map = {
-        'approved': '✓ Согласовано',
-        'changes_requested': '↻ На доработку',
-        'rejected': '✕ Отклонено',
-    }
+    if existing and existing.action == action:
+        existing.delete()
+        return Response({'element_id': element_id, 'action': None})
 
-    text = f"{action_map[action]} — {author_name}" if author_name else action_map[action]
-
-    comment = Comment.objects.create(
-        element=element,
-        author_name=author_name,
+    # update_or_create — one review per reviewer per element
+    review, _ = ElementReview.objects.update_or_create(
+        element_id=element_id,
         session_id=session_id,
-        text=text,
-        is_system=True,
+        defaults={'action': action, 'author_name': author_name},
     )
 
-    return Response({'id': comment.id, 'text': comment.text}, status=201)
+    return Response({
+        'element_id': element_id,
+        'action': review.action,
+        'author_name': review.author_name,
+    })
 
 
 @api_view(['POST'])

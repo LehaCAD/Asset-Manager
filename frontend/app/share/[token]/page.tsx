@@ -385,14 +385,19 @@ export default function PublicSharePage() {
             showMetadata: (data.display_preferences as any).showMetadata ?? true,
           })
         }
-        // Build comments map from element-level comments returned by backend
+        // Build comments map from element-level comments (filter out system comments from old review actions)
+        const filterSystem = (comments: Comment[]): Comment[] =>
+          comments.filter(c => !c.is_system).map(c => ({
+            ...c,
+            replies: c.replies ? filterSystem(c.replies) : [],
+          }))
         const map: Record<number, Comment[]> = {}
         for (const el of data.ungrouped_elements) {
-          map[el.id] = el.comments || []
+          map[el.id] = filterSystem(el.comments || [])
         }
         for (const scene of data.scenes) {
           for (const el of scene.elements) {
-            map[el.id] = el.comments || []
+            map[el.id] = filterSystem(el.comments || [])
           }
         }
         setCommentsMap(map)
