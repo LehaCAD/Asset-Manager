@@ -11,6 +11,7 @@ import type {
   GridDensity,
   WorkspaceElement,
   CreateOptimisticGenerationInput,
+  SectionCollapseState,
 } from "@/lib/types";
 
 const DENSITY_STORAGE_KEY = "scene-workspace-density";
@@ -183,17 +184,31 @@ async function processUploadQueue() {
       useSceneWorkspaceStore.getState()._replaceOptimistic(trackingId, element);
 
       // Race condition fix: WS COMPLETED may have arrived while we waited for HTTP response
-      // (element still had tempId → WS event was ignored). Re-fetch to catch up.
+      // (element still had tempId → WS event was ignored), or WS event may be lost entirely.
+      // Poll with increasing delays to catch up.
       if (element.status === "PROCESSING" || element.status === "UPLOADING") {
-        elementsApi.getById(element.id).then((fresh) => {
-          if (fresh.status === "COMPLETED" || fresh.status === "FAILED") {
-            useSceneWorkspaceStore.getState().updateElement(fresh.id, {
-              ...fresh,
-              client_upload_phase: undefined,
-              client_upload_progress: undefined,
-            });
-          }
-        }).catch(() => {});
+        const pollId = element.id;
+        const delays = [500, 3000, 8000, 15000]; // escalating poll
+        const pollOnce = (attempt: number) => {
+          if (attempt >= delays.length) return;
+          setTimeout(() => {
+            const current = useSceneWorkspaceStore.getState().elements.find((e) => e.id === pollId);
+            // Stop polling if element is already terminal or gone
+            if (!current || current.status === "COMPLETED" || current.status === "FAILED") return;
+            elementsApi.getById(pollId).then((fresh) => {
+              if (fresh.status === "COMPLETED" || fresh.status === "FAILED") {
+                useSceneWorkspaceStore.getState().updateElement(fresh.id, {
+                  ...fresh,
+                  client_upload_phase: undefined,
+                  client_upload_progress: undefined,
+                });
+              } else {
+                pollOnce(attempt + 1);
+              }
+            }).catch(() => pollOnce(attempt + 1));
+          }, delays[attempt]);
+        };
+        pollOnce(0);
       }
       // Blob URL revocation is handled by the store (updateElement/removeElement)
     } catch (error) {
@@ -242,6 +257,7 @@ interface SceneWorkspaceState {
   density: GridDensity;
   lightboxOpen: boolean;
   lightboxElementId: number | null;
+  collapsedSections: SectionCollapseState;
 
   // Loading
   isLoading: boolean;
@@ -276,6 +292,9 @@ interface SceneWorkspaceState {
   selectRange: (fromId: number, toId: number) => void;
   clearSelection: () => void;
   toggleSelectAll: () => void;
+  toggleSectionCollapse: (section: 'groups' | 'elements') => void;
+  selectAllInSection: (section: 'groups' | 'elements') => void;
+  getVisibleElementsForLightbox: () => WorkspaceElement[];
 
   // UI
   setFilter: (filter: ElementFilter) => void;
@@ -300,6 +319,7 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
   density: "md",
   lightboxOpen: false,
   lightboxElementId: null,
+  collapsedSections: { groups: false, elements: false },
   isLoading: false,
   error: null,
 
@@ -351,6 +371,17 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
       }
       const sortedElements = elements.sort((a, b) => a.order_index - b.order_index);
       set({ scene, elements: sortedElements, groups, isLoading: false });
+
+      // Hydrate collapsed sections from localStorage
+      try {
+        const stored = localStorage.getItem(`grid-sections-${projectId}`);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && typeof parsed.groups === 'boolean' && typeof parsed.elements === 'boolean') {
+            set({ collapsedSections: parsed });
+          }
+        }
+      } catch { /* ignore */ }
     } catch (error) {
       if (requestId !== latestLoadSceneRequestId) {
         return;
@@ -796,6 +827,50 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
     }
   },
 
+  toggleSectionCollapse: (section: 'groups' | 'elements') => {
+    const { collapsedSections, projectId } = get();
+    const next = {
+      ...collapsedSections,
+      [section]: !collapsedSections[section],
+    };
+    set({ collapsedSections: next });
+    if (projectId) {
+      try {
+        localStorage.setItem(
+          `grid-sections-${projectId}`,
+          JSON.stringify(next),
+        );
+      } catch { /* localStorage unavailable */ }
+    }
+  },
+
+  selectAllInSection: (section: 'groups' | 'elements') => {
+    const { selectedIds, getFilteredElements, groups } = get();
+
+    if (section === 'groups') {
+      const groupIds = groups.map((g) => g.id);
+      const allGroupsSelected = groupIds.length > 0 && groupIds.every((id) => selectedIds.has(id));
+      const next = new Set(selectedIds);
+      if (allGroupsSelected) {
+        groupIds.forEach((id) => next.delete(id));
+      } else {
+        groupIds.forEach((id) => next.add(id));
+      }
+      set({ selectedIds: next, isMultiSelectMode: next.size > 0 });
+    } else {
+      const filtered = getFilteredElements();
+      const elementIds = filtered.map((e) => e.id);
+      const allElementsSelected = elementIds.length > 0 && elementIds.every((id) => selectedIds.has(id));
+      const next = new Set(selectedIds);
+      if (allElementsSelected) {
+        elementIds.forEach((id) => next.delete(id));
+      } else {
+        elementIds.forEach((id) => next.add(id));
+      }
+      set({ selectedIds: next, isMultiSelectMode: next.size > 0 });
+    }
+  },
+
   setFilter: (filter: ElementFilter) => {
     set({ filter, selectedIds: new Set(), isMultiSelectMode: false });
   },
@@ -873,5 +948,11 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
     }
 
     return filtered.sort((a, b) => a.order_index - b.order_index);
+  },
+
+  getVisibleElementsForLightbox: () => {
+    const { collapsedSections } = get();
+    if (collapsedSections.elements) return [];
+    return get().getFilteredElements();
   },
 }));
