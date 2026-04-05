@@ -420,6 +420,7 @@ export function ElementGrid({ className, onRequestDelete, groups = [], onGroupCl
                       size={cardSize}
                       aspectRatio={preferences.aspectRatio}
                       fitMode={preferences.fitMode}
+                      showMetadata={preferences.showMetadata}
                       isSelected={shareMode ? (shareSelectedIds?.has(element.id) ?? false) : selectedIds.has(element.id)}
                       isMultiSelectMode={shareMode || isMultiSelectMode}
                       {...cardCallbacks}
