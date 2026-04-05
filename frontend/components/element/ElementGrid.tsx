@@ -68,7 +68,7 @@ function SortableGroupCard({
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.3 : undefined,
+    opacity: isDragging ? 0.4 : 1,
     flexShrink: 0,
   };
 
@@ -90,6 +90,10 @@ function SortableGroupCard({
 
 // Sortable wrapper for ElementCard
 function SortableElementCard({ dndId, ...props }: ElementCardProps & { dndId: string }) {
+  const isInProgress = props.element.status === "UPLOADING" ||
+    props.element.status === "PENDING" ||
+    props.element.status === "PROCESSING" ||
+    (props.element.client_upload_phase != null && (props.element.client_upload_progress ?? 0) < 100);
   const {
     attributes,
     listeners,
@@ -97,7 +101,7 @@ function SortableElementCard({ dndId, ...props }: ElementCardProps & { dndId: st
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: dndId });
+  } = useSortable({ id: dndId, disabled: isInProgress });
 
   const style: React.CSSProperties = {
     ...props.style,
@@ -123,9 +127,11 @@ interface ElementGridProps {
   shareMode?: boolean;
   shareSelectedIds?: Set<number>;
   onShareToggle?: (id: number) => void;
+  onRename?: (id: number, currentName: string) => void;
+  onMove?: (id: number) => void;
 }
 
-export function ElementGrid({ className, onRequestDelete, groups = [], onGroupClick, onGroupDelete, shareMode, shareSelectedIds, onShareToggle }: ElementGridProps) {
+export function ElementGrid({ className, onRequestDelete, groups = [], onGroupClick, onGroupDelete, shareMode, shareSelectedIds, onShareToggle, onRename, onMove }: ElementGridProps) {
   const {
     getFilteredElements,
     selectedIds,
@@ -309,8 +315,10 @@ export function ElementGrid({ className, onRequestDelete, groups = [], onGroupCl
         if (element) retryFromElement(element);
       },
       onUpdateStatus: (id: number, status: string | null) => updateApprovalStatus(id, status as any),
+      onRename,
+      onMove,
     }),
-    [selectElement, openLightbox, toggleFavorite, onRequestDelete, retryFromElement, getFilteredElements, updateApprovalStatus]
+    [selectElement, openLightbox, toggleFavorite, onRequestDelete, retryFromElement, getFilteredElements, updateApprovalStatus, onRename, onMove]
   );
 
   // Loading state

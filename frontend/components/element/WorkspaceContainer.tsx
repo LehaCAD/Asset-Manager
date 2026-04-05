@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDropzone } from 'react-dropzone';
-import { useSceneWorkspaceStore } from '@/lib/store/scene-workspace';
+import { useSceneWorkspaceStore, getActiveUploadCount } from '@/lib/store/scene-workspace';
+import { preloadImage } from '@/lib/utils/client-upload';
 import { useCreditsStore } from '@/lib/store/credits';
 import { useGenerationStore } from '@/lib/store/generation';
 import { useUIStore } from '@/lib/store/ui';
@@ -20,7 +21,9 @@ import { LightboxModal } from '@/components/lightbox/LightboxModal';
 import { DetailPanel } from '@/components/lightbox/DetailPanel';
 import { useKeyboard } from '@/lib/hooks/use-keyboard';
 import { scenesApi } from '@/lib/api/scenes';
+import { elementsApi } from '@/lib/api/elements';
 import { MoveToGroupDialog } from '@/components/element/MoveToGroupDialog';
+import { RenameDialog } from '@/components/element/RenameDialog';
 import { Upload, ChevronLeft, ChevronRight, FolderPlus, Share2, Link2, Plus } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ShareSelectionMode } from '@/components/sharing/ShareSelectionMode';
@@ -96,6 +99,8 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   } | null>(null);
   const [isGroupDeleting, setIsGroupDeleting] = useState(false);
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<{ id: number; name: string } | null>(null);
+  const [moveElementId, setMoveElementId] = useState<number | null>(null);
   const [sharePopoverOpen, setSharePopoverOpen] = useState(false);
 
   // Share mode persisted in sessionStorage to survive group navigation
@@ -154,9 +159,24 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   useEffect(() => {
     loadWorkspace(projectId, groupId);
     return () => {
-      resetWorkspace();
+      resetWorkspace(true); // showToast=true when navigating away
     };
   }, [projectId, groupId, loadWorkspace, resetWorkspace]);
+
+  // Warn before closing tab if uploads or generations are in progress
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      const hasUploads = getActiveUploadCount() > 0;
+      const hasGenerations = elements.some(
+        (el) => el.status === "PENDING" || el.status === "PROCESSING"
+      );
+      if (hasUploads || hasGenerations) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [elements]);
 
   // Handle lightbox deep-link from URL (?lightbox=elementId)
   useEffect(() => {
@@ -224,6 +244,10 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
     const unsubscribe = wsManager.on((event: WSEvent) => {
       if (event.type === 'element_status_changed') {
         if (event.status === 'COMPLETED') {
+          // Preload 800px preview into browser cache before updating element
+          if (event.preview_url) {
+            preloadImage(event.preview_url);
+          }
           updateElement(event.element_id, {
             status: 'COMPLETED',
             ...(event.file_url && { file_url: event.file_url }),
@@ -458,9 +482,34 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
 
   // Handle move completion
   const handleMoved = useCallback(() => {
+    setMoveElementId(null);
     clearSelection();
     loadWorkspace(projectId, groupId);
   }, [clearSelection, loadWorkspace, projectId, groupId]);
+
+  // Rename handlers (from three-dots menu on ElementCard)
+  const handleRename = useCallback((id: number, currentName: string) => {
+    setRenameTarget({ id, name: currentName });
+  }, []);
+
+  const handleRenameConfirm = useCallback(async (newName: string) => {
+    if (!renameTarget) return;
+    try {
+      await elementsApi.update(renameTarget.id, { original_filename: newName });
+      useSceneWorkspaceStore.getState().updateElement(renameTarget.id, { original_filename: newName });
+      toast.success('Переименовано');
+    } catch {
+      toast.error('Не удалось переименовать');
+    } finally {
+      setRenameTarget(null);
+    }
+  }, [renameTarget]);
+
+  // Move single element (from three-dots menu on ElementCard)
+  const handleMoveElement = useCallback((id: number) => {
+    setMoveElementId(id);
+    setMoveDialogOpen(true);
+  }, []);
 
   // Handle group delete with confirmation (fetches counts first)
   const handleRequestGroupDelete = useCallback(
@@ -715,7 +764,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
                   className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors text-left"
                 >
                   <Link2 className="h-4 w-4 text-muted-foreground" />
-                  Все ссылки
+                  Активные ссылки
                 </button>
               </PopoverContent>
             </Popover>
@@ -746,6 +795,8 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
               shareMode={shareMode}
               shareSelectedIds={shareSelectedIds}
               onShareToggle={handleToggleShareElement}
+              onRename={handleRename}
+              onMove={handleMoveElement}
             />
           ) : (
             <EmptyState onUploadClick={open} isDragActive={isDragActive} />
@@ -887,12 +938,23 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
         {/* Move to group dialog */}
         <MoveToGroupDialog
           open={moveDialogOpen}
-          onOpenChange={setMoveDialogOpen}
+          onOpenChange={(open) => {
+            setMoveDialogOpen(open);
+            if (!open) setMoveElementId(null);
+          }}
           projectId={projectId}
-          selectedElementIds={selectedElementIds}
-          selectedGroupIds={selectedGroupIds}
+          selectedElementIds={moveElementId ? [moveElementId] : selectedElementIds}
+          selectedGroupIds={moveElementId ? [] : selectedGroupIds}
           currentGroupId={groupId}
           onMoved={handleMoved}
+        />
+
+        {/* Rename dialog */}
+        <RenameDialog
+          open={!!renameTarget}
+          currentName={renameTarget?.name ?? ''}
+          onConfirm={handleRenameConfirm}
+          onCancel={() => setRenameTarget(null)}
         />
 
         {/* Group delete confirmation dialog */}
