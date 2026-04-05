@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ChevronRight } from 'lucide-react'
@@ -12,16 +12,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { NotificationIcon } from '@/components/ui/notification-icon'
 import { useNotificationStore } from '@/lib/store/notifications'
-import { projectsApi } from '@/lib/api/projects'
-import { cn } from '@/lib/utils'
 import type { Notification } from '@/lib/types'
-
-const CATEGORIES = [
-  { key: 'feedback' as const, label: 'Отзывы', types: ['comment_new', 'reaction_new'] },
-  { key: 'content' as const, label: 'Контент', types: ['generation_completed', 'generation_failed', 'upload_completed'] },
-]
-
-type CategoryKey = typeof CATEGORIES[number]['key']
 
 function relativeTime(dateStr: string): string {
   const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000)
@@ -32,28 +23,22 @@ function relativeTime(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('ru-RU')
 }
 
-interface NotificationItemProps {
+function NotificationItem({
+  notification,
+  onClose,
+}: {
   notification: Notification
   onClose: () => void
-}
-
-function NotificationItem({ notification, onClose }: NotificationItemProps) {
+}) {
   const markRead = useNotificationStore((s) => s.markRead)
   const router = useRouter()
 
   function handleClick() {
-    if (!notification.is_read) {
-      markRead(notification.id).catch(() => {})
-    }
+    if (!notification.is_read) markRead(notification.id).catch(() => {})
     if (notification.project) {
-      // Build URL: navigate to group if element has a scene, then open lightbox
       let url = `/projects/${notification.project}`
-      if (notification.scene) {
-        url += `/groups/${notification.scene}`
-      }
-      if (notification.element) {
-        url += `?lightbox=${notification.element}`
-      }
+      if (notification.scene) url += `/groups/${notification.scene}`
+      if (notification.element) url += `?lightbox=${notification.element}`
       router.push(url)
     }
     onClose()
@@ -94,55 +79,18 @@ export function NotificationDropdown({ children }: NotificationDropdownProps) {
   const unreadCount = useNotificationStore((s) => s.unreadCount)
   const markAllRead = useNotificationStore((s) => s.markAllRead)
   const fetchNotifications = useNotificationStore((s) => s.fetchNotifications)
-  const filters = useNotificationStore((s) => s.filters)
-  const setFilters = useNotificationStore((s) => s.setFilters)
-  const lastFetchedFilters = useNotificationStore((s) => s.lastFetchedFilters)
-
-  const [activeCategories, setActiveCategories] = useState<Set<CategoryKey>>(new Set())
-  const [projects, setProjects] = useState<{ id: number; name: string }[]>([])
-
-  useEffect(() => {
-    projectsApi.getAll().then(data => {
-      setProjects(data.map(p => ({ id: p.id, name: p.name })))
-    }).catch(() => {})
-  }, [])
 
   function handleOpenChange(next: boolean) {
     setOpen(next)
-    if (next) {
-      const filtersChanged = JSON.stringify(filters) !== JSON.stringify(lastFetchedFilters)
-      if (notifications.length === 0 || filtersChanged) {
-        fetchNotifications(0).catch(() => {})
-      }
-    }
-  }
-
-  function handleMarkAllRead() {
-    markAllRead().catch(() => {})
-  }
-
-  function handleCategoryToggle(key: CategoryKey) {
-    const next = new Set(activeCategories)
-    if (next.has(key)) next.delete(key)
-    else next.add(key)
-    setActiveCategories(next)
-
-    if (next.size === 0) {
-      setFilters({ types: null })
-    } else {
-      const types = CATEGORIES.filter(c => next.has(c.key)).flatMap(c => [...c.types])
-      setFilters({ types })
+    if (next && notifications.length === 0) {
+      fetchNotifications(0).catch(() => {})
     }
   }
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>{children}</PopoverTrigger>
-      <PopoverContent
-        align="end"
-        sideOffset={8}
-        className="w-80 p-0 overflow-hidden"
-      >
+      <PopoverContent align="end" sideOffset={8} className="w-80 p-0 overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
           <span className="text-sm font-semibold">Уведомления</span>
@@ -151,40 +99,11 @@ export function NotificationDropdown({ children }: NotificationDropdownProps) {
               variant="ghost"
               size="sm"
               className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
-              onClick={handleMarkAllRead}
+              onClick={() => markAllRead().catch(() => {})}
             >
               Прочитать все
             </Button>
           )}
-        </div>
-
-        {/* Filters */}
-        <div className="flex items-center gap-2 px-3 py-2 border-b border-border flex-wrap">
-          <select
-            value={filters.projectId ?? ''}
-            onChange={(e) => setFilters({ projectId: e.target.value ? Number(e.target.value) : null })}
-            className="px-2 py-1 text-xs bg-background border border-input rounded-md focus:outline-none max-w-[120px]"
-          >
-            <option value="">Все проекты</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
-          {CATEGORIES.map((cat) => (
-            <button
-              key={cat.key}
-              type="button"
-              onClick={() => handleCategoryToggle(cat.key)}
-              className={cn(
-                'px-2 py-0.5 rounded-full text-xs font-medium transition-all',
-                activeCategories.has(cat.key)
-                  ? 'bg-primary text-primary-foreground'
-                  : 'border border-border text-muted-foreground hover:text-foreground'
-              )}
-            >
-              {cat.label}
-            </button>
-          ))}
         </div>
 
         {/* List */}
