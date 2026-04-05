@@ -1,13 +1,16 @@
 "use client";
 
-import { useMemo, useEffect, useCallback } from "react";
+import { useMemo, useEffect, useCallback, useState } from "react";
 import {
   DndContext,
-  closestCenter,
+  DragOverlay,
+  pointerWithin,
   PointerSensor,
   KeyboardSensor,
   useSensor,
   useSensors,
+  type DragStartEvent,
+  type DragOverEvent,
   type DragEndEvent,
 } from "@dnd-kit/core";
 import {
@@ -15,6 +18,7 @@ import {
   sortableKeyboardCoordinates,
   rectSortingStrategy,
   useSortable,
+  arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useSceneWorkspaceStore } from "@/lib/store/scene-workspace";
@@ -23,9 +27,14 @@ import { useGenerationStore } from "@/lib/store/generation";
 import { ElementCard, type ElementCardProps } from "@/components/element/ElementCard";
 import { ElementCardSkeleton } from "@/components/element/ElementCardSkeleton";
 import { GroupCard } from "@/components/element/GroupCard";
+import { SectionHeader } from "@/components/element/SectionHeader";
+import { DragOverlayContent } from "@/components/element/DragOverlayContent";
+import { toDndId, parseDndId } from "@/lib/utils/dnd";
+import { elementsApi } from "@/lib/api/elements";
+import { scenesApi } from "@/lib/api/scenes";
 import { cn } from "@/lib/utils";
 import { DISPLAY_GRID_CONFIG, CARD_SIZES } from "@/lib/utils/constants";
-import type { DisplayCardSize, DisplayAspectRatio, Scene } from "@/lib/types";
+import type { DragItem, DisplayCardSize, DisplayAspectRatio, Scene } from "@/lib/types";
 import { toast } from "sonner";
 
 // Helper для получения минимальной ширины карточки
@@ -33,8 +42,54 @@ function getMinCardWidth(size: DisplayCardSize, aspectRatio: DisplayAspectRatio)
   return CARD_SIZES[size][aspectRatio].width;
 }
 
+// Sortable wrapper for GroupCard
+function SortableGroupCard({
+  dndId,
+  group,
+  isSelected,
+  isMultiSelectMode,
+  isDropTarget,
+  onSelect,
+  onClick,
+  onDelete,
+  size,
+}: {
+  dndId: string;
+  group: Scene;
+  isSelected: boolean;
+  isMultiSelectMode: boolean;
+  isDropTarget: boolean;
+  onSelect: (id: number, add: boolean) => void;
+  onClick: (id: number) => void;
+  onDelete: (id: number) => void;
+  size: DisplayCardSize;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: dndId });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.3 : undefined,
+    flexShrink: 0,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      <GroupCard
+        group={group}
+        isSelected={isSelected}
+        isMultiSelectMode={isMultiSelectMode}
+        isDropTarget={isDropTarget}
+        onSelect={onSelect}
+        onClick={onClick}
+        onDelete={onDelete}
+        size={size}
+      />
+    </div>
+  );
+}
+
 // Sortable wrapper for ElementCard
-function SortableElementCard(props: ElementCardProps) {
+function SortableElementCard({ dndId, ...props }: ElementCardProps & { dndId: string }) {
   const {
     attributes,
     listeners,
@@ -42,13 +97,13 @@ function SortableElementCard(props: ElementCardProps) {
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: props.element.id });
+  } = useSortable({ id: dndId });
 
   const style: React.CSSProperties = {
     ...props.style,
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.4 : 1,
+    opacity: isDragging ? 0.3 : 1,
     zIndex: isDragging ? 10 : undefined,
   };
 
@@ -104,35 +159,141 @@ export function ElementGrid({ className, onRequestDelete, groups = [], onGroupCl
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  // Element IDs for sortable context
-  const elementIds = useMemo(
-    () => filteredElements.map((e) => e.id),
+  // DnD local state
+  const [activeDragItem, setActiveDragItem] = useState<DragItem | null>(null);
+  const [overDropTarget, setOverDropTarget] = useState<string | null>(null);
+
+  const {
+    collapsedSections,
+    toggleSectionCollapse,
+    selectAllInSection,
+  } = useSceneWorkspaceStore();
+
+  // Prefixed DnD IDs
+  const prefixedGroupIds = useMemo(
+    () => groups.map((g) => toDndId('group', g.id)),
+    [groups],
+  );
+  const prefixedElementIds = useMemo(
+    () => filteredElements.map((e) => toDndId('element', e.id)),
     [filteredElements],
   );
 
-  // Handle drag end — reorder elements
+  // Section checkbox states
+  const groupsCheckboxState = useMemo(() => {
+    if (groups.length === 0) return 'empty' as const;
+    const selectedCount = groups.filter((g) => selectedIds.has(g.id)).length;
+    if (selectedCount === 0) return 'empty' as const;
+    if (selectedCount === groups.length) return 'full' as const;
+    return 'partial' as const;
+  }, [groups, selectedIds]);
+
+  const elementsCheckboxState = useMemo(() => {
+    if (filteredElements.length === 0) return 'empty' as const;
+    const selectedCount = filteredElements.filter((e) => selectedIds.has(e.id)).length;
+    if (selectedCount === 0) return 'empty' as const;
+    if (selectedCount === filteredElements.length) return 'full' as const;
+    return 'partial' as const;
+  }, [filteredElements, selectedIds]);
+
+  // Section total sizes
+  const groupsTotalSize = useMemo(
+    () => groups.reduce((sum, g) => sum + (g.storage_bytes ?? 0), 0),
+    [groups],
+  );
+  const elementsTotalSize = useMemo(
+    () => filteredElements.reduce((sum, e) => sum + (e.file_size ?? 0), 0),
+    [filteredElements],
+  );
+
+  // Sorted groups
+  const sortedGroups = useMemo(
+    () => [...groups].sort((a, b) => a.order_index - b.order_index),
+    [groups]
+  );
+
+  // DnD handlers
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const parsed = parseDndId(event.active.id);
+    if (parsed) setActiveDragItem(parsed);
+  }, []);
+
+  const handleDragOver = useCallback((event: DragOverEvent) => {
+    const overId = event.over?.id;
+    setOverDropTarget(overId ? String(overId) : null);
+  }, []);
+
   const handleDragEnd = useCallback(
     async (event: DragEndEvent) => {
       const { active, over } = event;
+      setActiveDragItem(null);
+      setOverDropTarget(null);
+
       if (!over || active.id === over.id) return;
 
-      const allElements = useSceneWorkspaceStore.getState().elements;
-      const oldIndex = allElements.findIndex((e) => e.id === active.id);
-      const newIndex = allElements.findIndex((e) => e.id === over.id);
-      if (oldIndex === -1 || newIndex === -1) return;
+      const activeParsed = parseDndId(active.id);
+      const overParsed = parseDndId(over.id);
+      if (!activeParsed || !overParsed) return;
 
-      // Build new order: move active element to new position
-      const ids = allElements.map((e) => e.id);
-      const [movedId] = ids.splice(oldIndex, 1);
-      ids.splice(newIndex, 0, movedId);
+      const { scene, elements, projectId } = useSceneWorkspaceStore.getState();
 
-      try {
-        await reorderElements(ids);
-      } catch {
-        toast.error("Не удалось сохранить порядок");
+      // Case 1: Element reorder (element → element)
+      if (activeParsed.type === 'element' && overParsed.type === 'element') {
+        if (!scene) return;
+        const allElements = elements;
+        const oldIndex = allElements.findIndex((e) => e.id === activeParsed.id);
+        const newIndex = allElements.findIndex((e) => e.id === overParsed.id);
+        if (oldIndex === -1 || newIndex === -1) return;
+        const ids = allElements.map((e) => e.id);
+        const [movedId] = ids.splice(oldIndex, 1);
+        ids.splice(newIndex, 0, movedId);
+        try {
+          await reorderElements(ids);
+        } catch {
+          toast.error("Не удалось сохранить порядок");
+        }
+      }
+
+      // Case 2: Element → Group (cross-container move)
+      if (activeParsed.type === 'element' && overParsed.type === 'group') {
+        const elementIds = selectedIds.has(activeParsed.id)
+          ? Array.from(selectedIds).filter((id) => elements.some((e) => e.id === id))
+          : [activeParsed.id];
+        try {
+          await elementsApi.move({
+            element_ids: elementIds,
+            target_scene: overParsed.id,
+          });
+          elementIds.forEach((id) => useSceneWorkspaceStore.getState().removeElement(id));
+          useSceneWorkspaceStore.getState().clearSelection();
+          if (projectId) {
+            const groupId = scene?.id;
+            useSceneWorkspaceStore.getState().loadWorkspace(projectId, groupId);
+          }
+          toast.success("Перемещено в группу");
+        } catch {
+          toast.error("Не удалось переместить");
+        }
+      }
+
+      // Case 3: Group reorder
+      if (activeParsed.type === 'group' && overParsed.type === 'group' && projectId) {
+        const oldIndex = sortedGroups.findIndex((g) => g.id === activeParsed.id);
+        const newIndex = sortedGroups.findIndex((g) => g.id === overParsed.id);
+        if (oldIndex === -1 || newIndex === -1) return;
+        const prevGroups = sortedGroups;
+        const reordered = arrayMove(sortedGroups, oldIndex, newIndex);
+        useSceneWorkspaceStore.setState({ groups: reordered.map((g, i) => ({ ...g, order_index: i })) });
+        const reorderedIds = reordered.map((g) => g.id);
+        try {
+          await scenesApi.reorder(projectId, { scene_ids: reorderedIds });
+        } catch {
+          useSceneWorkspaceStore.setState({ groups: prevGroups });
+          toast.error("Не удалось изменить порядок групп");
+        }
       }
     },
-    [reorderElements],
+    [sortedGroups, selectedIds, reorderElements],
   );
 
   // Card callbacks
@@ -148,12 +309,6 @@ export function ElementGrid({ className, onRequestDelete, groups = [], onGroupCl
       },
     }),
     [selectElement, openLightbox, toggleFavorite, onRequestDelete, retryFromElement, getFilteredElements]
-  );
-
-  // Sorted groups
-  const sortedGroups = useMemo(
-    () => [...groups].sort((a, b) => a.order_index - b.order_index),
-    [groups]
   );
 
   // Loading state
@@ -184,49 +339,116 @@ export function ElementGrid({ className, onRequestDelete, groups = [], onGroupCl
   }
 
   const gridStyle = { gridTemplateColumns: `repeat(auto-fill, minmax(${getMinCardWidth(preferences.size, preferences.aspectRatio)}px, 1fr))` };
+  const hasGroups = sortedGroups.length > 0;
+  const hasElements = filteredElements.length > 0;
 
   return (
     <div className={cn("element-grid", className)}>
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <div className={cn("grid", gridConfig.gap)} style={gridStyle}>
-          {/* Groups rendered inline, before elements — NOT sortable */}
-          {sortedGroups.map((group) => (
-            <GroupCard
-              key={`group-${group.id}`}
-              group={group}
-              isSelected={selectedIds.has(group.id)}
-              isMultiSelectMode={isMultiSelectMode}
-              onSelect={(id, add) => {
-                useSceneWorkspaceStore.getState().selectElement(id, add);
-              }}
-              onClick={onGroupClick ?? (() => {})}
-              onDelete={onGroupDelete ?? (() => {})}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={pointerWithin}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+      >
+        {/* Groups section */}
+        {hasGroups && (
+          <div className="mb-3">
+            <SectionHeader
+              label="Группы"
+              count={sortedGroups.length}
+              totalSize={groupsTotalSize}
+              collapsed={collapsedSections.groups}
+              checkboxState={groupsCheckboxState}
+              onToggleCollapse={() => toggleSectionCollapse('groups')}
+              onToggleSelectAll={() => selectAllInSection('groups')}
+            />
+            {!collapsedSections.groups && (
+              <SortableContext items={prefixedGroupIds} strategy={rectSortingStrategy}>
+                <div className="flex gap-3 overflow-x-auto overflow-y-hidden py-1">
+                  {sortedGroups.map((group) => {
+                    const dndId = toDndId('group', group.id);
+                    return (
+                      <SortableGroupCard
+                        key={dndId}
+                        dndId={dndId}
+                        group={group}
+                        isSelected={selectedIds.has(group.id)}
+                        isMultiSelectMode={isMultiSelectMode}
+                        isDropTarget={overDropTarget === dndId}
+                        onSelect={(id, add) => {
+                          useSceneWorkspaceStore.getState().selectElement(id, add);
+                        }}
+                        onClick={onGroupClick ?? (() => {})}
+                        onDelete={onGroupDelete ?? (() => {})}
+                        size={preferences.size}
+                      />
+                    );
+                  })}
+                </div>
+              </SortableContext>
+            )}
+          </div>
+        )}
+
+        {/* Divider between sections */}
+        {hasGroups && hasElements && (
+          <div className="border-t border-border mb-3" />
+        )}
+
+        {/* Elements section */}
+        {hasElements && (
+          <div>
+            <SectionHeader
+              label="Элементы"
+              count={filteredElements.length}
+              totalSize={elementsTotalSize}
+              collapsed={collapsedSections.elements}
+              checkboxState={elementsCheckboxState}
+              onToggleCollapse={() => toggleSectionCollapse('elements')}
+              onToggleSelectAll={() => selectAllInSection('elements')}
+            />
+            {!collapsedSections.elements && (
+              <SortableContext items={prefixedElementIds} strategy={rectSortingStrategy}>
+                <div className={cn("grid", gridConfig.gap)} style={gridStyle}>
+                  {filteredElements.map((element, index) => (
+                    <SortableElementCard
+                      key={element.id}
+                      dndId={toDndId('element', element.id)}
+                      element={element}
+                      index={index}
+                      size={cardSize}
+                      aspectRatio={preferences.aspectRatio}
+                      fitMode={preferences.fitMode}
+                      isSelected={shareMode ? (shareSelectedIds?.has(element.id) ?? false) : selectedIds.has(element.id)}
+                      isMultiSelectMode={shareMode || isMultiSelectMode}
+                      {...cardCallbacks}
+                      {...(shareMode && onShareToggle ? {
+                        onSelect: (id: number) => onShareToggle(id),
+                        onOpenLightbox: (id: number) => onShareToggle(id),
+                      } : {})}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            )}
+          </div>
+        )}
+
+        {/* Drag overlay */}
+        <DragOverlay>
+          {activeDragItem && (
+            <DragOverlayContent
+              type={activeDragItem.type}
+              element={activeDragItem.type === 'element' ? filteredElements.find((e) => e.id === activeDragItem.id) : undefined}
+              group={activeDragItem.type === 'group' ? sortedGroups.find((g) => g.id === activeDragItem.id) : undefined}
+              additionalCount={activeDragItem.type === 'element' && selectedIds.has(activeDragItem.id) ? selectedIds.size - 1 : 0}
               size={preferences.size}
               aspectRatio={preferences.aspectRatio}
               fitMode={preferences.fitMode}
             />
-          ))}
-          {/* Element cards — sortable */}
-          <SortableContext items={elementIds} strategy={rectSortingStrategy}>
-            {filteredElements.map((element, index) => (
-              <SortableElementCard
-                key={element.id}
-                element={element}
-                index={index}
-                size={cardSize}
-                aspectRatio={preferences.aspectRatio}
-                fitMode={preferences.fitMode}
-                isSelected={shareMode ? (shareSelectedIds?.has(element.id) ?? false) : selectedIds.has(element.id)}
-                isMultiSelectMode={shareMode || isMultiSelectMode}
-                {...cardCallbacks}
-                {...(shareMode && onShareToggle ? {
-                  onSelect: (id: number) => onShareToggle(id),
-                  onOpenLightbox: (id: number) => onShareToggle(id),
-                } : {})}
-              />
-            ))}
-          </SortableContext>
-        </div>
+          )}
+        </DragOverlay>
       </DndContext>
     </div>
   );
