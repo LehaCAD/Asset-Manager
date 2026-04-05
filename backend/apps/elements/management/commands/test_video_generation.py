@@ -123,7 +123,7 @@ class Command(BaseCommand):
                 'input_urls': [source_element.file_url],
             },
             status=Element.STATUS_PENDING,
-            source_type=Element.SOURCE_IMG2VID
+            source_type=Element.SOURCE_GENERATED
         )
 
         self.stdout.write(f'\n✅ Создан Element для видео #{element.id}')

@@ -388,6 +388,7 @@ export default function PublicSharePage() {
             size: data.display_preferences.size as DisplayCardSize,
             aspectRatio: (data.display_preferences.aspectRatio || 'landscape') as DisplayAspectRatio,
             fitMode: (data.display_preferences.fitMode || 'fill') as DisplayFitMode,
+            showMetadata: (data.display_preferences as any).showMetadata ?? true,
           })
         }
         // Build comments map from element-level comments returned by backend

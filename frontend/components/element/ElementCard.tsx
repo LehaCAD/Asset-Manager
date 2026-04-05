@@ -36,12 +36,12 @@ const PHASE_LABELS: Record<string, string> = {
 };
 
 const APPROVAL_STATUSES = [
-  { value: null, label: 'Нет статуса', textColor: 'text-[#94A3B8]', bgColor: 'bg-[#475569]/[0.125]' },
-  { value: 'IN_PROGRESS', label: 'В работе', textColor: 'text-[#60A5FA]', bgColor: 'bg-[#3B82F6]/[0.125]' },
-  { value: 'NEEDS_REVIEW', label: 'На согласовании', textColor: 'text-[#FBBF24]', bgColor: 'bg-[#F59E0B]/[0.125]' },
-  { value: 'APPROVED', label: 'Одобрено', textColor: 'text-[#4ADE80]', bgColor: 'bg-[#22C55E]/[0.125]' },
-  { value: 'CHANGES_REQUESTED', label: 'На доработку', textColor: 'text-[#FB923C]', bgColor: 'bg-[#F97316]/[0.125]' },
-  { value: 'REJECTED', label: 'Отклонено', textColor: 'text-[#94A3B8]', bgColor: 'bg-[#475569]/[0.125]' },
+  { value: null, label: 'Нет статуса', textColor: 'text-[#94A3B8]', bgColor: 'bg-[#475569]/[0.125]', dotColor: 'bg-[#94A3B8]' },
+  { value: 'IN_PROGRESS', label: 'В работе', textColor: 'text-[#60A5FA]', bgColor: 'bg-[#3B82F6]/[0.125]', dotColor: 'bg-[#60A5FA]' },
+  { value: 'NEEDS_REVIEW', label: 'На согласовании', textColor: 'text-[#FBBF24]', bgColor: 'bg-[#F59E0B]/[0.125]', dotColor: 'bg-[#FBBF24]' },
+  { value: 'APPROVED', label: 'Одобрено', textColor: 'text-[#4ADE80]', bgColor: 'bg-[#22C55E]/[0.125]', dotColor: 'bg-[#4ADE80]' },
+  { value: 'CHANGES_REQUESTED', label: 'На доработку', textColor: 'text-[#FB923C]', bgColor: 'bg-[#F97316]/[0.125]', dotColor: 'bg-[#FB923C]' },
+  { value: 'REJECTED', label: 'Отклонено', textColor: 'text-[#94A3B8]', bgColor: 'bg-[#475569]/[0.125]', dotColor: 'bg-[#94A3B8]' },
 ] as const;
 
 /** Progress overlay for uploads and generation finalization. */
@@ -573,7 +573,7 @@ export function ElementCard({
                     onClick={() => onUpdateStatus?.(element.id, status.value)}
                     className={cn(status.value === element.approval_status && "font-semibold")}
                   >
-                    <span className={cn("w-2 h-2 rounded-full mr-2 shrink-0", status.bgColor.replace('/[0.125]', ''))} />
+                    <span className={cn("w-2 h-2 rounded-full mr-2 shrink-0", status.dotColor)} />
                     {status.label}
                   </DropdownMenuItem>
                 ))}

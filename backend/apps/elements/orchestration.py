@@ -42,14 +42,7 @@ def create_generation(project, scene, prompt, ai_model_id, generation_config, us
 
     generation_config = generation_config or {}
     input_urls = generation_config.get('input_urls')
-    if (
-        element_type == 'VIDEO'
-        and isinstance(input_urls, list)
-        and len(input_urls) > 0
-    ):
-        source_type = Element.SOURCE_GENERATED
-    else:
-        source_type = Element.SOURCE_GENERATED
+    source_type = Element.SOURCE_GENERATED
 
     try:
         operation_key = uuid4().hex
