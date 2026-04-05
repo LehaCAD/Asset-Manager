@@ -763,24 +763,8 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
             </button>
           </div>
 
-          {/* Right: share + active links + filters + view */}
+          {/* Right: active links + filters + view */}
           <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              type="button"
-              onClick={async () => {
-                try {
-                  const els = await sharingApi.getProjectElements(projectId);
-                  if (els.length === 0) { toast.error('В проекте нет элементов'); return; }
-                  setShareElements(els);
-                  setShareSelectedIds(new Set(els.map(e => e.id)));
-                  setLinkDialogOpen(true);
-                } catch { toast.error('Не удалось загрузить элементы'); }
-              }}
-              className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors shrink-0"
-            >
-              <Share2 className="h-3.5 w-3.5" />
-              Поделиться
-            </button>
             <button
               type="button"
               onClick={() => setLinksPanelOpen(true)}
