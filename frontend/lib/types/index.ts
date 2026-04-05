@@ -118,7 +118,8 @@ export interface ReorderScenesPayload {
 
 export type ElementType = "IMAGE" | "VIDEO";
 export type ElementStatus = "PENDING" | "PROCESSING" | "UPLOADING" | "COMPLETED" | "FAILED";
-export type ElementSource = "GENERATED" | "UPLOADED" | "IMG2VID";
+export type ElementSource = "GENERATED" | "UPLOADED";
+export type ApprovalStatus = 'IN_PROGRESS' | 'NEEDS_REVIEW' | 'APPROVED' | 'CHANGES_REQUESTED' | 'REJECTED';
 export type OptimisticElementKind = "upload" | "generation";
 export type GenerationSubmitState = "idle" | "submitting" | "accepted" | "rejected";
 
@@ -146,6 +147,8 @@ export interface Element {
   generation_cost?: string | null;
   created_at: string;
   updated_at: string;
+  approval_status: ApprovalStatus | null;
+  original_filename: string;
 }
 
 export type UploadPhase = "resize" | "presign" | "upload_thumb" | "upload_full" | "completing";
@@ -199,6 +202,9 @@ export interface UpdateElementPayload {
   is_favorite?: boolean;
   order_index?: number;
   prompt_text?: string;
+  approval_status?: ApprovalStatus | null;
+  original_filename?: string;
+  scene?: number | null;
 }
 
 export interface ReorderElementsPayload {
@@ -374,6 +380,8 @@ export interface PublicElement {
   dislikes?: number
   reactions?: PublicElementReaction[]
   comments?: Comment[]
+  source_type?: ElementSource;
+  original_filename?: string;
 }
 
 export interface PublicScene {
@@ -398,6 +406,7 @@ export interface Comment {
   is_read: boolean
   created_at: string
   replies: Comment[]
+  is_system?: boolean;
 }
 
 export interface CreateCommentPayload {
@@ -467,6 +476,7 @@ export interface DisplayPreferences {
   size: DisplayCardSize;
   aspectRatio: DisplayAspectRatio;
   fitMode: DisplayFitMode;
+  showMetadata: boolean;
 }
 
 // Backward compatibility alias

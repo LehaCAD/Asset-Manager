@@ -24,7 +24,6 @@ interface DetailPanelProps {
 const sourceLabels: Record<string, string> = {
   GENERATED: "Генерация",
   UPLOADED: "Загрузка",
-  IMG2VID: "Из изображения",
 };
 
 /** Keys in generation_config that are system metadata, not user params */
@@ -94,7 +93,7 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
   }, [element.id]);
 
   const hasPromptChanged = promptText !== (element.prompt_text ?? "");
-  const isGenerated = element.source_type === "GENERATED" || element.source_type === "IMG2VID";
+  const isGenerated = element.source_type === "GENERATED";
 
   // Build label + value label maps from model's parameters_schema
   const { labelMap, valueLabelMap } = useMemo(() => {

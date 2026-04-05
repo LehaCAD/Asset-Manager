@@ -56,13 +56,14 @@ function defaultRange(): DateRange {
   return { from: subDays(now, 29), to: now };
 }
 
-const IS_GENERATED = new Set(["GENERATED", "IMG2VID"]);
+const IS_GENERATED = new Set(["GENERATED"]);
 
 /* ── Main Component ─────────────────────────────────────── */
 
 export default function HistoryPage() {
   const [data, setData] = useState<PaginatedResponse<CabinetHistoryEntry> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("");
   const [sourceType, setSourceType] = useState("");
@@ -86,18 +87,28 @@ export default function HistoryPage() {
 
   const showModelFilter = sourceType !== "UPLOADED";
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     setLoading(true);
-    getHistory({
-      page,
-      status: status || undefined,
-      source_type: sourceType || undefined,
-      ai_model_id: modelId,
-      project_id: projectId,
-      ...dateRangeToParams(dateRange),
-    })
-      .then(setData)
-      .finally(() => setLoading(false));
+    if (page === 1) setError(false);
+    try {
+      const result = await getHistory({
+        page,
+        status: status || undefined,
+        source_type: sourceType || undefined,
+        ai_model_id: modelId,
+        project_id: projectId,
+        ...dateRangeToParams(dateRange),
+      });
+      setData(result);
+    } catch {
+      if (page === 1) {
+        setError(true);
+      } else {
+        toast.error("Не удалось загрузить данные");
+      }
+    } finally {
+      setLoading(false);
+    }
   }, [page, status, sourceType, modelId, projectId, dateRange]);
 
   useEffect(() => { load(); }, [load]);
@@ -136,7 +147,22 @@ export default function HistoryPage() {
         </div>
       </div>
 
-      {/* Table */}
+      {/* Error / Table */}
+      {error ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="h-10 w-10 rounded-md bg-destructive/10 flex items-center justify-center mb-3">
+            <AlertCircle className="h-5 w-5 text-destructive" />
+          </div>
+          <p className="text-sm font-medium text-foreground">Не удалось загрузить данные</p>
+          <p className="text-xs text-muted-foreground mt-1">Попробуйте обновить страницу</p>
+          <button
+            onClick={() => { setError(false); load(); }}
+            className="mt-3 px-3 py-1.5 text-xs rounded-sm bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            Повторить
+          </button>
+        </div>
+      ) : <>
       <div className="rounded-md border border-border bg-card shadow-[var(--shadow-card)] overflow-hidden">
         <table className="w-full text-xs">
           <thead>
@@ -202,6 +228,7 @@ export default function HistoryPage() {
           )}
         </div>
       )}
+      </>}
     </div>
   );
 }
