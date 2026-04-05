@@ -62,6 +62,7 @@ export const DEFAULT_DISPLAY_PREFERENCES = {
   size: "medium",
   aspectRatio: "landscape",
   fitMode: "fill",
+  showMetadata: true,
 } as const;
 
 // Backward compatibility alias

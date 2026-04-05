@@ -35,6 +35,9 @@ function readPersistedPreferences(): DisplayPreferences | null {
       return null;
     }
 
+    // Backward compat: old localStorage may not have showMetadata
+    (prefs as any).showMetadata = (prefs as any).showMetadata ?? true;
+
     return prefs as DisplayPreferences;
   } catch {
     return null;
