@@ -95,31 +95,25 @@ export function ElementSelectionCard({
             <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5">
               {/* Element type icon */}
               <div
-                className="rounded-full bg-overlay text-overlay-text p-2"
+                className="rounded-md bg-black/60 backdrop-blur-sm p-[5px]"
                 title={isVideo ? "Видео" : "Изображение"}
               >
                 {isVideo ? (
-                  <Video className="w-5 h-5" />
+                  <Video className="h-3.5 w-3.5 text-white" />
                 ) : (
-                  <Image className="w-5 h-5" />
+                  <Image className="h-3.5 w-3.5 text-white" />
                 )}
               </div>
 
               {/* Favorite star - read only */}
-              <div
-                className={cn(
-                  "rounded-full bg-overlay p-2",
-                  element.is_favorite ? "text-favorite" : "text-overlay-text-muted"
-                )}
-                title={element.is_favorite ? "В избранном" : "Не в избранном"}
-              >
-                <Star
-                  className={cn(
-                    "w-5 h-5",
-                    element.is_favorite && "fill-current"
-                  )}
-                />
-              </div>
+              {element.is_favorite && (
+                <div
+                  className="rounded-md bg-black/60 backdrop-blur-sm p-1.5"
+                  title="В избранном"
+                >
+                  <Star className="h-4 w-4 text-white fill-amber-400" />
+                </div>
+              )}
             </div>
           </button>
         </TooltipTrigger>
