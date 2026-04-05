@@ -124,7 +124,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
                   onPointerDown={blockCardNavigation}
                   onClick={blockCardNavigation}
                 >
-                  <MoreHorizontal className="h-3.5 w-3.5" />
+                  <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent
@@ -177,25 +177,25 @@ export function ProjectCard({ project }: ProjectCardProps) {
         </div>
 
         {/* Footer */}
-        <div className="p-3 space-y-1.5 border-t border-border">
-          <h3 className="text-sm font-medium leading-tight line-clamp-1 group-hover:text-primary transition-colors">
+        <div className="px-3.5 py-3 space-y-1.5 border-t border-border">
+          <h3 className="text-base font-medium leading-tight line-clamp-1 group-hover:text-primary transition-colors">
             {project.name}
           </h3>
-          <div className="flex flex-wrap gap-x-1.5 gap-y-0.5 text-[11px] text-muted-foreground items-center">
+          <div className="flex flex-wrap gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground items-center">
             <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${statusConfig?.color ?? "bg-muted-foreground"}`} />
             <span>{statusConfig?.label ?? project.status}</span>
             {(project.scene_count ?? 0) > 0 && (
               <>
                 <span className="text-muted-foreground/40">&middot;</span>
                 <span className="flex items-center gap-0.5">
-                  <Folder className="h-2.5 w-2.5" />
+                  <Folder className="h-3 w-3" />
                   {project.scene_count}
                 </span>
               </>
             )}
             <span className="text-muted-foreground/40">&middot;</span>
             <span className="flex items-center gap-0.5">
-              <Layers className="h-2.5 w-2.5" />
+              <Layers className="h-3 w-3" />
               {project.element_count ?? 0}
             </span>
             {project.total_spent && parseFloat(project.total_spent) > 0 && (
@@ -211,13 +211,13 @@ export function ProjectCard({ project }: ProjectCardProps) {
               <>
                 <span className="text-muted-foreground/40">&middot;</span>
                 <span className="flex items-center gap-0.5">
-                  <HardDrive className="h-2.5 w-2.5" />
+                  <HardDrive className="h-3 w-3" />
                   {formatStorage(project.storage_bytes!)}
                 </span>
               </>
             )}
           </div>
-          <div className="text-[11px] text-muted-foreground/60">
+          <div className="text-xs text-muted-foreground/60">
             {formatRelativeDate(project.updated_at)}
           </div>
         </div>

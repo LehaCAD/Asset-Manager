@@ -50,7 +50,7 @@ export function ProjectGrid() {
       {/* Grid - full width, no max-width */}
       <div className="flex-1 overflow-auto px-4 py-4">
         {isLoading ? (
-            <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
+            <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))' }}>
               {Array.from({ length: 8 }).map((_, i) => (
                 <ProjectCardSkeleton key={i} />
               ))}
@@ -58,7 +58,7 @@ export function ProjectGrid() {
           ) : projects.length === 0 ? (
             <EmptyState onCreateClick={() => setCreateOpen(true)} />
           ) : (
-            <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
+            <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))' }}>
               {projects.map((project) => (
                 <ProjectCard key={project.id} project={project} />
               ))}
