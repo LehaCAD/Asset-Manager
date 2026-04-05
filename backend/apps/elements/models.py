@@ -37,19 +37,13 @@ class Element(models.Model):
         (SOURCE_UPLOADED, 'Загружено пользователем'),
     ]
 
-    # Статусы согласования
+    # Approval statuses — simplified set
     APPROVAL_IN_PROGRESS = 'IN_PROGRESS'
-    APPROVAL_NEEDS_REVIEW = 'NEEDS_REVIEW'
     APPROVAL_APPROVED = 'APPROVED'
-    APPROVAL_CHANGES_REQUESTED = 'CHANGES_REQUESTED'
-    APPROVAL_REJECTED = 'REJECTED'
 
     APPROVAL_STATUS_CHOICES = [
         (APPROVAL_IN_PROGRESS, 'В работе'),
-        (APPROVAL_NEEDS_REVIEW, 'На согласовании'),
-        (APPROVAL_APPROVED, 'Одобрено'),
-        (APPROVAL_CHANGES_REQUESTED, 'На доработку'),
-        (APPROVAL_REJECTED, 'Отклонено'),
+        (APPROVAL_APPROVED, 'Согласовано'),
     ]
     
     project = models.ForeignKey(
