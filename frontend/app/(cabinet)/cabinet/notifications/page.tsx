@@ -2,28 +2,22 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MessageCircle, CheckCircle2, XCircle, BellOff } from "lucide-react";
+import { BellOff, AlertCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { NotificationIcon } from "@/components/ui/notification-icon";
 import { useNotificationStore } from "@/lib/store/notifications";
-import type { Notification, NotificationType } from "@/lib/types";
+import { projectsApi } from "@/lib/api/projects";
+import { cn } from "@/lib/utils";
+import type { Notification } from "@/lib/types";
 
-/* ── Tabs ───────────────────────────────────────────────── */
+/* ── Category filter config ────────────────────────────────── */
 
-type Tab = "all" | "comments" | "generations";
+const CATEGORIES = [
+  { key: 'feedback' as const, label: 'Отзывы', types: ['comment_new', 'reaction_new'] },
+  { key: 'content' as const, label: 'Контент', types: ['generation_completed', 'generation_failed', 'upload_completed'] },
+] as const;
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "all", label: "Все" },
-  { id: "comments", label: "Комментарии" },
-  { id: "generations", label: "Генерации" },
-];
-
-function matchesTab(type: NotificationType, tab: Tab): boolean {
-  if (tab === "all") return true;
-  if (tab === "comments") return type === "comment_new";
-  if (tab === "generations")
-    return type === "generation_completed" || type === "generation_failed";
-  return false;
-}
+type CategoryKey = typeof CATEGORIES[number]['key'];
 
 /* ── Relative time ──────────────────────────────────────── */
 
@@ -42,30 +36,6 @@ function relativeTime(iso: string): string {
     month: "2-digit",
     year: "numeric",
   });
-}
-
-/* ── Icon by type ───────────────────────────────────────── */
-
-function NotificationIcon({ type }: { type: NotificationType }) {
-  if (type === "comment_new")
-    return (
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
-        <MessageCircle className="h-4 w-4 text-primary" />
-      </div>
-    );
-  if (type === "generation_completed")
-    return (
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-success/10">
-        <CheckCircle2 className="h-4 w-4 text-success" />
-      </div>
-    );
-  if (type === "generation_failed")
-    return (
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-destructive/10">
-        <XCircle className="h-4 w-4 text-destructive" />
-      </div>
-    );
-  return null;
 }
 
 /* ── Single notification row ────────────────────────────── */
@@ -127,16 +97,43 @@ function NotificationSkeleton() {
 
 export default function NotificationsPage() {
   const router = useRouter();
-  const { notifications, hasMore, isLoading, fetchNotifications, markRead, markAllRead } =
-    useNotificationStore();
+  const {
+    notifications, hasMore, isLoading, error,
+    filters, setFilters,
+    fetchNotifications, markRead, markAllRead,
+  } = useNotificationStore();
 
-  const [activeTab, setActiveTab] = useState<Tab>("all");
+  const [activeCategories, setActiveCategories] = useState<Set<CategoryKey>>(new Set());
+  const [projects, setProjects] = useState<{ id: number; name: string }[]>([]);
 
   useEffect(() => {
     fetchNotifications(0);
   }, [fetchNotifications]);
 
-  const filtered = notifications.filter((n) => matchesTab(n.type, activeTab));
+  // Fetch projects for dropdown
+  useEffect(() => {
+    projectsApi.getAll().then(data => {
+      setProjects(data.map(p => ({ id: p.id, name: p.name })));
+    }).catch(() => {});
+  }, []);
+
+  function handleCategoryToggle(key: CategoryKey) {
+    const next = new Set(activeCategories);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    setActiveCategories(next);
+
+    if (next.size === 0) {
+      setFilters({ types: null });
+    } else {
+      const types = CATEGORIES.filter(c => next.has(c.key)).flatMap(c => [...c.types]);
+      setFilters({ types });
+    }
+  }
+
+  function handleProjectChange(projectId: number | null) {
+    setFilters({ projectId });
+  }
 
   const handleRead = async (n: Notification) => {
     if (!n.is_read) await markRead(n.id);
@@ -165,34 +162,61 @@ export default function NotificationsPage() {
         </button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 border-b border-border">
-        {TABS.map((tab) => (
+      {/* Filters */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <select
+          value={filters.projectId ?? ''}
+          onChange={(e) => handleProjectChange(e.target.value ? Number(e.target.value) : null)}
+          className="px-3 py-1.5 text-xs bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          <option value="">Все проекты</option>
+          {projects.map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+
+        {CATEGORIES.map((cat) => (
           <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 text-xs font-medium transition-colors ${
-              activeTab === tab.id
-                ? "border-b-2 border-primary text-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
+            key={cat.key}
+            type="button"
+            onClick={() => handleCategoryToggle(cat.key)}
+            className={cn(
+              'inline-flex items-center px-3 py-1 rounded-full text-xs font-medium transition-all',
+              activeCategories.has(cat.key)
+                ? 'bg-primary text-primary-foreground'
+                : 'border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30'
+            )}
           >
-            {tab.label}
+            {cat.label}
           </button>
         ))}
       </div>
 
       {/* List */}
       <div className="rounded-md border border-border bg-card shadow-[var(--shadow-card)] overflow-hidden">
-        {isLoading && notifications.length === 0 ? (
+        {error && notifications.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="h-10 w-10 rounded-md bg-destructive/10 flex items-center justify-center mb-3">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+            </div>
+            <p className="text-sm font-medium text-foreground">Не удалось загрузить данные</p>
+            <p className="text-xs text-muted-foreground mt-1">Попробуйте обновить страницу</p>
+            <button
+              onClick={() => fetchNotifications(0)}
+              className="mt-3 px-3 py-1.5 text-xs rounded-sm bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              Повторить
+            </button>
+          </div>
+        ) : isLoading && notifications.length === 0 ? (
           <div className="divide-y divide-border/50">
             {[...Array(5)].map((_, i) => (
               <NotificationSkeleton key={i} />
             ))}
           </div>
-        ) : filtered.length > 0 ? (
+        ) : notifications.length > 0 ? (
           <div className="divide-y divide-border/50">
-            {filtered.map((n) => (
+            {notifications.map((n) => (
               <NotificationItem key={n.id} notification={n} onRead={handleRead} />
             ))}
           </div>
