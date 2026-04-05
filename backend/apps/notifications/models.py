@@ -5,6 +5,7 @@ from django.db import models
 class Notification(models.Model):
     class Type(models.TextChoices):
         COMMENT_NEW = 'comment_new', 'Новый комментарий'
+        REACTION_NEW = 'reaction_new', 'Новая реакция'
         GENERATION_COMPLETED = 'generation_completed', 'Генерация завершена'
         GENERATION_FAILED = 'generation_failed', 'Ошибка генерации'
 

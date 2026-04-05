@@ -352,7 +352,7 @@ def public_reaction_view(request, token):
             display_name = author_name or 'Гость'
             create_notification(
                 user=el.project.user,
-                type=Notification.Type.COMMENT_NEW,
+                type=Notification.Type.REACTION_NEW,
                 project=el.project,
                 title=f'{display_name} {emoji}',
                 message='Реакция на элемент',
@@ -469,15 +469,23 @@ def group_element_ids(request, scene_id):
     from apps.scenes.models import Scene
     from apps.elements.models import Element
     scene = get_object_or_404(Scene, id=scene_id, project__user=request.user)
-    scene_ids = [scene.id]
-    if hasattr(Scene, 'parent'):
-        def get_child_ids(parent_id):
-            children = list(Scene.objects.filter(parent_id=parent_id).values_list('id', flat=True))
-            result = list(children)
-            for child_id in children:
-                result.extend(get_child_ids(child_id))
-            return result
-        scene_ids.extend(get_child_ids(scene.id))
+
+    # Single query: all scenes in this project, then BFS in Python
+    all_scenes = list(
+        Scene.objects.filter(project=scene.project).values_list('id', 'parent_id')
+    )
+    children_map = {}
+    for sid, pid in all_scenes:
+        children_map.setdefault(pid, []).append(sid)
+
+    # BFS from target scene
+    scene_ids = []
+    queue = [scene.id]
+    while queue:
+        current = queue.pop(0)
+        scene_ids.append(current)
+        queue.extend(children_map.get(current, []))
+
     elements = list(
         Element.objects.filter(scene_id__in=scene_ids)
         .exclude(status='FAILED')
