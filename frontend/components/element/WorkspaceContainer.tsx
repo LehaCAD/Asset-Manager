@@ -768,7 +768,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
             <button
               type="button"
               onClick={() => setLinksPanelOpen(true)}
-              className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
+              className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-muted-foreground bg-card hover:text-foreground transition-colors shrink-0"
             >
               Активные ссылки
             </button>

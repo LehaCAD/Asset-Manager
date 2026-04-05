@@ -332,6 +332,7 @@ export interface SharedLink {
   id: number
   token: string
   project: number
+  project_name: string
   created_by: number
   name: string
   element_ids: number[]

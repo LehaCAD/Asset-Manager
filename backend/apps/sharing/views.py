@@ -34,7 +34,7 @@ class SharedLinkViewSet(viewsets.ModelViewSet):
     http_method_names = ['get', 'post', 'patch', 'delete']
 
     def get_queryset(self):
-        qs = SharedLink.objects.filter(created_by=self.request.user)
+        qs = SharedLink.objects.filter(created_by=self.request.user).select_related('project')
         project_id = self.request.query_params.get('project')
         if project_id:
             qs = qs.filter(project_id=project_id)
