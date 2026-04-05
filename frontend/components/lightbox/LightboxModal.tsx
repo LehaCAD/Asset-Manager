@@ -21,7 +21,6 @@ import {
   FilterX,
   Loader2,
   AlertCircle,
-  Sparkles,
 } from "lucide-react";
 import type { Element, ElementFilter } from "@/lib/types";
 import { BADGE_MD } from "@/lib/utils/constants";
@@ -468,16 +467,9 @@ export function LightboxModal({
                       height: bounds.height,
                     }}
                   >
-                    {/* Badges - top right: AI (leftmost) → Star → Type (rightmost) */}
+                    {/* Badges - top right: Star (leftmost) → Type → AI */}
                     <div className="absolute top-2 right-2 flex items-center gap-1">
-                      {/* AI badge - only for generated elements */}
-                      {isGenerated && (
-                        <div className={cn(BADGE_MD.wrapper, "rounded-md bg-black/60 backdrop-blur-sm flex items-center justify-center text-overlay-text")}>
-                          <Sparkles className={BADGE_MD.icon} />
-                        </div>
-                      )}
-
-                      {/* Favorite icon - clickable */}
+                      {/* Favorite icon - always leftmost to prevent layout jump */}
                       <button
                         type="button"
                         onPointerDown={(e) => e.stopPropagation()}
@@ -505,6 +497,13 @@ export function LightboxModal({
                           <Image className={BADGE_MD.icon} />
                         )}
                       </div>
+
+                      {/* AI badge - only for generated elements */}
+                      {isGenerated && (
+                        <div className={cn(BADGE_MD.wrapper, "rounded-md bg-black/60 backdrop-blur-sm flex items-center justify-center")}>
+                          <span className="text-white font-bold leading-none text-[10px]">AI</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Video controls - positioned within bounds */}

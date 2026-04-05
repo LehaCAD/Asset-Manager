@@ -4,7 +4,7 @@ import { useRef, useEffect } from "react";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import type { Element } from "@/lib/types";
-import { Video, Image, Star, Sparkles } from "lucide-react";
+import { Video, Image, Star } from "lucide-react";
 import { BADGE_SM } from "@/lib/utils/constants";
 
 export interface FilmstripProps {
@@ -68,15 +68,8 @@ export function Filmstrip({ elements, currentElementId, onSelect }: FilmstripPro
                 </div>
               )}
 
-              {/* Badges - top right: AI (leftmost) → Star → Type (rightmost) */}
+              {/* Badges - top right: Star (leftmost) → Type → AI */}
               <div className="absolute top-1 right-1 flex items-center gap-0.5">
-                {/* AI badge - only for generated elements */}
-                {isGenerated && (
-                  <div className={cn(BADGE_SM.wrapper, "rounded-md bg-black/60 backdrop-blur-sm flex items-center justify-center text-overlay-text")}>
-                    <Sparkles className={BADGE_SM.icon} />
-                  </div>
-                )}
-
                 {/* Favorite icon */}
                 {el.is_favorite && (
                   <div className={cn(BADGE_SM.wrapper, "rounded-md bg-black/60 backdrop-blur-sm flex items-center justify-center")}>
@@ -92,6 +85,13 @@ export function Filmstrip({ elements, currentElementId, onSelect }: FilmstripPro
                     <Image className={BADGE_SM.icon} />
                   )}
                 </div>
+
+                {/* AI badge - only for generated elements */}
+                {isGenerated && (
+                  <div className={cn(BADGE_SM.wrapper, "rounded-md bg-black/60 backdrop-blur-sm flex items-center justify-center")}>
+                    <span className="text-white font-bold leading-none text-[8px]">AI</span>
+                  </div>
+                )}
               </div>
 
               {/* Hover overlay for better visibility */}

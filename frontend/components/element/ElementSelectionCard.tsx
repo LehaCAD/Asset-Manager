@@ -91,11 +91,21 @@ export function ElementSelectionCard({
               />
             )}
 
-            {/* Top-right corner: Type icon and Favorite star */}
-            <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5">
+            {/* Top-right badges: Star (leftmost) → Type → AI */}
+            <div className="absolute top-2 right-2 z-20 flex items-center gap-1">
+              {/* Favorite star - leftmost, read only */}
+              {element.is_favorite && (
+                <div
+                  className="rounded-md bg-black/60 backdrop-blur-sm h-6 w-6 flex items-center justify-center"
+                  title="В избранном"
+                >
+                  <Star className="h-3.5 w-3.5 text-white fill-amber-400" />
+                </div>
+              )}
+
               {/* Element type icon */}
               <div
-                className="rounded-md bg-black/60 backdrop-blur-sm p-[5px]"
+                className="rounded-md bg-black/60 backdrop-blur-sm h-6 w-6 flex items-center justify-center"
                 title={isVideo ? "Видео" : "Изображение"}
               >
                 {isVideo ? (
@@ -105,13 +115,10 @@ export function ElementSelectionCard({
                 )}
               </div>
 
-              {/* Favorite star - read only */}
-              {element.is_favorite && (
-                <div
-                  className="rounded-md bg-black/60 backdrop-blur-sm p-1.5"
-                  title="В избранном"
-                >
-                  <Star className="h-4 w-4 text-white fill-amber-400" />
+              {/* AI badge - only for generated */}
+              {element.source_type === "GENERATED" && (
+                <div className="rounded-md bg-black/60 backdrop-blur-sm h-6 w-6 flex items-center justify-center">
+                  <span className="text-white font-bold leading-none text-[10px]">AI</span>
                 </div>
               )}
             </div>

@@ -304,16 +304,9 @@ export function ElementCard({
           )}
         </button>
 
-        {/* Top-right badges: star + type + AI (hidden during upload — Cancel × takes this spot) */}
+        {/* Top-right badges: star → type → AI (hidden during upload — Cancel × takes this spot) */}
         <div className={cn("absolute top-2 right-2 z-40 flex items-center gap-1", isUploading && "hidden")}>
-          {/* AI badge - only for GENERATED */}
-          {element.source_type === "GENERATED" && (
-            <div className="rounded-md bg-black/60 backdrop-blur-sm h-6 w-6 flex items-center justify-center">
-              <span className="text-white font-bold leading-none text-[10px]">AI</span>
-            </div>
-          )}
-
-          {/* Star - hover for empty, always for filled */}
+          {/* Star - always leftmost to prevent layout jump on hover */}
           <button
             type="button"
             onPointerDown={handleControlPointerDown}
@@ -335,6 +328,13 @@ export function ElementCard({
               <Image className={cn(BADGE_SM.icon, "text-white")} />
             )}
           </div>
+
+          {/* AI badge - only for GENERATED */}
+          {element.source_type === "GENERATED" && (
+            <div className="rounded-md bg-black/60 backdrop-blur-sm h-6 w-6 flex items-center justify-center">
+              <span className="text-white font-bold leading-none text-[10px]">AI</span>
+            </div>
+          )}
         </div>
 
         {/* Comment count badge — always visible */}

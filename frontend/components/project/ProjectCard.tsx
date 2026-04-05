@@ -117,7 +117,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
         {/* Footer */}
         <div className="px-3.5 py-3 space-y-1.5 border-t border-border">
           <div className="flex items-center justify-between gap-2 min-w-0">
-            <h3 className="text-base font-medium leading-tight line-clamp-1 group-hover:text-primary transition-colors flex-1 min-w-0">
+            <h3 className="text-base font-medium leading-tight line-clamp-1 text-foreground group-hover:text-primary transition-colors flex-1 min-w-0">
               {project.name}
             </h3>
             <div data-no-navigate className="shrink-0">
