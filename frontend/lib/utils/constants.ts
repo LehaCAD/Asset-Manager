@@ -6,9 +6,9 @@ export const ASPECT_RATIOS = [
 export type AspectRatio = (typeof ASPECT_RATIOS)[number]["value"];
 
 export const PROJECT_STATUSES = [
-  { value: "ACTIVE", label: "Активен", color: "text-green-500" },
-  { value: "PAUSED", label: "На паузе", color: "text-yellow-500" },
-  { value: "COMPLETED", label: "Завершён", color: "text-blue-500" },
+  { value: "ACTIVE", label: "Активен", color: "bg-success" },
+  { value: "PAUSED", label: "На паузе", color: "bg-warning" },
+  { value: "COMPLETED", label: "Завершён", color: "bg-blue-400" },
 ] as const;
 
 export const SCENE_STATUSES = [
@@ -102,12 +102,25 @@ export const CARD_SIZES = {
   },
 } as const;
 
-// GroupCard sizes — scales with display size setting, but ignores aspect ratio.
-// Always landscape-ish proportions for consistent group row height.
+// GroupCard sizes — proportions ~5:4, pixel area ≈ CARD_SIZES landscape.
+// stackStep = offset per layer (same in X and Y). 2 layers → stackWidth = width + step*2.
 export const GROUP_CARD_SIZES = {
-  compact: { width: 180, height: 130 },
-  medium:  { width: 220, height: 155 },
-  large:   { width: 280, height: 190 },
+  compact: { width: 220, height: 175, stackStep: 5, stackWidth: 230 },  // 220+5*2
+  medium:  { width: 270, height: 215, stackStep: 6, stackWidth: 282 },  // 270+6*2
+  large:   { width: 320, height: 255, stackStep: 7, stackWidth: 334 },  // 320+7*2
+} as const;
+
+// ── Badge System (фиксированные, НЕ зависят от view mode) ──
+export const BADGE_SM = {
+  wrapper: "h-6 w-6",         // 24px
+  icon: "h-3.5 w-3.5",        // 14px
+  padding: "p-[5px]",
+} as const;
+
+export const BADGE_MD = {
+  wrapper: "h-7 w-7",         // 28px
+  icon: "h-4 w-4",            // 16px
+  padding: "p-1.5",
 } as const;
 
 // Размеры иконок для каждого размера карточки
