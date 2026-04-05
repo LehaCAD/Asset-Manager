@@ -14,6 +14,7 @@ class ElementSerializer(serializers.ModelSerializer):
     file_size = serializers.IntegerField(read_only=True, allow_null=True)
     generation_cost = serializers.SerializerMethodField()
     review_summary = serializers.SerializerMethodField()
+    comment_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Element
@@ -47,7 +48,8 @@ class ElementSerializer(serializers.ModelSerializer):
             'review_summary',
             'preview_url',
             'created_at',
-            'updated_at'
+            'updated_at',
+            'comment_count',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'external_task_id', 'review_summary']
 
@@ -89,6 +91,12 @@ class ElementSerializer(serializers.ModelSerializer):
         priority = {'rejected': 0, 'changes_requested': 1, 'approved': 2}
         worst = min(reviews, key=lambda r: priority.get(r.action, 99))
         return {'action': worst.action, 'author_name': worst.author_name}
+
+    def get_comment_count(self, obj):
+        """Count of comments on this element (excluding system comments)."""
+        if hasattr(obj, '_comment_count'):
+            return obj._comment_count
+        return obj.comments.filter(is_system=False).count()
 
 
 class ReorderSerializer(serializers.Serializer):
