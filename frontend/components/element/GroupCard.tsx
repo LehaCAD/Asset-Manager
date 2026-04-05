@@ -2,7 +2,7 @@
 
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatStorage } from '@/lib/utils/format';
-import { ASPECT_RATIO_CLASSES, CARD_ICON_SIZES, CARD_TEXT_SIZES } from '@/lib/utils/constants';
+import { GROUP_CARD_SIZES, CARD_ICON_SIZES, CARD_TEXT_SIZES } from '@/lib/utils/constants';
 import { Folder, FolderOpen, Check, Trash2, Layers, HardDrive } from 'lucide-react';
 import { ChargeIcon } from '@/components/ui/charge-icon';
 import type { Scene, DisplayCardSize, DisplayAspectRatio, DisplayFitMode } from '@/lib/types';
@@ -14,6 +14,7 @@ export interface GroupCardProps {
   onSelect: (id: number, addToSelection: boolean) => void;
   onClick: (id: number) => void;
   onDelete?: (id: number) => void;
+  isDropTarget?: boolean;
   className?: string;
   style?: React.CSSProperties;
   size?: DisplayCardSize;
@@ -28,6 +29,7 @@ export function GroupCard({
   onSelect,
   onClick,
   onDelete,
+  isDropTarget = false,
   className,
   style,
   size = 'medium',
@@ -35,7 +37,8 @@ export function GroupCard({
 }: GroupCardProps) {
   const iconSizes = CARD_ICON_SIZES[size];
   const textSizes = CARD_TEXT_SIZES[size];
-  const aspectClass = ASPECT_RATIO_CLASSES[aspectRatio];
+  const groupDims = GROUP_CARD_SIZES[size];
+  const iconSm = iconSizes.sm;
 
   const elementCount = group.element_count ?? group.elements_count ?? 0;
 
@@ -65,13 +68,20 @@ export function GroupCard({
         'transition-all duration-150',
         'hover:shadow-md hover:shadow-primary/5',
         isSelected && 'ring-2 ring-primary border-primary',
+        isDropTarget && 'ring-2 ring-primary bg-primary/[0.04] border-primary',
         className,
       )}
-      style={style}
+      style={{ width: groupDims.width, ...style }}
       onClick={handleCardClick}
     >
       {/* Preview area */}
-      <div className={cn('relative overflow-hidden bg-muted', aspectClass)}>
+      <div className="relative overflow-hidden bg-muted" style={{ height: groupDims.height - 44 }}>
+        {/* Badge «Группа» */}
+        <div className="absolute left-1.5 top-1.5 z-10 flex items-center gap-1 rounded bg-[#0F172A]/80 px-1.5 py-0.5">
+          <Folder className="h-2.5 w-2.5 text-muted-foreground" />
+          <span className="text-[9px] font-semibold text-muted-foreground">Группа</span>
+        </div>
+
         {group.preview_thumbnails && group.preview_thumbnails.length > 0 ? (
           <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-0.5">
             {[0, 1, 2, 3].map((i) => {
@@ -146,7 +156,11 @@ export function GroupCard({
       {/* Info section (like ProjectCard) */}
       <div className="p-2.5 space-y-1">
         <div className="flex items-center gap-1.5">
-          <Folder className="h-3.5 w-3.5 text-primary/60 shrink-0" />
+          {isDropTarget ? (
+            <FolderOpen className={cn(iconSm, "text-primary shrink-0")} />
+          ) : (
+            <Folder className={cn(iconSm, "text-muted-foreground shrink-0")} />
+          )}
           <span className={cn('font-medium line-clamp-1 text-foreground group-hover:text-primary transition-colors', textSizes.title)}>
             {group.name}
           </span>
