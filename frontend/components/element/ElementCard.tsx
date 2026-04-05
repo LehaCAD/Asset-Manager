@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import type { WorkspaceElement, DisplayCardSize, DisplayAspectRatio, DisplayFitMode, UploadPhase } from "@/lib/types";
-import { ASPECT_RATIO_CLASSES, FIT_MODE_CLASSES, CARD_ICON_SIZES } from "@/lib/utils/constants";
+import { ASPECT_RATIO_CLASSES, FIT_MODE_CLASSES, BADGE_SM, BADGE_MD } from "@/lib/utils/constants";
 import {
   Star,
   Trash2,
@@ -18,6 +18,7 @@ import {
   Pencil,
   FolderInput,
   X,
+  MessageCircle,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -131,9 +132,6 @@ export function ElementCard({
   const mediaSrc = (isVideo
     ? videoThumbnailSrc || videoFileSrc
     : element.preview_url?.trim() || element.thumbnail_url?.trim() || element.file_url)?.trim() || null;
-
-  // Получаем размеры иконок для текущего size
-  const iconSizes = CARD_ICON_SIZES[size];
 
   // Filename for download and display
   const filename = element.original_filename ||
@@ -286,8 +284,8 @@ export function ElementCard({
           onPointerDown={handleControlPointerDown}
           onClick={handleSelectClick}
           className={cn(
-            "absolute top-2 left-2 z-40 rounded-full flex items-center justify-center transition-all duration-150",
-            iconSizes.padding,
+            "absolute top-2 left-2 z-40 rounded-md flex items-center justify-center transition-all duration-150",
+            BADGE_MD.padding,
             isFailed
               ? "opacity-0 pointer-events-none"
               : isMultiSelectMode || isSelected
@@ -300,9 +298,9 @@ export function ElementCard({
           )}
         >
           {isSelected ? (
-            <Check className={iconSizes.md} />
+            <Check className={BADGE_MD.icon} />
           ) : (
-            <Check className={cn(iconSizes.md, "opacity-0")} />
+            <Check className={cn(BADGE_MD.icon, "opacity-0")} />
           )}
         </button>
 
@@ -315,29 +313,26 @@ export function ElementCard({
             onClick={handleToggleFavoriteClick}
             className={cn(
               "rounded-md bg-black/60 p-1.5 transition-opacity duration-150",
-              element.is_favorite ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+              element.is_favorite ? "opacity-100" : "hidden"
             )}
             title={element.is_favorite ? "Убрать из избранного" : "В избранное"}
           >
-            <Star className={cn(iconSizes.sm, "text-white", element.is_favorite && "fill-amber-400 text-amber-400")} />
+            <Star className={cn(BADGE_MD.icon, "text-white", element.is_favorite && "fill-amber-400 text-amber-400")} />
           </button>
 
           {/* Media type - always visible */}
           <div className="rounded-md bg-black/60 p-1.5">
             {isVideo ? (
-              <Video className={cn(iconSizes.sm, "text-white")} />
+              <Video className={cn(BADGE_SM.icon, "text-white")} />
             ) : (
-              <Image className={cn(iconSizes.sm, "text-white")} />
+              <Image className={cn(BADGE_SM.icon, "text-white")} />
             )}
           </div>
 
           {/* AI pill - only for GENERATED */}
           {element.source_type === "GENERATED" && (
             <div className="rounded-md bg-black/60 p-1.5 flex items-center">
-              <span className={cn(
-                "text-white font-bold leading-none",
-                size === "compact" ? "text-[9px]" : "text-[11px]"
-              )}>AI</span>
+              <span className="text-white font-bold leading-none text-[11px]">AI</span>
             </div>
           )}
         </div>
@@ -345,7 +340,27 @@ export function ElementCard({
         {/* Bottom-left: Play for video */}
         {isVideo && element.status === 'COMPLETED' && (
           <div className="absolute bottom-2 left-2 z-30 rounded-md bg-black/60 p-1.5">
-            <Play className={cn(iconSizes.sm, "text-white fill-white")} />
+            <Play className={cn(BADGE_SM.icon, "text-white fill-white")} />
+          </div>
+        )}
+
+        {/* Comment count badge — always visible */}
+        {element.comment_count != null && element.comment_count > 0 && element.status === 'COMPLETED' && (
+          <div className={cn(
+            "absolute bottom-2 z-30 flex items-center gap-1",
+            isVideo && element.status === 'COMPLETED' ? "left-10" : "left-2"
+          )}>
+            <div className={cn(
+              "rounded-md bg-black/60 backdrop-blur-sm flex items-center gap-1",
+              element.comment_count > 1 ? "h-6 px-1.5" : "h-6 w-6 justify-center"
+            )}>
+              <MessageCircle className="h-3.5 w-3.5 text-white" />
+              {element.comment_count > 1 && (
+                <span className="text-[11px] font-semibold text-white">
+                  {element.comment_count > 99 ? '99+' : element.comment_count}
+                </span>
+              )}
+            </div>
           </div>
         )}
 
@@ -358,7 +373,7 @@ export function ElementCard({
             className="absolute top-2 right-2 z-50 rounded-full bg-black/70 hover:bg-error/70 p-1 transition-colors"
             title="Отменить загрузку"
           >
-            <X className={iconSizes.sm} />
+            <X className={BADGE_SM.icon} />
           </button>
         )}
 
@@ -381,11 +396,11 @@ export function ElementCard({
                   onPointerDown={handleControlPointerDown}
                   onClick={handleOpenLightboxClick}
                   className={cn(
-                    "rounded-full bg-overlay-button hover:bg-overlay-button-hover transition-colors pointer-events-auto",
-                    iconSizes.padding
+                    "rounded-md bg-overlay-button hover:bg-overlay-button-hover transition-colors pointer-events-auto",
+                    BADGE_MD.padding
                   )}
                 >
-                  <Play className={cn(iconSizes.lg, "text-overlay-text fill-white")} />
+                  <Play className={cn("h-5 w-5", "text-overlay-text fill-white")} />
                 </button>
               </div>
             )}
@@ -399,11 +414,11 @@ export function ElementCard({
                   onPointerDown={handleControlPointerDown}
                   onClick={handleDownload}
                   className={cn(
-                    "rounded-full bg-overlay-button hover:bg-overlay-button-hover transition-colors text-overlay-text",
-                    iconSizes.padding
+                    "rounded-md bg-overlay-button hover:bg-overlay-button-hover transition-colors text-overlay-text",
+                    BADGE_MD.padding
                   )}
                 >
-                  <Download className={iconSizes.md} />
+                  <Download className={BADGE_MD.icon} />
                 </button>
               ) : (
                 <button
@@ -412,11 +427,11 @@ export function ElementCard({
                   onPointerDown={handleControlPointerDown}
                   onClick={(e) => e.stopPropagation()}
                   className={cn(
-                    "rounded-full bg-overlay-light text-overlay-text-muted cursor-not-allowed",
-                    iconSizes.padding
+                    "rounded-md bg-overlay-light text-overlay-text-muted cursor-not-allowed",
+                    BADGE_MD.padding
                   )}
                 >
-                  <Download className={iconSizes.md} />
+                  <Download className={BADGE_MD.icon} />
                 </button>
               )}
 
@@ -426,11 +441,11 @@ export function ElementCard({
                 onPointerDown={handleControlPointerDown}
                 onClick={handleDeleteClick}
                 className={cn(
-                  "rounded-full bg-overlay-button hover:bg-error/50 transition-colors text-overlay-text",
-                  iconSizes.padding
+                  "rounded-md bg-overlay-button hover:bg-error/50 transition-colors text-overlay-text",
+                  BADGE_MD.padding
                 )}
               >
-                <Trash2 className={iconSizes.md} />
+                <Trash2 className={BADGE_MD.icon} />
               </button>
             </div>
           </div>
@@ -477,7 +492,7 @@ export function ElementCard({
         {/* Status overlay */}
         {isSubmitting && (
           <div className="absolute inset-0 z-30 bg-overlay-heavy flex flex-col items-center justify-center pointer-events-none">
-            <Loader2 className={cn(iconSizes.lg, "text-overlay-text animate-spin mb-1")} />
+            <Loader2 className={cn("h-6 w-6", "text-overlay-text animate-spin mb-1")} />
             <span className="text-[10px] text-overlay-text font-medium">Отправка...</span>
             {elapsed && <span className="text-[10px] text-overlay-text-muted">{elapsed}</span>}
           </div>
@@ -486,12 +501,12 @@ export function ElementCard({
           <UploadProgressOverlay
             phase={element.client_upload_phase}
             progress={element.client_upload_progress ?? 0}
-            iconSize={iconSizes.lg}
+            iconSize={"h-6 w-6"}
           />
         )}
         {!isSubmitting && !isUploading && isProcessing && (
           <div className="absolute inset-0 z-30 bg-overlay flex flex-col items-center justify-center pointer-events-none gap-1">
-            <Loader2 className={cn(iconSizes.lg, "text-overlay-text animate-spin")} />
+            <Loader2 className={cn("h-6 w-6", "text-overlay-text animate-spin")} />
             <span className="text-[10px] text-overlay-text font-medium truncate max-w-[90%] text-center">
               {element.status === "PENDING"
                 ? "Ожидание..."
@@ -506,7 +521,7 @@ export function ElementCard({
           <div className="absolute inset-0 z-30 flex flex-col pointer-events-none">
             {/* Top area — muted error icon */}
             <div className="flex-1 bg-error/10 flex flex-col items-center justify-center gap-1.5">
-              <AlertCircle className={cn(iconSizes.lg, "text-error/25")} />
+              <AlertCircle className={cn("h-6 w-6", "text-error/25")} />
               <span className="text-[10px] text-overlay-text-muted">{element.source_type === "UPLOADED" ? "Загрузка не удалась" : "Генерация не удалась"}</span>
             </div>
             {/* Bottom info bar */}
