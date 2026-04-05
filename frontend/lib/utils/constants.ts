@@ -123,44 +123,6 @@ export const BADGE_MD = {
   padding: "p-1.5",
 } as const;
 
-// Размеры иконок для каждого размера карточки
-export const CARD_ICON_SIZES = {
-  compact: {
-    sm: "w-3 h-3",      // маленькие иконки (чекбокс, тип)
-    md: "w-4 h-4",      // средние (звезда, скачать)
-    lg: "w-5 h-5",      // большие (play)
-    padding: "p-1.5",   // padding для кнопок
-  },
-  medium: {
-    sm: "w-4 h-4",
-    md: "w-5 h-5",
-    lg: "w-6 h-6",
-    padding: "p-2",
-  },
-  large: {
-    sm: "w-5 h-5",
-    md: "w-6 h-6",
-    lg: "w-7 h-7",
-    padding: "p-2.5",
-  },
-} as const;
-
-// Размеры текста для каждого размера карточки
-export const CARD_TEXT_SIZES = {
-  compact: {
-    title: "text-xs",
-    meta: "text-[10px]",
-  },
-  medium: {
-    title: "text-sm",
-    meta: "text-xs",
-  },
-  large: {
-    title: "text-base",
-    meta: "text-sm",
-  },
-} as const;
-
 // CSS классы для grid с auto-fit
 export const DISPLAY_GRID_CONFIG = {
   compact: {
