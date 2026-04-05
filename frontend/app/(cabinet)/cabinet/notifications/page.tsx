@@ -6,20 +6,20 @@ import { BellOff, AlertCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NotificationIcon } from "@/components/ui/notification-icon";
 import { useNotificationStore } from "@/lib/store/notifications";
+import type { NotificationTab } from "@/lib/store/notifications";
 import { projectsApi } from "@/lib/api/projects";
 import { cn } from "@/lib/utils";
 import type { Notification } from "@/lib/types";
 
-/* ── Category filter config ────────────────────────────────── */
+/* ── Tabs config ───────────────────────────────────────── */
 
-const CATEGORIES = [
-  { key: 'feedback' as const, label: 'Отзывы', types: ['comment_new', 'reaction_new'] },
-  { key: 'content' as const, label: 'Контент', types: ['generation_completed', 'generation_failed', 'upload_completed'] },
-] as const;
+const TABS: { id: NotificationTab; label: string }[] = [
+  { id: "all", label: "Все" },
+  { id: "feedback", label: "Отзывы" },
+  { id: "content", label: "Контент" },
+];
 
-type CategoryKey = typeof CATEGORIES[number]['key'];
-
-/* ── Relative time ──────────────────────────────────────── */
+/* ── Relative time ─────────────────────────────────────── */
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -38,7 +38,7 @@ function relativeTime(iso: string): string {
   });
 }
 
-/* ── Single notification row ────────────────────────────── */
+/* ── Single notification row ───────────────────────────── */
 
 function NotificationItem({
   notification,
@@ -55,7 +55,6 @@ function NotificationItem({
       }`}
     >
       <NotificationIcon type={notification.type} />
-
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm font-medium text-foreground leading-snug truncate">
@@ -71,7 +70,6 @@ function NotificationItem({
           </p>
         )}
       </div>
-
       {!notification.is_read && (
         <div className="shrink-0 mt-1.5 h-2 w-2 rounded-full bg-primary" />
       )}
@@ -79,7 +77,7 @@ function NotificationItem({
   );
 }
 
-/* ── Skeleton loader ────────────────────────────────────── */
+/* ── Skeleton ──────────────────────────────────────────── */
 
 function NotificationSkeleton() {
   return (
@@ -93,60 +91,37 @@ function NotificationSkeleton() {
   );
 }
 
-/* ── Page ───────────────────────────────────────────────── */
+/* ── Page ──────────────────────────────────────────────── */
 
 export default function NotificationsPage() {
   const router = useRouter();
   const {
     notifications, hasMore, isLoading, error,
-    filters, setFilters,
+    activeTab, projectId,
+    setActiveTab, setProjectId,
     fetchNotifications, markRead, markAllRead,
   } = useNotificationStore();
 
-  const [activeCategories, setActiveCategories] = useState<Set<CategoryKey>>(new Set());
   const [projects, setProjects] = useState<{ id: number; name: string }[]>([]);
 
   useEffect(() => {
     fetchNotifications(0);
   }, [fetchNotifications]);
 
-  // Fetch projects for dropdown
   useEffect(() => {
     projectsApi.getAll().then(data => {
       setProjects(data.map(p => ({ id: p.id, name: p.name })));
     }).catch(() => {});
   }, []);
 
-  function handleCategoryToggle(key: CategoryKey) {
-    const next = new Set(activeCategories);
-    if (next.has(key)) next.delete(key);
-    else next.add(key);
-    setActiveCategories(next);
-
-    if (next.size === 0) {
-      setFilters({ types: null });
-    } else {
-      const types = CATEGORIES.filter(c => next.has(c.key)).flatMap(c => [...c.types]);
-      setFilters({ types });
-    }
-  }
-
-  function handleProjectChange(projectId: number | null) {
-    setFilters({ projectId });
-  }
-
   const handleRead = async (n: Notification) => {
     if (!n.is_read) await markRead(n.id);
     if (n.project) {
-      let url = `/projects/${n.project}`
-      if (n.scene) url += `/groups/${n.scene}`
-      if (n.element) url += `?lightbox=${n.element}`
-      router.push(url)
+      let url = `/projects/${n.project}`;
+      if (n.scene) url += `/groups/${n.scene}`;
+      if (n.element) url += `?lightbox=${n.element}`;
+      router.push(url);
     }
-  };
-
-  const handleLoadMore = () => {
-    fetchNotifications(notifications.length);
   };
 
   return (
@@ -162,34 +137,37 @@ export default function NotificationsPage() {
         </button>
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <select
-          value={filters.projectId ?? ''}
-          onChange={(e) => handleProjectChange(e.target.value ? Number(e.target.value) : null)}
-          className="px-3 py-1.5 text-xs bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-        >
-          <option value="">Все проекты</option>
-          {projects.map((p) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
+      {/* Tabs + Project dropdown */}
+      <div className="flex items-center justify-between">
+        <div className="flex gap-0 border-b border-border">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                "px-4 py-2 text-xs font-medium transition-colors",
+                activeTab === tab.id
+                  ? "border-b-2 border-primary text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {tab.label}
+            </button>
           ))}
-        </select>
+        </div>
 
-        {CATEGORIES.map((cat) => (
-          <button
-            key={cat.key}
-            type="button"
-            onClick={() => handleCategoryToggle(cat.key)}
-            className={cn(
-              'inline-flex items-center px-3 py-1 rounded-full text-xs font-medium transition-all',
-              activeCategories.has(cat.key)
-                ? 'bg-primary text-primary-foreground'
-                : 'border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30'
-            )}
+        {projects.length > 0 && (
+          <select
+            value={projectId ?? ''}
+            onChange={(e) => setProjectId(e.target.value ? Number(e.target.value) : null)}
+            className="px-3 py-1.5 text-xs bg-background border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring appearance-none cursor-pointer"
           >
-            {cat.label}
-          </button>
-        ))}
+            <option value="">Все проекты</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* List */}
@@ -234,7 +212,7 @@ export default function NotificationsPage() {
       {hasMore && !isLoading && (
         <div className="flex justify-center">
           <button
-            onClick={handleLoadMore}
+            onClick={() => fetchNotifications(notifications.length)}
             className="px-4 py-2 text-xs text-muted-foreground hover:text-foreground bg-muted/60 hover:bg-muted rounded-md transition-colors"
           >
             Загрузить ещё
@@ -242,7 +220,6 @@ export default function NotificationsPage() {
         </div>
       )}
 
-      {/* Inline loader for load-more */}
       {isLoading && notifications.length > 0 && (
         <div className="flex justify-center py-2">
           <div className="h-4 w-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />
