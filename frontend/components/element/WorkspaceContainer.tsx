@@ -104,6 +104,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   const [groupRenameTarget, setGroupRenameTarget] = useState<{ id: number; name: string } | null>(null);
   const [groupShareOpen, setGroupShareOpen] = useState(false);
   const [groupShareProjectId, setGroupShareProjectId] = useState<number>(0);
+  const [groupShareElements, setGroupShareElements] = useState<Array<{ id: number; element_type: string; is_favorite: boolean; source_type: string }>>([]);
 
 
   // Share mode persisted in sessionStorage to survive group navigation
@@ -536,9 +537,14 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   }, [groupRenameTarget, loadWorkspace, projectId, groupId]);
 
   // Group share (from three-dots menu on GroupCard)
-  const handleGroupShare = useCallback((_groupIdToShare: number) => {
-    setGroupShareProjectId(projectId);
-    setGroupShareOpen(true);
+  const handleGroupShare = useCallback(async (groupIdToShare: number) => {
+    try {
+      const els = await sharingApi.getGroupElements(groupIdToShare);
+      if (els.length === 0) { toast.error('В группе нет элементов'); return; }
+      setGroupShareElements(els);
+      setGroupShareProjectId(projectId);
+      setGroupShareOpen(true);
+    } catch { toast.error('Не удалось загрузить элементы'); }
   }, [projectId]);
 
   // Handle group delete with confirmation (fetches counts first)
@@ -984,9 +990,10 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
         {/* Group share dialog */}
         <CreateLinkDialog
           isOpen={groupShareOpen}
-          onClose={() => setGroupShareOpen(false)}
+          onClose={() => { setGroupShareOpen(false); setGroupShareElements([]); }}
           projectId={groupShareProjectId}
-          elementIds={[]}
+          elementIds={groupShareElements.map(e => e.id)}
+          elements={groupShareElements}
         />
 
         {/* Group delete confirmation dialog */}
