@@ -168,60 +168,66 @@ export function CreateLinkDialog({
           {/* Filter rows — only if metadata available */}
           {hasMetadata && simpleCounts && (
             <div className="space-y-2.5">
-              {/* Source row — hide if only one source type exists */}
-              {(simpleCounts.generated > 0 && simpleCounts.uploaded > 0) && (
-                <div className="flex items-center gap-3">
-                  <span className="text-[11px] text-muted-foreground font-medium w-16 shrink-0">Источник</span>
-                  <div className="flex gap-1.5">
+              {/* Source row */}
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] text-muted-foreground font-medium w-16 shrink-0">Источник</span>
+                <div className="flex gap-1.5">
+                  {simpleCounts.generated > 0 && (
                     <FilterPill
                       label="Генерации"
                       count={simpleCounts.generated}
                       active={sourceFilter.has('GENERATED')}
                       onClick={() => setSourceFilter(s => toggleInSet(s, 'GENERATED'))}
                     />
+                  )}
+                  {simpleCounts.uploaded > 0 && (
                     <FilterPill
                       label="Загрузки"
                       count={simpleCounts.uploaded}
                       active={sourceFilter.has('UPLOADED')}
                       onClick={() => setSourceFilter(s => toggleInSet(s, 'UPLOADED'))}
                     />
-                  </div>
+                  )}
                 </div>
-              )}
-              {/* Type row — hide if only one type exists */}
-              {(simpleCounts.images > 0 && simpleCounts.videos > 0) && (
-                <div className="flex items-center gap-3">
-                  <span className="text-[11px] text-muted-foreground font-medium w-16 shrink-0">Тип</span>
-                  <div className="flex gap-1.5">
+              </div>
+              {/* Type row */}
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] text-muted-foreground font-medium w-16 shrink-0">Тип</span>
+                <div className="flex gap-1.5">
+                  {simpleCounts.images > 0 && (
                     <FilterPill
                       label="Фото"
                       count={simpleCounts.images}
                       active={typeFilter.has('IMAGE')}
                       onClick={() => setTypeFilter(s => toggleInSet(s, 'IMAGE'))}
                     />
+                  )}
+                  {simpleCounts.videos > 0 && (
                     <FilterPill
                       label="Видео"
                       count={simpleCounts.videos}
                       active={typeFilter.has('VIDEO')}
                       onClick={() => setTypeFilter(s => toggleInSet(s, 'VIDEO'))}
                     />
-                  </div>
+                  )}
                 </div>
-              )}
-              {/* Favorites row — hide if no favorites */}
-              {simpleCounts.favorites > 0 && (
-                <div className="flex items-center gap-3">
-                  <span className="text-[11px] text-muted-foreground font-medium w-16 shrink-0">Статус</span>
-                  <div className="flex gap-1.5">
+              </div>
+              {/* Favorites row */}
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] text-muted-foreground font-medium w-16 shrink-0">Статус</span>
+                <div className="flex gap-1.5">
+                  {simpleCounts.favorites > 0 ? (
                     <FilterPill
                       label="Избранное"
                       count={simpleCounts.favorites}
                       active={favoriteFilter}
                       onClick={() => setFavoriteFilter(f => !f)}
                     />
-                  </div>
+                  ) : (
+                    <span className="text-[11px] text-muted-foreground/50">нет избранных</span>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           )}
 
