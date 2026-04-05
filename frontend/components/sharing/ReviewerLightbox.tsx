@@ -2,6 +2,7 @@
 
 import { useEffect, useCallback, useState, useRef } from 'react'
 import { X, Download, ExternalLink, MessageCircle, Video, Image, ThumbsUp, ThumbsDown, Check, RotateCcw } from 'lucide-react'
+import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { LightboxNavigation } from '@/components/lightbox/LightboxNavigation'
@@ -62,6 +63,7 @@ export function ReviewerLightbox({
 }: ReviewerLightboxProps) {
   const [reviewerName, setReviewerName] = useState('')
   const [sessionId, setSessionId] = useState('')
+  const [mobileCommentsOpen, setMobileCommentsOpen] = useState(false)
   const activeThumbRef = useRef<HTMLButtonElement>(null)
 
   // Load reviewer identity from localStorage
@@ -281,6 +283,15 @@ export function ReviewerLightbox({
               </>
             )}
 
+            {/* Mobile comments button — only on small screens */}
+            <button
+              className="md:hidden rounded-md bg-muted px-3 py-1.5 text-xs text-muted-foreground"
+              onClick={() => setMobileCommentsOpen(true)}
+            >
+              <MessageCircle className="w-4 h-4 inline mr-1" />
+              Комменты
+            </button>
+
             {/* Review actions */}
             <div className="flex items-center gap-1.5 ml-4 border-l border-border pl-4">
               <button
@@ -375,6 +386,33 @@ export function ReviewerLightbox({
           <ScrollBar orientation="horizontal" />
         </ScrollArea>
       </div>
+      {/* Mobile comments sheet */}
+      <Sheet open={mobileCommentsOpen} onOpenChange={setMobileCommentsOpen}>
+        <SheetContent side="bottom" className="h-[70vh] p-0">
+          <div className="flex flex-col h-full">
+            <div className="px-4 py-3 border-b flex items-center gap-2 shrink-0">
+              <MessageCircle className="w-4 h-4 text-muted-foreground" />
+              <h3 className="text-sm font-medium text-foreground">Комментарии</h3>
+              {comments.length > 0 && (
+                <span className="text-xs text-muted-foreground bg-muted rounded-full px-2 py-0.5">
+                  {comments.length}
+                </span>
+              )}
+            </div>
+            <div className="flex-1 overflow-y-auto px-4 py-3">
+              {!hasIdentity ? (
+                <ReviewerNameInput onSave={handleNameSave} />
+              ) : (
+                <CommentThread
+                  comments={comments}
+                  onSubmit={handleCommentSubmit}
+                  isAuthenticated={true}
+                />
+              )}
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }
