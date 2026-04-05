@@ -292,6 +292,29 @@ def public_review_action(request, token):
         defaults={'action': action, 'author_name': author_name},
     )
 
+    # Notify project owner about review decision
+    try:
+        from apps.notifications.services import create_notification
+        from apps.notifications.models import Notification
+        from apps.elements.models import Element
+        el = Element.objects.select_related('project__user').get(id=element_id)
+        action_labels = {
+            'approved': 'Согласовано ✅',
+            'changes_requested': 'На доработку 🔄',
+            'rejected': 'Отклонено ❌',
+        }
+        display_name = author_name or 'Гость'
+        create_notification(
+            user=el.project.user,
+            type=Notification.Type.REVIEW_NEW,
+            project=el.project,
+            title=f'{display_name}: {action_labels.get(action, action)}',
+            message='Решение по элементу',
+            element=el,
+        )
+    except Exception as e:
+        logger.warning(f'Failed to send review notification: {e}')
+
     return Response({
         'element_id': element_id,
         'action': review.action,

@@ -6,6 +6,7 @@ class Notification(models.Model):
     class Type(models.TextChoices):
         COMMENT_NEW = 'comment_new', 'Новый комментарий'
         REACTION_NEW = 'reaction_new', 'Новая реакция'
+        REVIEW_NEW = 'review_new', 'Новое решение по ревью'
         GENERATION_COMPLETED = 'generation_completed', 'Генерация завершена'
         GENERATION_FAILED = 'generation_failed', 'Ошибка генерации'
         UPLOAD_COMPLETED = 'upload_completed', 'Загрузка завершена'

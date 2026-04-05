@@ -441,7 +441,7 @@ export interface WSElementStatusChangedEvent {
   upload_progress?: number;
 }
 
-export type NotificationType = 'comment_new' | 'reaction_new' | 'generation_completed' | 'generation_failed' | 'upload_completed'
+export type NotificationType = 'comment_new' | 'reaction_new' | 'review_new' | 'generation_completed' | 'generation_failed' | 'upload_completed'
 
 export interface Notification {
   id: number

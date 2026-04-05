@@ -1,9 +1,10 @@
-import { MessageCircle, CheckCircle2, XCircle, ThumbsUp, Upload } from 'lucide-react'
+import { MessageCircle, CheckCircle2, XCircle, ThumbsUp, Upload, ClipboardCheck } from 'lucide-react'
 import type { NotificationType } from '@/lib/types'
 
 const ICON_CONFIG: Record<NotificationType, { icon: React.ElementType; colorClass: string }> = {
   comment_new: { icon: MessageCircle, colorClass: 'text-primary bg-primary/10' },
   reaction_new: { icon: ThumbsUp, colorClass: 'text-primary bg-primary/10' },
+  review_new: { icon: ClipboardCheck, colorClass: 'text-primary bg-primary/10' },
   generation_completed: { icon: CheckCircle2, colorClass: 'text-success bg-success/10' },
   generation_failed: { icon: XCircle, colorClass: 'text-destructive bg-destructive/10' },
   upload_completed: { icon: Upload, colorClass: 'text-success bg-success/10' },

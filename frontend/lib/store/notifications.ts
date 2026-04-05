@@ -6,7 +6,7 @@ type NotificationTab = 'all' | 'feedback' | 'content';
 
 const TAB_TYPES: Record<NotificationTab, string[] | null> = {
   all: null,
-  feedback: ['comment_new', 'reaction_new'],
+  feedback: ['comment_new', 'reaction_new', 'review_new'],
   content: ['generation_completed', 'generation_failed', 'upload_completed'],
 };
 
