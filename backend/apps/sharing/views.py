@@ -49,11 +49,16 @@ class SharedLinkViewSet(viewsets.ModelViewSet):
 
 
 class PublicCommentThrottle(AnonRateThrottle):
-    rate = '600/min'  # Generous limit — reviewers are trusted users, not random public
+    rate = '60/min'
+
+
+class PublicReadThrottle(AnonRateThrottle):
+    rate = '120/min'
 
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
+@throttle_classes([PublicReadThrottle])
 def public_share_view(request, token):
     """GET /api/sharing/public/{token}/ — reviewer loads shared content."""
     link = get_object_or_404(SharedLink, token=token)
@@ -83,7 +88,7 @@ def public_share_view(request, token):
     comments_by_scene = {}
     if scene_ids:
         scene_comments = Comment.objects.filter(
-            scene_id__in=scene_ids, parent__isnull=True
+            scene_id__in=scene_ids, parent__isnull=True, is_system=False
         ).prefetch_related('replies').order_by('created_at')
         for c in scene_comments:
             comments_by_scene.setdefault(c.scene_id, []).append(c)
@@ -154,6 +159,7 @@ def public_comment_view(request, token):
     serializer = CreateCommentPublicSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
+    data['author_name'] = strip_tags(data.get('author_name', '')).strip()[:100]
 
     # Strip HTML from text
     clean_text = strip_tags(data['text'])
@@ -258,7 +264,7 @@ def public_review_action(request, token):
         return Response({'detail': 'element_id must be an integer.'}, status=400)
     action = request.data.get('action')
     session_id = request.data.get('session_id', '')
-    author_name = request.data.get('author_name', '')
+    author_name = strip_tags(request.data.get('author_name', '')).strip()[:100]
 
     if not element_id or not action:
         return Response({'error': 'element_id and action required'}, status=400)
@@ -309,7 +315,7 @@ def public_reaction_view(request, token):
         return Response({'detail': 'element_id must be an integer.'}, status=400)
     session_id = request.data.get('session_id')
     value = request.data.get('value')  # 'like', 'dislike', or null to remove
-    author_name = request.data.get('author_name', '')
+    author_name = strip_tags(request.data.get('author_name', '')).strip()[:100]
 
     if not element_id or not session_id:
         return Response({'detail': 'element_id and session_id required'}, status=400)
