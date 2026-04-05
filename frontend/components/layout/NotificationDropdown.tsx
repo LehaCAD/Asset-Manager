@@ -1,18 +1,27 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { MessageCircle, Check, XCircle, ChevronRight } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { NotificationIcon } from '@/components/ui/notification-icon'
 import { useNotificationStore } from '@/lib/store/notifications'
-import type { Notification, NotificationType } from '@/lib/types'
+import { projectsApi } from '@/lib/api/projects'
+import { cn } from '@/lib/utils'
+import type { Notification } from '@/lib/types'
+
+const CATEGORIES = [
+  { key: 'feedback' as const, label: 'Отзывы', types: ['comment_new', 'reaction_new'] },
+  { key: 'content' as const, label: 'Контент', types: ['generation_completed', 'generation_failed', 'upload_completed'] },
+]
+
+type CategoryKey = typeof CATEGORIES[number]['key']
 
 function relativeTime(dateStr: string): string {
   const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000)
@@ -21,16 +30,6 @@ function relativeTime(dateStr: string): string {
   if (diff < 86400) return `${Math.floor(diff / 3600)} ч назад`
   if (diff < 172800) return 'Вчера'
   return new Date(dateStr).toLocaleDateString('ru-RU')
-}
-
-function NotificationIcon({ type }: { type: NotificationType }) {
-  if (type === 'comment_new') {
-    return <MessageCircle className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.75} />
-  }
-  if (type === 'generation_completed') {
-    return <Check className="h-4 w-4 shrink-0 text-success" strokeWidth={1.75} />
-  }
-  return <XCircle className="h-4 w-4 shrink-0 text-destructive" strokeWidth={1.75} />
 }
 
 interface NotificationItemProps {
@@ -68,7 +67,7 @@ function NotificationItem({ notification, onClose }: NotificationItemProps) {
       }`}
     >
       <div className="mt-0.5">
-        <NotificationIcon type={notification.type} />
+        <NotificationIcon type={notification.type} size="sm" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-xs font-medium text-foreground leading-snug truncate">
@@ -85,29 +84,6 @@ function NotificationItem({ notification, onClose }: NotificationItemProps) {
   )
 }
 
-interface NotificationListProps {
-  notifications: Notification[]
-  onClose: () => void
-}
-
-function NotificationList({ notifications, onClose }: NotificationListProps) {
-  if (notifications.length === 0) {
-    return (
-      <div className="py-8 text-center">
-        <p className="text-sm text-muted-foreground">Уведомлений пока нет</p>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex flex-col gap-0.5 py-1">
-      {notifications.slice(0, 10).map((n) => (
-        <NotificationItem key={n.id} notification={n} onClose={onClose} />
-      ))}
-    </div>
-  )
-}
-
 interface NotificationDropdownProps {
   children: React.ReactNode
 }
@@ -118,11 +94,26 @@ export function NotificationDropdown({ children }: NotificationDropdownProps) {
   const unreadCount = useNotificationStore((s) => s.unreadCount)
   const markAllRead = useNotificationStore((s) => s.markAllRead)
   const fetchNotifications = useNotificationStore((s) => s.fetchNotifications)
+  const filters = useNotificationStore((s) => s.filters)
+  const setFilters = useNotificationStore((s) => s.setFilters)
+  const lastFetchedFilters = useNotificationStore((s) => s.lastFetchedFilters)
+
+  const [activeCategories, setActiveCategories] = useState<Set<CategoryKey>>(new Set())
+  const [projects, setProjects] = useState<{ id: number; name: string }[]>([])
+
+  useEffect(() => {
+    projectsApi.getAll().then(data => {
+      setProjects(data.map(p => ({ id: p.id, name: p.name })))
+    }).catch(() => {})
+  }, [])
 
   function handleOpenChange(next: boolean) {
     setOpen(next)
-    if (next && notifications.length === 0) {
-      fetchNotifications(0).catch(() => {})
+    if (next) {
+      const filtersChanged = JSON.stringify(filters) !== JSON.stringify(lastFetchedFilters)
+      if (notifications.length === 0 || filtersChanged) {
+        fetchNotifications(0).catch(() => {})
+      }
     }
   }
 
@@ -130,10 +121,19 @@ export function NotificationDropdown({ children }: NotificationDropdownProps) {
     markAllRead().catch(() => {})
   }
 
-  const comments = notifications.filter((n) => n.type === 'comment_new')
-  const generations = notifications.filter(
-    (n) => n.type === 'generation_completed' || n.type === 'generation_failed'
-  )
+  function handleCategoryToggle(key: CategoryKey) {
+    const next = new Set(activeCategories)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    setActiveCategories(next)
+
+    if (next.size === 0) {
+      setFilters({ types: null })
+    } else {
+      const types = CATEGORIES.filter(c => next.has(c.key)).flatMap(c => [...c.types])
+      setFilters({ types })
+    }
+  }
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
@@ -158,41 +158,49 @@ export function NotificationDropdown({ children }: NotificationDropdownProps) {
           )}
         </div>
 
-        {/* Tabs */}
-        <Tabs defaultValue="all">
-          <TabsList className="w-full rounded-none border-b border-border h-9 bg-transparent gap-0 px-2">
-            <TabsTrigger
-              value="all"
-              className="flex-1 text-xs h-7 rounded-sm data-[state=active]:bg-muted"
+        {/* Filters */}
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-border flex-wrap">
+          <select
+            value={filters.projectId ?? ''}
+            onChange={(e) => setFilters({ projectId: e.target.value ? Number(e.target.value) : null })}
+            className="px-2 py-1 text-xs bg-background border border-input rounded-md focus:outline-none max-w-[120px]"
+          >
+            <option value="">Все проекты</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat.key}
+              type="button"
+              onClick={() => handleCategoryToggle(cat.key)}
+              className={cn(
+                'px-2 py-0.5 rounded-full text-xs font-medium transition-all',
+                activeCategories.has(cat.key)
+                  ? 'bg-primary text-primary-foreground'
+                  : 'border border-border text-muted-foreground hover:text-foreground'
+              )}
             >
-              Все
-            </TabsTrigger>
-            <TabsTrigger
-              value="comments"
-              className="flex-1 text-xs h-7 rounded-sm data-[state=active]:bg-muted"
-            >
-              Комментарии
-            </TabsTrigger>
-            <TabsTrigger
-              value="generations"
-              className="flex-1 text-xs h-7 rounded-sm data-[state=active]:bg-muted"
-            >
-              Генерации
-            </TabsTrigger>
-          </TabsList>
+              {cat.label}
+            </button>
+          ))}
+        </div>
 
-          <div className="max-h-[360px] overflow-y-auto px-1">
-            <TabsContent value="all" className="mt-0">
-              <NotificationList notifications={notifications} onClose={() => setOpen(false)} />
-            </TabsContent>
-            <TabsContent value="comments" className="mt-0">
-              <NotificationList notifications={comments} onClose={() => setOpen(false)} />
-            </TabsContent>
-            <TabsContent value="generations" className="mt-0">
-              <NotificationList notifications={generations} onClose={() => setOpen(false)} />
-            </TabsContent>
-          </div>
-        </Tabs>
+        {/* List */}
+        <div className="max-h-[360px] overflow-y-auto px-1">
+          {notifications.length === 0 ? (
+            <div className="py-8 text-center">
+              <p className="text-sm text-muted-foreground">Уведомлений пока нет</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-0.5 py-1">
+              {notifications.slice(0, 10).map((n) => (
+                <NotificationItem key={n.id} notification={n} onClose={() => setOpen(false)} />
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Footer */}
         <div className="border-t border-border px-3 py-2">
