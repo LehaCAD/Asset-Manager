@@ -47,7 +47,7 @@ def create_generation(project, scene, prompt, ai_model_id, generation_config, us
         and isinstance(input_urls, list)
         and len(input_urls) > 0
     ):
-        source_type = Element.SOURCE_IMG2VID
+        source_type = Element.SOURCE_GENERATED
     else:
         source_type = Element.SOURCE_GENERATED
 

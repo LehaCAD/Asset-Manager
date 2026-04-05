@@ -31,12 +31,25 @@ class Element(models.Model):
     # Типы источников
     SOURCE_GENERATED = 'GENERATED'
     SOURCE_UPLOADED = 'UPLOADED'
-    SOURCE_IMG2VID = 'IMG2VID'
-    
+
     SOURCE_TYPE_CHOICES = [
         (SOURCE_GENERATED, 'Сгенерировано AI'),
         (SOURCE_UPLOADED, 'Загружено пользователем'),
-        (SOURCE_IMG2VID, 'Img2Vid преобразование'),
+    ]
+
+    # Статусы согласования
+    APPROVAL_IN_PROGRESS = 'IN_PROGRESS'
+    APPROVAL_NEEDS_REVIEW = 'NEEDS_REVIEW'
+    APPROVAL_APPROVED = 'APPROVED'
+    APPROVAL_CHANGES_REQUESTED = 'CHANGES_REQUESTED'
+    APPROVAL_REJECTED = 'REJECTED'
+
+    APPROVAL_STATUS_CHOICES = [
+        (APPROVAL_IN_PROGRESS, 'В работе'),
+        (APPROVAL_NEEDS_REVIEW, 'На согласовании'),
+        (APPROVAL_APPROVED, 'Одобрено'),
+        (APPROVAL_CHANGES_REQUESTED, 'На доработку'),
+        (APPROVAL_REJECTED, 'Отклонено'),
     ]
     
     project = models.ForeignKey(
@@ -139,6 +152,16 @@ class Element(models.Model):
         verbose_name='Размер файла (байт)',
     )
     upload_keys = models.JSONField(null=True, blank=True, help_text='S3 keys for presigned upload: {original, small, medium}')
+    approval_status = models.CharField(
+        max_length=20,
+        choices=APPROVAL_STATUS_CHOICES,
+        null=True, blank=True, default=None,
+        verbose_name='Статус согласования'
+    )
+    original_filename = models.CharField(
+        max_length=255, blank=True, default='',
+        verbose_name='Оригинальное имя файла'
+    )
 
     created_at = models.DateTimeField(
         auto_now_add=True,
