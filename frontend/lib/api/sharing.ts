@@ -10,8 +10,8 @@ const publicClient = axios.create({
 
 export const sharingApi = {
   // SharedLink CRUD (authenticated)
-  getLinks: (projectId: number) =>
-    apiClient.get<SharedLink[]>('/api/sharing/links/', { params: { project: projectId } })
+  getLinks: (projectId?: number) =>
+    apiClient.get<SharedLink[]>('/api/sharing/links/', { params: projectId ? { project: projectId } : {} })
       .then(r => r.data),
 
   createLink: (data: { project: number; element_ids: number[]; name?: string; expires_at?: string; display_preferences?: { size: string; aspectRatio: string; fitMode: string } }) =>

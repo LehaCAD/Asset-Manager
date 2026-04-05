@@ -7,7 +7,7 @@ import { sharingApi } from '@/lib/api/sharing'
 import type { SharedLink } from '@/lib/types'
 
 interface ShareLinksPanelProps {
-  projectId: number
+  projectId?: number
   refreshKey?: number
 }
 
