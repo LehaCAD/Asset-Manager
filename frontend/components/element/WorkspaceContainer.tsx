@@ -101,6 +101,9 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<{ id: number; name: string } | null>(null);
   const [moveElementId, setMoveElementId] = useState<number | null>(null);
+  const [groupRenameTarget, setGroupRenameTarget] = useState<{ id: number; name: string } | null>(null);
+  const [groupShareOpen, setGroupShareOpen] = useState(false);
+  const [groupShareProjectId, setGroupShareProjectId] = useState<number>(0);
 
 
   // Share mode persisted in sessionStorage to survive group navigation
@@ -133,7 +136,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
     });
   }, []);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
-  const [shareElements, setShareElements] = useState<Array<{ id: number; element_type: string; is_favorite: boolean }>>([]);
+  const [shareElements, setShareElements] = useState<Array<{ id: number; element_type: string; is_favorite: boolean; source_type: string }>>([]);
   const [linksPanelOpen, setLinksPanelOpen] = useState(false);
   const [linksRefreshKey, setLinksRefreshKey] = useState(0);
   const [promptBarHeight, setPromptBarHeight] = useState(0);
@@ -511,6 +514,33 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
     setMoveDialogOpen(true);
   }, []);
 
+  // Group rename (from three-dots menu on GroupCard)
+  const handleGroupRename = useCallback((groupIdToRename: number) => {
+    const group = groups.find(g => g.id === groupIdToRename);
+    if (group) {
+      setGroupRenameTarget({ id: groupIdToRename, name: group.name });
+    }
+  }, [groups]);
+
+  const handleGroupRenameConfirm = useCallback(async (newName: string) => {
+    if (!groupRenameTarget) return;
+    try {
+      await scenesApi.update(groupRenameTarget.id, { name: newName.trim() });
+      toast.success('Группа переименована');
+      loadWorkspace(projectId, groupId);
+    } catch {
+      toast.error('Не удалось переименовать группу');
+    } finally {
+      setGroupRenameTarget(null);
+    }
+  }, [groupRenameTarget, loadWorkspace, projectId, groupId]);
+
+  // Group share (from three-dots menu on GroupCard)
+  const handleGroupShare = useCallback((_groupIdToShare: number) => {
+    setGroupShareProjectId(projectId);
+    setGroupShareOpen(true);
+  }, [projectId]);
+
   // Handle group delete with confirmation (fetches counts first)
   const handleRequestGroupDelete = useCallback(
     async (groupIdToDelete: number) => {
@@ -776,6 +806,8 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
               groups={groups}
               onGroupClick={handleGroupClick}
               onGroupDelete={handleRequestGroupDelete}
+              onGroupRename={handleGroupRename}
+              onGroupShare={handleGroupShare}
               shareMode={shareMode}
               shareSelectedIds={shareSelectedIds}
               onShareToggle={handleToggleShareElement}
@@ -812,7 +844,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
               // Only elements — build metadata from store
               const els = getFilteredElements()
                 .filter(e => elementOnlyIds.includes(e.id))
-                .map(e => ({ id: e.id, element_type: e.element_type, is_favorite: e.is_favorite }));
+                .map(e => ({ id: e.id, element_type: e.element_type, is_favorite: e.is_favorite, source_type: e.source_type }));
               setShareElements(els);
               setShareSelectedIds(new Set(elementOnlyIds));
               setLinkDialogOpen(true);
@@ -823,7 +855,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
                   const groupEls = results.flat();
                   const storeEls = getFilteredElements()
                     .filter(e => elementOnlyIds.includes(e.id))
-                    .map(e => ({ id: e.id, element_type: e.element_type, is_favorite: e.is_favorite }));
+                    .map(e => ({ id: e.id, element_type: e.element_type, is_favorite: e.is_favorite, source_type: e.source_type }));
                   const allEls = [...storeEls, ...groupEls];
                   if (allEls.length === 0) {
                     toast.error('Нет элементов для шеринга');
@@ -939,6 +971,22 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
           currentName={renameTarget?.name ?? ''}
           onConfirm={handleRenameConfirm}
           onCancel={() => setRenameTarget(null)}
+        />
+
+        {/* Group rename dialog */}
+        <RenameDialog
+          open={!!groupRenameTarget}
+          currentName={groupRenameTarget?.name ?? ''}
+          onConfirm={handleGroupRenameConfirm}
+          onCancel={() => setGroupRenameTarget(null)}
+        />
+
+        {/* Group share dialog */}
+        <CreateLinkDialog
+          isOpen={groupShareOpen}
+          onClose={() => setGroupShareOpen(false)}
+          projectId={groupShareProjectId}
+          elementIds={[]}
         />
 
         {/* Group delete confirmation dialog */}

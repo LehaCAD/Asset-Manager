@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { toast } from 'sonner'
-import { Copy, Image, Video, Star } from 'lucide-react'
+import { Copy } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -32,20 +32,51 @@ interface CreateLinkDialogProps {
   elements?: ShareableElement[]
 }
 
-type FilterType = 'all' | 'images' | 'videos' | 'favorites'
-
 const EXPIRY_OPTIONS = [
   { label: 'Без ограничений', value: '' },
   { label: '7 дней', value: '7' },
   { label: '30 дней', value: '30' },
 ]
 
-const FILTERS: { key: FilterType; label: string; icon: React.ElementType }[] = [
-  { key: 'all', label: 'Все', icon: Copy },
-  { key: 'images', label: 'Фото', icon: Image },
-  { key: 'videos', label: 'Видео', icon: Video },
-  { key: 'favorites', label: 'Избранное', icon: Star },
-]
+function toggleInSet<T>(set: Set<T>, value: T): Set<T> {
+  const next = new Set(set)
+  if (next.has(value)) next.delete(value)
+  else next.add(value)
+  return next
+}
+
+function FilterPill({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  label: string
+  count: number
+  active: boolean
+  onClick: () => void
+}) {
+  const disabled = count === 0
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium transition-all',
+        active
+          ? 'bg-primary text-primary-foreground'
+          : 'border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30',
+        disabled && 'opacity-40 pointer-events-none'
+      )}
+    >
+      {label}
+      <span className={cn('tabular-nums', active ? 'text-primary-foreground/70' : 'text-muted-foreground/70')}>
+        {count}
+      </span>
+    </button>
+  )
+}
 
 export function CreateLinkDialog({
   isOpen,
@@ -57,33 +88,53 @@ export function CreateLinkDialog({
 }: CreateLinkDialogProps) {
   const [name, setName] = useState('')
   const [expiry, setExpiry] = useState('')
-  const [filter, setFilter] = useState<FilterType>('all')
+  const [sourceFilter, setSourceFilter] = useState<Set<string>>(new Set())
+  const [typeFilter, setTypeFilter] = useState<Set<string>>(new Set())
+  const [favoriteFilter, setFavoriteFilter] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { preferences } = useDisplayStore()
 
   const hasMetadata = !!elements && elements.length > 0
 
   const filteredIds = useMemo(() => {
-    if (!hasMetadata || filter === 'all') return elementIds
-    return elements!
-      .filter(el => {
-        if (filter === 'images') return el.element_type === 'IMAGE'
-        if (filter === 'videos') return el.element_type === 'VIDEO'
-        if (filter === 'favorites') return el.is_favorite
-        return true
-      })
-      .map(el => el.id)
-  }, [elementIds, elements, filter, hasMetadata])
+    if (!hasMetadata) return elementIds
+    return elements!.filter(el => {
+      if (sourceFilter.size > 0 && !sourceFilter.has(el.source_type)) return false
+      if (typeFilter.size > 0 && !typeFilter.has(el.element_type)) return false
+      if (favoriteFilter && !el.is_favorite) return false
+      return true
+    }).map(el => el.id)
+  }, [elements, elementIds, sourceFilter, typeFilter, favoriteFilter, hasMetadata])
 
-  const filterCounts = useMemo(() => {
+  const pillCounts = useMemo(() => {
     if (!hasMetadata) return null
-    return {
-      all: elements!.length,
-      images: elements!.filter(el => el.element_type === 'IMAGE').length,
-      videos: elements!.filter(el => el.element_type === 'VIDEO').length,
-      favorites: elements!.filter(el => el.is_favorite).length,
+
+    const countWith = (
+      source: Set<string>,
+      type: Set<string>,
+      fav: boolean
+    ) => elements!.filter(el => {
+      if (source.size > 0 && !source.has(el.source_type)) return false
+      if (type.size > 0 && !type.has(el.element_type)) return false
+      if (fav && !el.is_favorite) return false
+      return true
+    }).length
+
+    const withSource = (v: string) => {
+      const s = new Set(sourceFilter); s.add(v); return countWith(s, typeFilter, favoriteFilter)
     }
-  }, [elements, hasMetadata])
+    const withType = (v: string) => {
+      const s = new Set(typeFilter); s.add(v); return countWith(sourceFilter, s, favoriteFilter)
+    }
+
+    return {
+      generated: withSource('GENERATED'),
+      uploaded: withSource('UPLOADED'),
+      images: withType('IMAGE'),
+      videos: withType('VIDEO'),
+      favorites: countWith(sourceFilter, typeFilter, true),
+    }
+  }, [elements, hasMetadata, sourceFilter, typeFilter, favoriteFilter])
 
   function buildExpiresAt(days: string): string | undefined {
     if (!days) return undefined
@@ -122,7 +173,9 @@ export function CreateLinkDialog({
   function handleClose() {
     setName('')
     setExpiry('')
-    setFilter('all')
+    setSourceFilter(new Set())
+    setTypeFilter(new Set())
+    setFavoriteFilter(false)
     onClose()
   }
 
@@ -134,30 +187,41 @@ export function CreateLinkDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          {/* Filter tabs — only if metadata available */}
-          {hasMetadata && filterCounts && (
-            <div className="flex gap-1 p-1 bg-muted/50 rounded-lg">
-              {FILTERS.map(({ key, label, icon: Icon }) => {
-                const count = filterCounts[key]
-                if (key !== 'all' && count === 0) return null
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setFilter(key)}
-                    className={cn(
-                      'flex items-center gap-1.5 flex-1 justify-center px-2 py-1.5 rounded-md text-xs font-medium transition-all',
-                      filter === key
-                        ? 'bg-background shadow-sm text-foreground'
-                        : 'text-muted-foreground hover:text-foreground'
-                    )}
-                  >
-                    <Icon className="w-3.5 h-3.5" />
-                    <span>{label}</span>
-                    <span className="text-muted-foreground/70">{count}</span>
-                  </button>
-                )
-              })}
+          {/* Filter pills — only if metadata available */}
+          {hasMetadata && pillCounts && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <FilterPill
+                label="Генерации"
+                count={pillCounts.generated}
+                active={sourceFilter.has('GENERATED')}
+                onClick={() => setSourceFilter(s => toggleInSet(s, 'GENERATED'))}
+              />
+              <FilterPill
+                label="Загрузки"
+                count={pillCounts.uploaded}
+                active={sourceFilter.has('UPLOADED')}
+                onClick={() => setSourceFilter(s => toggleInSet(s, 'UPLOADED'))}
+              />
+              <span className="text-muted-foreground/50 text-xs select-none mx-0.5">&middot;</span>
+              <FilterPill
+                label="Фото"
+                count={pillCounts.images}
+                active={typeFilter.has('IMAGE')}
+                onClick={() => setTypeFilter(s => toggleInSet(s, 'IMAGE'))}
+              />
+              <FilterPill
+                label="Видео"
+                count={pillCounts.videos}
+                active={typeFilter.has('VIDEO')}
+                onClick={() => setTypeFilter(s => toggleInSet(s, 'VIDEO'))}
+              />
+              <span className="text-muted-foreground/50 text-xs select-none mx-0.5">&middot;</span>
+              <FilterPill
+                label="Избранное"
+                count={pillCounts.favorites}
+                active={favoriteFilter}
+                onClick={() => setFavoriteFilter(f => !f)}
+              />
             </div>
           )}
 

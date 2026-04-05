@@ -72,12 +72,12 @@ export const sharingApi = {
 
   // Element metadata for sharing
   getProjectElements: (projectId: number) =>
-    apiClient.get<{ elements: Array<{ id: number; element_type: string; is_favorite: boolean }> }>(
+    apiClient.get<{ elements: Array<{ id: number; element_type: string; is_favorite: boolean; source_type: string }> }>(
       `/api/sharing/project-elements/${projectId}/`
     ).then(r => r.data.elements),
 
   getGroupElements: (sceneId: number) =>
-    apiClient.get<{ elements: Array<{ id: number; element_type: string; is_favorite: boolean }> }>(
+    apiClient.get<{ elements: Array<{ id: number; element_type: string; is_favorite: boolean; source_type: string }> }>(
       `/api/sharing/group-elements/${sceneId}/`
     ).then(r => r.data.elements),
 }
