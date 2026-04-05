@@ -2,11 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, Pencil, Trash2, Film, Layers, HardDrive, ImageIcon, FolderOpen } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash2, Film, Layers, HardDrive, Folder, Share2 } from "lucide-react";
 import { ChargeIcon } from "@/components/ui/charge-icon";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,20 +22,16 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { ProjectSettingsDialog } from "./ProjectSettingsDialog";
+import { CreateLinkDialog } from "@/components/sharing/CreateLinkDialog";
+import { sharingApi } from "@/lib/api/sharing";
 import { useProjectsStore } from "@/lib/store/projects";
 import { PROJECT_STATUSES } from "@/lib/utils/constants";
-import { formatStorage, formatCurrency } from "@/lib/utils/format";
+import { formatStorage, formatCurrency, formatRelativeDate } from "@/lib/utils/format";
 import type { Project } from "@/lib/types";
 
 interface ProjectCardProps {
   project: Project;
 }
-
-const STATUS_BADGE_VARIANTS: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
-  ACTIVE: "default",
-  PAUSED: "secondary",
-  COMPLETED: "outline",
-};
 
 
 export function ProjectCard({ project }: ProjectCardProps) {
@@ -44,6 +39,9 @@ export function ProjectCard({ project }: ProjectCardProps) {
   const deleteProject = useProjectsStore((s) => s.deleteProject);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareLoading, setShareLoading] = useState(false);
+  const [shareElements, setShareElements] = useState<Array<{ id: number; element_type: string; is_favorite: boolean; source_type: string }>>([]);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const statusConfig = PROJECT_STATUSES.find((s) => s.value === project.status);
@@ -77,51 +75,45 @@ export function ProjectCard({ project }: ProjectCardProps) {
         onClick={handleCardClick}
         className="group relative bg-card border border-border rounded-md overflow-hidden cursor-pointer hover:border-primary/40 hover:shadow-md hover:shadow-primary/5 transition-all duration-150"
       >
-        {/* Thumbnail area */}
+        {/* Preview area */}
         <div className="aspect-video bg-muted relative overflow-hidden">
-          {project.preview_thumbnails && project.preview_thumbnails.length > 0 ? (
-            /* 2x2 Preview Grid */
-            <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-0.5">
-              {Array.from({ length: 4 }).map((_, i) => {
-                const src = project.preview_thumbnails![i];
-                return src ? (
-                  <img
-                    key={i}
-                    src={src}
-                    alt=""
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div key={i} className="w-full h-full bg-muted flex items-center justify-center">
-                    <ImageIcon className="h-4 w-4 text-muted-foreground/20" />
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <>
-              {/* Decorative grid pattern */}
-              <div className="absolute inset-0 opacity-[0.07]"
-                style={{
-                  backgroundImage: "linear-gradient(var(--foreground) 1px, transparent 1px), linear-gradient(90deg, var(--foreground) 1px, transparent 1px)",
-                  backgroundSize: "24px 24px",
-                }}
-              />
-              {/* Film icon placeholder */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Film className="h-10 w-10 text-muted-foreground/30" />
+          {(() => {
+            const thumbs = project.preview_thumbnails ?? [];
+            const count = thumbs.length;
+
+            if (count === 0) {
+              return (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5">
+                  <Film className="h-8 w-8 text-muted-foreground/20" />
+                  <span className="text-[11px] text-muted-foreground/30">Нет элементов</span>
+                </div>
+              );
+            }
+
+            if (count === 1) {
+              return (
+                <div className="absolute inset-0 p-1.5">
+                  <img src={thumbs[0]} alt="" className="w-full h-full rounded-md object-cover" />
+                </div>
+              );
+            }
+
+            // 2+ thumbnails: hero + side column
+            const sideCount = Math.min(count - 1, 3);
+            return (
+              <div className="absolute inset-0 p-1.5 flex gap-1">
+                <img src={thumbs[0]} alt="" className="flex-1 min-w-0 h-full object-cover rounded-md" />
+                <div className="flex flex-col gap-1 w-[100px]">
+                  {thumbs.slice(1, 1 + sideCount).map((src, i) => (
+                    <img key={i} src={src} alt="" className="w-full flex-1 min-h-0 object-cover rounded-md" />
+                  ))}
+                </div>
               </div>
-            </>
-          )}
-          {/* Type badge */}
-          <div className="absolute top-1.5 left-1.5">
-            <span className="flex items-center gap-1 text-[10px] font-medium bg-background/80 backdrop-blur-sm text-muted-foreground px-1.5 py-0.5 rounded border border-border/50">
-              <FolderOpen className="h-3 w-3" />
-              Проект
-            </span>
-          </div>
+            );
+          })()}
+
           {/* Actions menu */}
-          <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity" data-no-navigate>
+          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity" data-no-navigate>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -151,6 +143,23 @@ export function ProjectCard({ project }: ProjectCardProps) {
                   <Pencil className="mr-2 h-3.5 w-3.5" />
                   Редактировать
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  onSelect={async (e) => {
+                    e.preventDefault();
+                    setShareLoading(true);
+                    try {
+                      const els = await sharingApi.getProjectElements(project.id);
+                      if (els.length === 0) { toast.error('В проекте нет элементов'); return; }
+                      setShareElements(els);
+                      setShareOpen(true);
+                    } catch { toast.error('Не удалось загрузить элементы'); }
+                    finally { setShareLoading(false); }
+                  }}
+                >
+                  <Share2 className="mr-2 h-3.5 w-3.5" />
+                  {shareLoading ? 'Загрузка...' : 'Поделиться'}
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
@@ -168,37 +177,49 @@ export function ProjectCard({ project }: ProjectCardProps) {
           </div>
         </div>
 
-        {/* Card info */}
-        <div className="p-2.5 space-y-1.5">
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="text-[13px] font-medium leading-tight line-clamp-2 group-hover:text-primary transition-colors">
-              {project.name}
-            </h3>
-            <Badge
-              variant={STATUS_BADGE_VARIANTS[project.status] ?? "secondary"}
-              className="shrink-0 text-[10px]"
-            >
-              {statusConfig?.label ?? project.status}
-            </Badge>
-          </div>
-
-          <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5">
-            <span className="flex items-center gap-1">
-              <Layers className="h-3 w-3" />
+        {/* Footer */}
+        <div className="p-3 space-y-1.5 border-t border-border">
+          <h3 className="text-sm font-medium leading-tight line-clamp-1 group-hover:text-primary transition-colors">
+            {project.name}
+          </h3>
+          <div className="flex flex-wrap gap-x-1.5 gap-y-0.5 text-[11px] text-muted-foreground items-center">
+            <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${statusConfig?.color ?? "bg-muted-foreground"}`} />
+            <span>{statusConfig?.label ?? project.status}</span>
+            {(project.scene_count ?? 0) > 0 && (
+              <>
+                <span className="text-muted-foreground/40">&middot;</span>
+                <span className="flex items-center gap-0.5">
+                  <Folder className="h-2.5 w-2.5" />
+                  {project.scene_count}
+                </span>
+              </>
+            )}
+            <span className="text-muted-foreground/40">&middot;</span>
+            <span className="flex items-center gap-0.5">
+              <Layers className="h-2.5 w-2.5" />
               {project.element_count ?? 0}
             </span>
             {project.total_spent && parseFloat(project.total_spent) > 0 && (
-              <span className="flex items-center gap-1">
-                <ChargeIcon size="sm" />
-                {formatCurrency(project.total_spent)}
-              </span>
+              <>
+                <span className="text-muted-foreground/40">&middot;</span>
+                <span className="flex items-center gap-0.5">
+                  <ChargeIcon size="xs" />
+                  {formatCurrency(project.total_spent)}
+                </span>
+              </>
             )}
             {(project.storage_bytes ?? 0) > 0 && (
-              <span className="flex items-center gap-1">
-                <HardDrive className="h-3 w-3" />
-                {formatStorage(project.storage_bytes!)}
-              </span>
+              <>
+                <span className="text-muted-foreground/40">&middot;</span>
+                <span className="flex items-center gap-0.5">
+                  <HardDrive className="h-2.5 w-2.5" />
+                  {formatStorage(project.storage_bytes!)}
+                </span>
+              </>
             )}
+          </div>
+          <div className="text-[11px] text-muted-foreground/60">
+            {formatRelativeDate(project.updated_at)}
           </div>
         </div>
       </div>
@@ -207,6 +228,14 @@ export function ProjectCard({ project }: ProjectCardProps) {
         project={project}
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
+      />
+
+      <CreateLinkDialog
+        isOpen={shareOpen}
+        onClose={() => { setShareOpen(false); setShareElements([]); }}
+        projectId={project.id}
+        elementIds={shareElements.map(e => e.id)}
+        elements={shareElements}
       />
 
       {/* Delete confirmation */}
