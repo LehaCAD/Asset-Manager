@@ -48,11 +48,7 @@ class SharedLinkViewSet(viewsets.ModelViewSet):
 
 
 class PublicCommentThrottle(AnonRateThrottle):
-    rate = '30/min'
-
-
-class PublicReactionThrottle(AnonRateThrottle):
-    rate = '600/min'  # Practically unlimited — reactions are lightweight toggle operations
+    rate = '600/min'  # Generous limit — reviewers are trusted users, not random public
 
 
 @api_view(['GET'])
@@ -67,9 +63,9 @@ def public_share_view(request, token):
         )
 
     shared_elements = link.elements.select_related('scene').prefetch_related('reactions').annotate(
-        comment_count=Count('comments'),
-        likes=Count('reactions', filter=Q(reactions__value='like')),
-        dislikes=Count('reactions', filter=Q(reactions__value='dislike')),
+        comment_count=Count('comments', distinct=True),
+        likes=Count('reactions', filter=Q(reactions__value='like'), distinct=True),
+        dislikes=Count('reactions', filter=Q(reactions__value='dislike'), distinct=True),
     ).all()
 
     # Prefetch all element comments in one query to avoid N+1
@@ -264,7 +260,7 @@ def public_review_action(request, token):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
-@throttle_classes([PublicReactionThrottle])
+@throttle_classes([PublicCommentThrottle])
 def public_reaction_view(request, token):
     """POST /api/sharing/public/{token}/reactions/ — reviewer reacts to element."""
     link = get_object_or_404(SharedLink, token=token)
