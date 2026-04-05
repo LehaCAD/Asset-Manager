@@ -17,7 +17,6 @@ import {
   ChevronDown,
   Pencil,
   FolderInput,
-  Copy,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -541,9 +540,6 @@ export function ElementCard({
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onMove?.(element.id)}>
                   <FolderInput className="w-4 h-4 mr-2" />Переместить
-                </DropdownMenuItem>
-                <DropdownMenuItem disabled>
-                  <Copy className="w-4 h-4 mr-2" />Копировать
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="text-destructive" onClick={handleDeleteClick}>

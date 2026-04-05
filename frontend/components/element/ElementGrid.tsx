@@ -136,6 +136,7 @@ export function ElementGrid({ className, onRequestDelete, groups = [], onGroupCl
     openLightbox,
     toggleFavorite,
     reorderElements,
+    updateApprovalStatus,
   } = useSceneWorkspaceStore();
 
   const { preferences, hydratePreferences } = useDisplayStore();
@@ -307,8 +308,9 @@ export function ElementGrid({ className, onRequestDelete, groups = [], onGroupCl
         const element = getFilteredElements().find((e) => e.id === id);
         if (element) retryFromElement(element);
       },
+      onUpdateStatus: (id: number, status: string | null) => updateApprovalStatus(id, status as any),
     }),
-    [selectElement, openLightbox, toggleFavorite, onRequestDelete, retryFromElement, getFilteredElements]
+    [selectElement, openLightbox, toggleFavorite, onRequestDelete, retryFromElement, getFilteredElements, updateApprovalStatus]
   );
 
   // Loading state

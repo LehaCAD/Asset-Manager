@@ -12,6 +12,7 @@ import type {
   WorkspaceElement,
   CreateOptimisticGenerationInput,
   SectionCollapseState,
+  ApprovalStatus,
 } from "@/lib/types";
 
 const DENSITY_STORAGE_KEY = "scene-workspace-density";
@@ -276,6 +277,7 @@ interface SceneWorkspaceState {
   // Element actions (API)
   setHeadliner: (elementId: number) => Promise<void>;
   toggleFavorite: (elementId: number) => Promise<void>;
+  updateApprovalStatus: (elementId: number, status: ApprovalStatus | null) => Promise<void>;
   deleteElements: (elementIds: number[], options?: { silent?: boolean }) => Promise<void>;
   deleteElement: (elementId: number, options?: { silent?: boolean }) => Promise<void>;
   deleteSelected: () => Promise<void>;
@@ -543,6 +545,21 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
       const message =
         error instanceof Error ? error.message : "Не удалось обновить избранное";
       toast.error(message);
+    }
+  },
+
+  updateApprovalStatus: async (elementId: number, status: ApprovalStatus | null) => {
+    const prevElements = get().elements;
+    set((state) => ({
+      elements: state.elements.map((e) =>
+        e.id === elementId ? { ...e, approval_status: status } : e
+      ),
+    }));
+    try {
+      await elementsApi.update(elementId, { approval_status: status });
+    } catch (error) {
+      set({ elements: prevElements });
+      toast.error('Ошибка при изменении статуса');
     }
   },
 
@@ -909,8 +926,8 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
   },
 
   navigateLightbox: (direction: "prev" | "next") => {
-    const { lightboxElementId, getFilteredElements } = get();
-    const filtered = getFilteredElements();
+    const { lightboxElementId, getVisibleElementsForLightbox } = get();
+    const filtered = getVisibleElementsForLightbox();
 
     if (filtered.length === 0 || lightboxElementId === null) return;
 
