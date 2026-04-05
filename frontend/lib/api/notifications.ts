@@ -8,7 +8,7 @@ interface NotificationListResponse {
 }
 
 export const notificationsApi = {
-  list: (params?: { type?: string; is_read?: boolean; offset?: number }) =>
+  list: (params?: { type?: string; is_read?: boolean; offset?: number; project?: number }) =>
     apiClient.get<NotificationListResponse>('/api/notifications/', { params })
       .then(r => r.data),
 

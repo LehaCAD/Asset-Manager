@@ -2,24 +2,38 @@ import { create } from "zustand";
 import { notificationsApi } from "@/lib/api/notifications";
 import type { Notification } from "@/lib/types";
 
+interface NotificationFilters {
+  projectId: number | null;
+  types: string[] | null; // null = all types
+}
+
 interface NotificationState {
   notifications: Notification[];
   unreadCount: number;
   hasMore: boolean;
   isLoading: boolean;
+  error: boolean;
+  filters: NotificationFilters;
+  lastFetchedFilters: NotificationFilters | null;
 
   fetchUnreadCount: () => Promise<void>;
   fetchNotifications: (offset?: number) => Promise<void>;
+  setFilters: (update: Partial<NotificationFilters>) => void;
   markRead: (id: number) => Promise<void>;
   markAllRead: () => Promise<void>;
   addNotification: (notification: Notification) => void;
 }
+
+const DEFAULT_FILTERS: NotificationFilters = { projectId: null, types: null };
 
 export const useNotificationStore = create<NotificationState>((set, get) => ({
   notifications: [],
   unreadCount: 0,
   hasMore: false,
   isLoading: false,
+  error: false,
+  filters: { ...DEFAULT_FILTERS },
+  lastFetchedFilters: null,
 
   fetchUnreadCount: async () => {
     try {
@@ -31,9 +45,14 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   },
 
   fetchNotifications: async (offset = 0) => {
-    set({ isLoading: true });
+    const { filters } = get();
+    set({ isLoading: true, error: false });
     try {
-      const data = await notificationsApi.list({ offset });
+      const params: Record<string, unknown> = { offset };
+      if (filters.projectId) params.project = filters.projectId;
+      if (filters.types && filters.types.length > 0) params.type = filters.types.join(',');
+
+      const data = await notificationsApi.list(params as any);
       set((state) => ({
         notifications:
           offset === 0
@@ -41,10 +60,19 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
             : [...state.notifications, ...data.results],
         hasMore: data.has_more,
         isLoading: false,
+        lastFetchedFilters: { ...filters },
       }));
     } catch {
-      set({ isLoading: false });
+      set({ isLoading: false, error: offset === 0 });
     }
+  },
+
+  setFilters: (update) => {
+    set((state) => ({
+      filters: { ...state.filters, ...update },
+    }));
+    // Auto-refetch with new filters
+    get().fetchNotifications(0);
   },
 
   markRead: async (id) => {
