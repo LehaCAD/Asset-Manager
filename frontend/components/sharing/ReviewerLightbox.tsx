@@ -64,6 +64,7 @@ export function ReviewerLightbox({
   const [reviewerName, setReviewerName] = useState('')
   const [sessionId, setSessionId] = useState('')
   const [mobileCommentsOpen, setMobileCommentsOpen] = useState(false)
+  const [reviewLoading, setReviewLoading] = useState(false)
   const activeThumbRef = useRef<HTMLButtonElement>(null)
 
   // Load reviewer identity from localStorage
@@ -149,7 +150,8 @@ export function ReviewerLightbox({
       toast.error('Введите имя для оценки')
       return
     }
-    if (!current) return
+    if (!current || reviewLoading) return
+    setReviewLoading(true)
     try {
       await sharingApi.submitReview(token, {
         element_id: current.id,
@@ -165,6 +167,8 @@ export function ReviewerLightbox({
       toast.success(actionLabels[action] || action)
     } catch {
       toast.error('Ошибка при отправке оценки')
+    } finally {
+      setReviewLoading(false)
     }
   }
 
@@ -236,84 +240,90 @@ export function ReviewerLightbox({
             )}
           </div>
 
-          {/* Action bar below media — compact, not wider than image */}
-          <div className="mt-3 flex items-center gap-1.5">
-            {/* Reactions */}
-            <button
-              onClick={() => handleReaction('like')}
-              className={cn(
-                'flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium transition-all',
-                reactionsMap[current.id] === 'like'
-                  ? 'bg-emerald-500/20 text-emerald-500'
-                  : 'bg-card text-muted-foreground hover:text-emerald-500 hover:bg-emerald-500/10'
+          {/* Action bar below media — two rows */}
+          <div className="mt-3 flex flex-col items-center gap-2">
+            {/* Row 1: Reactions + Download + Comments */}
+            <div className="flex items-center gap-1.5">
+              {/* Reactions */}
+              <button
+                onClick={() => handleReaction('like')}
+                className={cn(
+                  'flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium transition-all',
+                  reactionsMap[current.id] === 'like'
+                    ? 'bg-emerald-500/20 text-emerald-500'
+                    : 'bg-card text-muted-foreground hover:text-emerald-500 hover:bg-emerald-500/10'
+                )}
+                aria-label="Нравится"
+              >
+                <ThumbsUp className="h-4.5 w-4.5" />
+                {(current.likes ?? 0) > 0 && <span>{current.likes}</span>}
+              </button>
+              <button
+                onClick={() => handleReaction('dislike')}
+                className={cn(
+                  'flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium transition-all',
+                  reactionsMap[current.id] === 'dislike'
+                    ? 'bg-orange-500/20 text-orange-500'
+                    : 'bg-card text-muted-foreground hover:text-orange-500 hover:bg-orange-500/10'
+                )}
+                aria-label="Не нравится"
+              >
+                <ThumbsDown className="h-4.5 w-4.5" />
+                {(current.dislikes ?? 0) > 0 && <span>{current.dislikes}</span>}
+              </button>
+
+              {/* Separator */}
+              <div className="w-px h-5 bg-border mx-1" />
+
+              {/* Download + Original */}
+              {hasFileUrl && (
+                <>
+                  <button type="button" onClick={() => handleDownload(current.file_url, fileName)}
+                    className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-muted-foreground bg-card hover:text-foreground transition-colors">
+                    <Download className="h-3.5 w-3.5" /> Скачать
+                  </button>
+                  <a href={current.file_url} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-muted-foreground bg-card hover:text-foreground transition-colors">
+                    <ExternalLink className="h-3.5 w-3.5" /> Оригинал
+                  </a>
+                </>
               )}
-              aria-label="Нравитс��"
-            >
-              <ThumbsUp className="h-4.5 w-4.5" />
-              {(current.likes ?? 0) > 0 && <span>{current.likes}</span>}
-            </button>
-            <button
-              onClick={() => handleReaction('dislike')}
-              className={cn(
-                'flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium transition-all',
-                reactionsMap[current.id] === 'dislike'
-                  ? 'bg-orange-500/20 text-orange-500'
-                  : 'bg-card text-muted-foreground hover:text-orange-500 hover:bg-orange-500/10'
-              )}
-              aria-label="Не нравится"
-            >
-              <ThumbsDown className="h-4.5 w-4.5" />
-              {(current.dislikes ?? 0) > 0 && <span>{current.dislikes}</span>}
-            </button>
 
-            {/* Separator */}
-            <div className="w-px h-5 bg-border mx-1" />
+              {/* Mobile comments button */}
+              <button
+                className="md:hidden rounded-md bg-muted px-3 py-1.5 text-xs text-muted-foreground"
+                onClick={() => setMobileCommentsOpen(true)}
+              >
+                <MessageCircle className="w-4 h-4 inline mr-1" />
+                Комменты
+              </button>
+            </div>
 
-            {/* Download + Original */}
-            {hasFileUrl && (
-              <>
-                <button type="button" onClick={() => handleDownload(current.file_url, fileName)}
-                  className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-muted-foreground bg-card hover:text-foreground transition-colors">
-                  <Download className="h-3.5 w-3.5" /> Скачать
-                </button>
-                <a href={current.file_url} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-muted-foreground bg-card hover:text-foreground transition-colors">
-                  <ExternalLink className="h-3.5 w-3.5" /> Оригинал
-                </a>
-              </>
-            )}
-
-            {/* Mobile comments button — only on small screens */}
-            <button
-              className="md:hidden rounded-md bg-muted px-3 py-1.5 text-xs text-muted-foreground"
-              onClick={() => setMobileCommentsOpen(true)}
-            >
-              <MessageCircle className="w-4 h-4 inline mr-1" />
-              Комменты
-            </button>
-
-            {/* Review actions */}
-            <div className="flex items-center gap-1.5 ml-4 border-l border-border pl-4">
+            {/* Row 2: Review actions — separate row */}
+            <div className="flex items-center gap-1.5">
               <button
                 onClick={() => handleReview('approved')}
-                className="rounded-md px-3 py-1.5 text-xs font-medium bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                disabled={reviewLoading}
+                className="rounded-md px-3 py-1.5 text-xs font-medium bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
               >
                 <Check className="w-3.5 h-3.5 inline mr-1" />
                 Согласовано
               </button>
               <button
                 onClick={() => handleReview('changes_requested')}
-                className="rounded-md px-3 py-1.5 text-xs font-medium bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 transition-colors"
+                disabled={reviewLoading}
+                className="rounded-md px-3 py-1.5 text-xs font-medium bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 transition-colors disabled:opacity-50"
               >
                 <RotateCcw className="w-3.5 h-3.5 inline mr-1" />
                 На доработку
               </button>
               <button
                 onClick={() => handleReview('rejected')}
-                className="rounded-md px-3 py-1.5 text-xs font-medium bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
+                disabled={reviewLoading}
+                className="rounded-md px-3 py-1.5 text-xs font-medium bg-muted text-muted-foreground hover:bg-muted/80 transition-colors disabled:opacity-50"
               >
                 <X className="w-3.5 h-3.5 inline mr-1" />
-                Отклонено
+                Отклонить
               </button>
             </div>
           </div>
