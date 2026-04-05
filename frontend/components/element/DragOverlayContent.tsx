@@ -62,9 +62,9 @@ export function DragOverlayContent({
             boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
           }}
         >
-          {element.thumbnail_url ? (
+          {(element.preview_url || element.thumbnail_url) ? (
             <img
-              src={element.thumbnail_url}
+              src={element.preview_url?.trim() || element.thumbnail_url}
               alt=""
               className={cn('h-full w-full', fitClass)}
               draggable={false}
@@ -75,7 +75,7 @@ export function DragOverlayContent({
         </div>
 
         {additionalCount > 0 && (
-          <div className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
+          <div className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-md bg-primary text-[11px] font-bold text-primary-foreground">
             +{additionalCount}
           </div>
         )}
