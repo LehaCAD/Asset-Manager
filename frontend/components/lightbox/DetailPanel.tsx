@@ -72,6 +72,7 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
   const [isCopied, setIsCopied] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
   const [reactions, setReactions] = useState<PublicElementReaction[]>([]);
+  const [reviews, setReviews] = useState<Array<{ session_id: string; author_name: string; action: string }>>([]);
 
   const { retryFromElement, availableModels } = useGenerationStore();
 
@@ -88,6 +89,9 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
     }).catch(() => {});
     sharingApi.getElementReactions(element.id).then((data) => {
       if (!cancelled) setReactions(data);
+    }).catch(() => {});
+    sharingApi.getElementReviews(element.id).then((data) => {
+      if (!cancelled) setReviews(data);
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [element.id]);
@@ -340,6 +344,30 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
                 {r.value === 'like' ? <ThumbsUp className="w-3 h-3" /> : <ThumbsDown className="w-3 h-3" />} {r.author_name || 'Гость'}
               </span>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Review decisions from reviewers */}
+      {reviews.length > 0 && (
+        <div>
+          <h3 className="text-sm font-medium text-muted-foreground mb-2">Согласование</h3>
+          <Separator className="mb-3" />
+          <div className="flex flex-wrap gap-1.5">
+            {reviews.map((r, i) => {
+              const icon = r.action === 'approved' ? '✓' : r.action === 'changes_requested' ? '↻' : '✕'
+              const label = r.action === 'approved' ? 'Согласовано' : r.action === 'changes_requested' ? 'На доработку' : 'Отклонено'
+              const colorClass = r.action === 'approved'
+                ? 'bg-emerald-500/10 text-emerald-500'
+                : r.action === 'changes_requested'
+                  ? 'bg-orange-500/10 text-orange-500'
+                  : 'bg-red-500/10 text-red-400'
+              return (
+                <span key={i} className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs', colorClass)}>
+                  {icon} {r.author_name || 'Гость'} — {label}
+                </span>
+              )
+            })}
           </div>
         </div>
       )}

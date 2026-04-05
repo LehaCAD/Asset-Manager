@@ -328,7 +328,7 @@ def element_comments_view(request, element_id):
     element = get_object_or_404(Element, id=element_id, project__user=request.user)
 
     if request.method == 'GET':
-        comments = element.comments.filter(parent__isnull=True).prefetch_related('replies')
+        comments = element.comments.filter(parent__isnull=True, is_system=False).prefetch_related('replies')
         return Response(CommentSerializer(comments, many=True).data)
 
     serializer = CreateCommentAuthSerializer(data=request.data)
@@ -341,6 +341,7 @@ def element_comments_view(request, element_id):
         session_id='',
         text=text,
         parent_id=serializer.validated_data.get('parent_id'),
+        is_system=False,
     )
     comment.full_clean()
     comment.save()
@@ -356,7 +357,7 @@ def scene_comments_view(request, scene_id):
     scene = get_object_or_404(Scene, id=scene_id, project__user=request.user)
 
     if request.method == 'GET':
-        comments = scene.comments.filter(parent__isnull=True).prefetch_related('replies')
+        comments = scene.comments.filter(parent__isnull=True, is_system=False).prefetch_related('replies')
         return Response(CommentSerializer(comments, many=True).data)
 
     serializer = CreateCommentAuthSerializer(data=request.data)
@@ -369,6 +370,7 @@ def scene_comments_view(request, scene_id):
         session_id='',
         text=text,
         parent_id=serializer.validated_data.get('parent_id'),
+        is_system=False,
     )
     comment.full_clean()
     comment.save()
@@ -383,6 +385,17 @@ def element_reactions_view(request, element_id):
     element = get_object_or_404(Element, id=element_id, project__user=request.user)
     reactions = ElementReaction.objects.filter(element=element)
     data = [{'session_id': r.session_id, 'author_name': r.author_name, 'value': r.value} for r in reactions]
+    return Response(data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def element_reviews_view(request, element_id):
+    """GET /api/sharing/elements/{id}/reviews/"""
+    from apps.elements.models import Element
+    element = get_object_or_404(Element, id=element_id, project__user=request.user)
+    reviews = ElementReview.objects.filter(element=element)
+    data = [{'session_id': r.session_id, 'author_name': r.author_name, 'action': r.action} for r in reviews]
     return Response(data)
 
 

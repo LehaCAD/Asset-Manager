@@ -66,6 +66,10 @@ export const sharingApi = {
   getElementReactions: (elementId: number) =>
     apiClient.get<PublicElementReaction[]>(`/api/sharing/elements/${elementId}/reactions/`).then(r => r.data),
 
+  // Reviews — authenticated (creator workspace)
+  getElementReviews: (elementId: number) =>
+    apiClient.get<Array<{ session_id: string; author_name: string; action: string }>>(`/api/sharing/elements/${elementId}/reviews/`).then(r => r.data),
+
   // Element metadata for sharing
   getProjectElements: (projectId: number) =>
     apiClient.get<{ elements: Array<{ id: number; element_type: string; is_favorite: boolean }> }>(

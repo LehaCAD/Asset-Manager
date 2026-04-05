@@ -13,6 +13,7 @@ urlpatterns = [
     path('public/<uuid:token>/review/', views.public_review_action, name='public-review'),
     path('elements/<int:element_id>/comments/', views.element_comments_view),
     path('elements/<int:element_id>/reactions/', views.element_reactions_view),
+    path('elements/<int:element_id>/reviews/', views.element_reviews_view),
     path('scenes/<int:scene_id>/comments/', views.scene_comments_view),
     path('comments/<int:comment_id>/read/', views.mark_comment_read),
     path('comments/read-all/', views.mark_all_comments_read),
