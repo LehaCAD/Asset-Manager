@@ -56,22 +56,19 @@ function FilterPill({
   active: boolean
   onClick: () => void
 }) {
-  const disabled = count === 0
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={disabled}
       className={cn(
-        'inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium transition-all',
+        'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all',
         active
           ? 'bg-primary text-primary-foreground'
-          : 'border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30',
-        disabled && 'opacity-40 pointer-events-none'
+          : 'border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30'
       )}
     >
       {label}
-      <span className={cn('tabular-nums', active ? 'text-primary-foreground/70' : 'text-muted-foreground/70')}>
+      <span className={cn('tabular-nums', active ? 'text-primary-foreground/70' : 'text-muted-foreground/60')}>
         {count}
       </span>
     </button>
@@ -106,35 +103,16 @@ export function CreateLinkDialog({
     }).map(el => el.id)
   }, [elements, elementIds, sourceFilter, typeFilter, favoriteFilter, hasMetadata])
 
-  const pillCounts = useMemo(() => {
+  const simpleCounts = useMemo(() => {
     if (!hasMetadata) return null
-
-    const countWith = (
-      source: Set<string>,
-      type: Set<string>,
-      fav: boolean
-    ) => elements!.filter(el => {
-      if (source.size > 0 && !source.has(el.source_type)) return false
-      if (type.size > 0 && !type.has(el.element_type)) return false
-      if (fav && !el.is_favorite) return false
-      return true
-    }).length
-
-    const withSource = (v: string) => {
-      const s = new Set(sourceFilter); s.add(v); return countWith(s, typeFilter, favoriteFilter)
-    }
-    const withType = (v: string) => {
-      const s = new Set(typeFilter); s.add(v); return countWith(sourceFilter, s, favoriteFilter)
-    }
-
     return {
-      generated: withSource('GENERATED'),
-      uploaded: withSource('UPLOADED'),
-      images: withType('IMAGE'),
-      videos: withType('VIDEO'),
-      favorites: countWith(sourceFilter, typeFilter, true),
+      generated: elements!.filter(e => e.source_type === 'GENERATED').length,
+      uploaded: elements!.filter(e => e.source_type === 'UPLOADED').length,
+      images: elements!.filter(e => e.element_type === 'IMAGE').length,
+      videos: elements!.filter(e => e.element_type === 'VIDEO').length,
+      favorites: elements!.filter(e => e.is_favorite).length,
     }
-  }, [elements, hasMetadata, sourceFilter, typeFilter, favoriteFilter])
+  }, [elements, hasMetadata])
 
   function buildExpiresAt(days: string): string | undefined {
     if (!days) return undefined
@@ -187,41 +165,63 @@ export function CreateLinkDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          {/* Filter pills — only if metadata available */}
-          {hasMetadata && pillCounts && (
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <FilterPill
-                label="Генерации"
-                count={pillCounts.generated}
-                active={sourceFilter.has('GENERATED')}
-                onClick={() => setSourceFilter(s => toggleInSet(s, 'GENERATED'))}
-              />
-              <FilterPill
-                label="Загрузки"
-                count={pillCounts.uploaded}
-                active={sourceFilter.has('UPLOADED')}
-                onClick={() => setSourceFilter(s => toggleInSet(s, 'UPLOADED'))}
-              />
-              <span className="text-muted-foreground/50 text-xs select-none mx-0.5">&middot;</span>
-              <FilterPill
-                label="Фото"
-                count={pillCounts.images}
-                active={typeFilter.has('IMAGE')}
-                onClick={() => setTypeFilter(s => toggleInSet(s, 'IMAGE'))}
-              />
-              <FilterPill
-                label="Видео"
-                count={pillCounts.videos}
-                active={typeFilter.has('VIDEO')}
-                onClick={() => setTypeFilter(s => toggleInSet(s, 'VIDEO'))}
-              />
-              <span className="text-muted-foreground/50 text-xs select-none mx-0.5">&middot;</span>
-              <FilterPill
-                label="Избранное"
-                count={pillCounts.favorites}
-                active={favoriteFilter}
-                onClick={() => setFavoriteFilter(f => !f)}
-              />
+          {/* Filter rows — only if metadata available */}
+          {hasMetadata && simpleCounts && (
+            <div className="space-y-2.5">
+              {/* Source row — hide if only one source type exists */}
+              {(simpleCounts.generated > 0 && simpleCounts.uploaded > 0) && (
+                <div className="flex items-center gap-3">
+                  <span className="text-[11px] text-muted-foreground font-medium w-16 shrink-0">Источник</span>
+                  <div className="flex gap-1.5">
+                    <FilterPill
+                      label="Генерации"
+                      count={simpleCounts.generated}
+                      active={sourceFilter.has('GENERATED')}
+                      onClick={() => setSourceFilter(s => toggleInSet(s, 'GENERATED'))}
+                    />
+                    <FilterPill
+                      label="Загрузки"
+                      count={simpleCounts.uploaded}
+                      active={sourceFilter.has('UPLOADED')}
+                      onClick={() => setSourceFilter(s => toggleInSet(s, 'UPLOADED'))}
+                    />
+                  </div>
+                </div>
+              )}
+              {/* Type row — hide if only one type exists */}
+              {(simpleCounts.images > 0 && simpleCounts.videos > 0) && (
+                <div className="flex items-center gap-3">
+                  <span className="text-[11px] text-muted-foreground font-medium w-16 shrink-0">Тип</span>
+                  <div className="flex gap-1.5">
+                    <FilterPill
+                      label="Фото"
+                      count={simpleCounts.images}
+                      active={typeFilter.has('IMAGE')}
+                      onClick={() => setTypeFilter(s => toggleInSet(s, 'IMAGE'))}
+                    />
+                    <FilterPill
+                      label="Видео"
+                      count={simpleCounts.videos}
+                      active={typeFilter.has('VIDEO')}
+                      onClick={() => setTypeFilter(s => toggleInSet(s, 'VIDEO'))}
+                    />
+                  </div>
+                </div>
+              )}
+              {/* Favorites row — hide if no favorites */}
+              {simpleCounts.favorites > 0 && (
+                <div className="flex items-center gap-3">
+                  <span className="text-[11px] text-muted-foreground font-medium w-16 shrink-0">Статус</span>
+                  <div className="flex gap-1.5">
+                    <FilterPill
+                      label="Избранное"
+                      count={simpleCounts.favorites}
+                      active={favoriteFilter}
+                      onClick={() => setFavoriteFilter(f => !f)}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
