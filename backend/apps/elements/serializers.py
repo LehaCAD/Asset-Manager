@@ -41,6 +41,8 @@ class ElementSerializer(serializers.ModelSerializer):
             'external_task_id',
             'file_size',
             'generation_cost',
+            'approval_status',
+            'original_filename',
             'preview_url',
             'created_at',
             'updated_at'
