@@ -119,7 +119,7 @@ export interface ReorderScenesPayload {
 export type ElementType = "IMAGE" | "VIDEO";
 export type ElementStatus = "PENDING" | "PROCESSING" | "UPLOADING" | "COMPLETED" | "FAILED";
 export type ElementSource = "GENERATED" | "UPLOADED";
-export type ApprovalStatus = 'IN_PROGRESS' | 'NEEDS_REVIEW' | 'APPROVED' | 'CHANGES_REQUESTED' | 'REJECTED';
+export type ApprovalStatus = 'IN_PROGRESS' | 'APPROVED';
 export type OptimisticElementKind = "upload" | "generation";
 export type GenerationSubmitState = "idle" | "submitting" | "accepted" | "rejected";
 

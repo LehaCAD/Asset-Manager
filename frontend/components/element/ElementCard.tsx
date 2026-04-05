@@ -17,6 +17,7 @@ import {
   ChevronDown,
   Pencil,
   FolderInput,
+  X,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -37,10 +38,7 @@ const PHASE_LABELS: Record<string, string> = {
 const APPROVAL_STATUSES = [
   { value: null, label: 'Нет статуса', textColor: 'text-[#94A3B8]', bgColor: 'bg-[#475569]/[0.125]', dotColor: 'bg-[#94A3B8]' },
   { value: 'IN_PROGRESS', label: 'В работе', textColor: 'text-[#60A5FA]', bgColor: 'bg-[#3B82F6]/[0.125]', dotColor: 'bg-[#60A5FA]' },
-  { value: 'NEEDS_REVIEW', label: 'На согласовании', textColor: 'text-[#FBBF24]', bgColor: 'bg-[#F59E0B]/[0.125]', dotColor: 'bg-[#FBBF24]' },
-  { value: 'APPROVED', label: 'Одобрено', textColor: 'text-[#4ADE80]', bgColor: 'bg-[#22C55E]/[0.125]', dotColor: 'bg-[#4ADE80]' },
-  { value: 'CHANGES_REQUESTED', label: 'На доработку', textColor: 'text-[#FB923C]', bgColor: 'bg-[#F97316]/[0.125]', dotColor: 'bg-[#FB923C]' },
-  { value: 'REJECTED', label: 'Отклонено', textColor: 'text-[#94A3B8]', bgColor: 'bg-[#475569]/[0.125]', dotColor: 'bg-[#94A3B8]' },
+  { value: 'APPROVED', label: 'Согласовано', textColor: 'text-[#4ADE80]', bgColor: 'bg-[#22C55E]/[0.125]', dotColor: 'bg-[#4ADE80]' },
 ] as const;
 
 /** Progress overlay for uploads and generation finalization. */
@@ -299,8 +297,8 @@ export function ElementCard({
           )}
         </button>
 
-        {/* Top-right badges: star + type + AI */}
-        <div className="absolute top-2 right-2 z-40 flex items-center gap-1">
+        {/* Top-right badges: star + type + AI (hidden during upload — Cancel × takes this spot) */}
+        <div className={cn("absolute top-2 right-2 z-40 flex items-center gap-1", isUploading && "hidden")}>
           {/* Star - hover for empty, always for filled */}
           <button
             type="button"
@@ -326,8 +324,11 @@ export function ElementCard({
 
           {/* AI pill - only for GENERATED */}
           {element.source_type === "GENERATED" && (
-            <div className="rounded-md bg-black/60 px-2 py-1.5 flex items-center">
-              <span className="text-white text-[11px] font-bold leading-none">AI</span>
+            <div className="rounded-md bg-black/60 p-1.5 flex items-center">
+              <span className={cn(
+                "text-white font-bold leading-none",
+                size === "compact" ? "text-[9px]" : "text-[11px]"
+              )}>AI</span>
             </div>
           )}
         </div>
@@ -339,8 +340,21 @@ export function ElementCard({
           </div>
         )}
 
-        {/* Hover overlay — image-safe: no blur, just dark scrim */}
-        {!isFailed && (
+        {/* Cancel button for uploading cards — always visible, no hover needed */}
+        {isUploading && (
+          <button
+            type="button"
+            onPointerDown={handleControlPointerDown}
+            onClick={(e) => { e.stopPropagation(); onDelete(element.id); }}
+            className="absolute top-2 right-2 z-50 rounded-full bg-black/70 hover:bg-error/70 p-1 transition-colors"
+            title="Отменить загрузку"
+          >
+            <X className={iconSizes.sm} />
+          </button>
+        )}
+
+        {/* Hover overlay — image-safe: no blur, just dark scrim. Hidden during upload/generation. */}
+        {!isFailed && !isUploading && !isProcessing && !isSubmitting && (
           <div
             className={cn(
               "absolute inset-0 z-20 bg-overlay",
@@ -519,7 +533,7 @@ export function ElementCard({
 
       {/* Metadata footer - only when showMetadata and element is completed */}
       {showMetadata && element.status === 'COMPLETED' && (
-        <div className="bg-[#151B2B] px-3 py-2.5 space-y-1.5" onClick={(e) => e.stopPropagation()}>
+        <div className="bg-card border-t border-border px-3 py-2.5 space-y-1.5" onClick={(e) => e.stopPropagation()}>
           {/* Row 1: filename + dots menu */}
           <div className="flex items-center justify-between gap-2 min-w-0">
             <span className="text-xs font-medium text-foreground truncate flex-1 min-w-0">
@@ -527,7 +541,7 @@ export function ElementCard({
             </span>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="shrink-0 p-0.5 rounded hover:bg-white/5">
+                <button className="shrink-0 p-0.5 rounded hover:bg-muted">
                   <Ellipsis className="w-4 h-4 text-muted-foreground" />
                 </button>
               </DropdownMenuTrigger>
