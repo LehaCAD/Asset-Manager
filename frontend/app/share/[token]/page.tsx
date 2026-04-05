@@ -455,10 +455,11 @@ export default function PublicSharePage() {
     if (!sessionId || reactingRef.current.has(elementId)) return
     reactingRef.current.add(elementId)
 
-    try {
-      const currentValue = reactionsMap[elementId]
-      const newValue = currentValue === value ? null : value
+    // Capture previous value before any mutation
+    const previousValue = reactionsMap[elementId] ?? null
+    const newValue = previousValue === value ? null : value
 
+    try {
       // Optimistic update of reactionsMap
       setReactionsMap((prev) => ({ ...prev, [elementId]: newValue }))
 
@@ -469,8 +470,8 @@ export default function PublicSharePage() {
           if (el.id !== elementId) return el
           let likes = el.likes ?? 0
           let dislikes = el.dislikes ?? 0
-          if (currentValue === 'like') likes = Math.max(0, likes - 1)
-          if (currentValue === 'dislike') dislikes = Math.max(0, dislikes - 1)
+          if (previousValue === 'like') likes = Math.max(0, likes - 1)
+          if (previousValue === 'dislike') dislikes = Math.max(0, dislikes - 1)
           if (newValue === 'like') likes++
           if (newValue === 'dislike') dislikes++
           return { ...el, likes, dislikes }
@@ -489,10 +490,23 @@ export default function PublicSharePage() {
         author_name: reviewerName,
       })
     } catch {
-      // Full revert — both reactionsMap AND project
-      setReactionsMap((prev) => ({ ...prev, [elementId]: reactionsMap[elementId] ?? null }))
-      // Re-fetch to get correct state from server
-      sharingApi.getPublicProject(token).then(data => setProject(data)).catch(() => {})
+      // Revert to captured previous value
+      setReactionsMap((prev) => ({ ...prev, [elementId]: previousValue }))
+      // Re-fetch to get correct counts from server and rebuild reactionsMap
+      sharingApi.getPublicProject(token).then(data => {
+        setProject(data)
+        // Rebuild reactionsMap from fresh data
+        const sid = sessionId
+        if (sid) {
+          const rMap: Record<number, string | null> = {}
+          const allEls = [...data.ungrouped_elements, ...data.scenes.flatMap(s => s.elements)]
+          for (const el of allEls) {
+            const myReaction = el.reactions?.find(r => r.session_id === sid)
+            rMap[el.id] = myReaction?.value ?? null
+          }
+          setReactionsMap(rMap)
+        }
+      }).catch(() => {})
     } finally {
       reactingRef.current.delete(elementId)
     }

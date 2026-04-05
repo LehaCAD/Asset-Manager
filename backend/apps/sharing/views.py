@@ -48,7 +48,11 @@ class SharedLinkViewSet(viewsets.ModelViewSet):
 
 
 class PublicCommentThrottle(AnonRateThrottle):
-    rate = '10/min'
+    rate = '30/min'
+
+
+class PublicReactionThrottle(AnonRateThrottle):
+    rate = '60/min'
 
 
 @api_view(['GET'])
@@ -168,6 +172,7 @@ def public_comment_view(request, token):
             session_id=data['session_id'],
             text=clean_text,
             parent_id=data.get('parent_id'),
+            is_system=False,
         )
         comment.full_clean()
         comment.save()
@@ -188,6 +193,7 @@ def public_comment_view(request, token):
             session_id=data['session_id'],
             text=clean_text,
             parent_id=data.get('parent_id'),
+            is_system=False,
         )
         comment.full_clean()
         comment.save()
@@ -258,7 +264,7 @@ def public_review_action(request, token):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
-@throttle_classes([PublicCommentThrottle])
+@throttle_classes([PublicReactionThrottle])
 def public_reaction_view(request, token):
     """POST /api/sharing/public/{token}/reactions/ — reviewer reacts to element."""
     link = get_object_or_404(SharedLink, token=token)

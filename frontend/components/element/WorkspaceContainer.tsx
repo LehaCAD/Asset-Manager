@@ -24,8 +24,8 @@ import { scenesApi } from '@/lib/api/scenes';
 import { elementsApi } from '@/lib/api/elements';
 import { MoveToGroupDialog } from '@/components/element/MoveToGroupDialog';
 import { RenameDialog } from '@/components/element/RenameDialog';
-import { Upload, ChevronLeft, ChevronRight, FolderPlus, Share2, Link2, Plus } from 'lucide-react';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Upload, ChevronLeft, ChevronRight, FolderPlus, Share2, Plus } from 'lucide-react';
+
 import { ShareSelectionMode } from '@/components/sharing/ShareSelectionMode';
 import { CreateLinkDialog } from '@/components/sharing/CreateLinkDialog';
 import { ShareLinksPanel } from '@/components/sharing/ShareLinksPanel';
@@ -101,7 +101,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<{ id: number; name: string } | null>(null);
   const [moveElementId, setMoveElementId] = useState<number | null>(null);
-  const [sharePopoverOpen, setSharePopoverOpen] = useState(false);
+
 
   // Share mode persisted in sessionStorage to survive group navigation
   const [shareMode, _setShareMode] = useState(() => {
@@ -727,47 +727,31 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
             </button>
           </div>
 
-          {/* Right: share + filters + view */}
+          {/* Right: share + active links + filters + view */}
           <div className="flex items-center gap-1.5 shrink-0">
-            <Popover open={sharePopoverOpen} onOpenChange={setSharePopoverOpen}>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors shrink-0"
-                >
-                  <Share2 className="h-3.5 w-3.5" />
-                  Поделиться
-                </button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-52 p-1" sideOffset={4}>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setSharePopoverOpen(false);
-                    try {
-                      const els = await sharingApi.getProjectElements(projectId);
-                      if (els.length === 0) { toast.error('В проекте нет элементов'); return; }
-                      setShareElements(els);
-                      setShareSelectedIds(new Set(els.map(e => e.id)));
-                      setLinkDialogOpen(true);
-                    } catch { toast.error('Не удалось загрузить элементы'); }
-                  }}
-                  className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors text-left"
-                >
-                  <Share2 className="h-4 w-4 text-muted-foreground" />
-                  Весь проект
-                </button>
-                <div className="h-px bg-border my-1" />
-                <button
-                  type="button"
-                  onClick={() => { setSharePopoverOpen(false); setLinksPanelOpen(true); }}
-                  className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors text-left"
-                >
-                  <Link2 className="h-4 w-4 text-muted-foreground" />
-                  Активные ссылки
-                </button>
-              </PopoverContent>
-            </Popover>
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const els = await sharingApi.getProjectElements(projectId);
+                  if (els.length === 0) { toast.error('В проекте нет элементов'); return; }
+                  setShareElements(els);
+                  setShareSelectedIds(new Set(els.map(e => e.id)));
+                  setLinkDialogOpen(true);
+                } catch { toast.error('Не удалось загрузить элементы'); }
+              }}
+              className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors shrink-0"
+            >
+              <Share2 className="h-3.5 w-3.5" />
+              Поделиться
+            </button>
+            <button
+              type="button"
+              onClick={() => setLinksPanelOpen(true)}
+              className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
+            >
+              Активные ссылки
+            </button>
             <ElementFilters
               filter={filter}
               onFilterChange={setFilter}

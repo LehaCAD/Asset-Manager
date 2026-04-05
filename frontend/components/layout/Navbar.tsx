@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LogOut, User, Clapperboard, HardDrive, LayoutDashboard, Bell, Link2 } from "lucide-react";
+import { LogOut, User, Clapperboard, HardDrive, LayoutDashboard, Bell } from "lucide-react";
 import { ChargeIcon } from "@/components/ui/charge-icon";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,8 +14,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { ShareLinksPanel } from "@/components/sharing/ShareLinksPanel";
 import { ThemeToggle } from "./ThemeToggle";
 import { NotificationDropdown } from "./NotificationDropdown";
 import { useAuthStore } from "@/lib/store/auth";
@@ -31,7 +29,6 @@ export function Navbar() {
   const router = useRouter();
 
   const setUser = useAuthStore((s) => s.setUser);
-  const [linksOpen, setLinksOpen] = useState(false);
   const balance = useCreditsStore((s) => s.balance);
   const loadBalance = useCreditsStore((s) => s.loadBalance);
 
@@ -139,28 +136,6 @@ export function Navbar() {
                 )}
               </Button>
             </NotificationDropdown>
-          )}
-
-          {/* Активные ссылки */}
-          {user && (
-            <Sheet open={linksOpen} onOpenChange={setLinksOpen}>
-              <SheetTrigger asChild>
-                <button
-                  className="relative p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  title="Активные ссылки"
-                >
-                  <Link2 className="h-4 w-4" />
-                </button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-80 sm:w-96 p-0">
-                <div className="p-4 border-b">
-                  <h2 className="text-sm font-medium">Активные ссылки</h2>
-                </div>
-                <div className="p-4">
-                  <ShareLinksPanel />
-                </div>
-              </SheetContent>
-            </Sheet>
           )}
 
           <ThemeToggle />
