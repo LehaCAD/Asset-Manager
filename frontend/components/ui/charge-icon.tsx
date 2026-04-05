@@ -3,11 +3,12 @@
 import { cn } from "@/lib/utils";
 
 interface ChargeIconProps {
-  size?: "sm" | "md" | "lg" | "xl" | "auto";
+  size?: "xs" | "sm" | "md" | "lg" | "xl" | "auto";
   className?: string;
 }
 
 const SIZES = {
+  xs: "h-2.5 w-2.5",
   sm: "h-3 w-3",
   md: "h-3.5 w-3.5",
   lg: "h-4.5 w-4.5",

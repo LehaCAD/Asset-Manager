@@ -124,6 +124,11 @@ function LoginPageContent() {
                 "Войти"
               )}
             </Button>
+            <div className="text-center">
+              <Link href="/forgot-password" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                Забыли пароль?
+              </Link>
+            </div>
           </form>
         </div>
 

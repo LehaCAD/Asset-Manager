@@ -23,6 +23,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import type { Element, ElementFilter } from "@/lib/types";
+import { BADGE_MD } from "@/lib/utils/constants";
 
 // URL helpers for display hierarchy
 function getPreviewUrl(element: Element): string {
@@ -328,6 +329,7 @@ export function LightboxModal({
   
   const isVideo = currentElement?.element_type === "VIDEO";
   const isFavorite = currentElement?.is_favorite ?? false;
+  const isGenerated = currentElement?.source_type === "GENERATED";
   const hasFileUrl = !!currentElement?.file_url?.trim();
   const previewUrl = currentElement ? getPreviewUrl(currentElement) : '';
   const hasPreviewUrl = !!previewUrl;
@@ -465,18 +467,9 @@ export function LightboxModal({
                       height: bounds.height,
                     }}
                   >
-                    {/* Type and favorite icons - top right, like ElementCard */}
+                    {/* Badges - top right: Star (leftmost) → Type → AI */}
                     <div className="absolute top-2 right-2 flex items-center gap-1">
-                      {/* Type icon */}
-                      <div className="rounded-full bg-overlay-medium text-overlay-text p-1.5">
-                        {isVideo ? (
-                          <Video className="w-3.5 h-3.5" />
-                        ) : (
-                          <Image className="w-3.5 h-3.5" />
-                        )}
-                      </div>
-
-                      {/* Favorite icon - clickable */}
+                      {/* Favorite icon - always leftmost to prevent layout jump */}
                       <button
                         type="button"
                         onPointerDown={(e) => e.stopPropagation()}
@@ -484,17 +477,33 @@ export function LightboxModal({
                           e.stopPropagation();
                           if (currentElement) onToggleFavorite(currentElement.id);
                         }}
-                        className="rounded-full bg-overlay-medium p-1.5 hover:bg-overlay-heavy transition-colors cursor-pointer pointer-events-auto focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                        className={cn(BADGE_MD.wrapper, "rounded-md bg-black/60 backdrop-blur-sm flex items-center justify-center hover:bg-black/80 transition-colors cursor-pointer pointer-events-auto focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0")}
                       >
                         <Star
                           className={cn(
-                            "w-3.5 h-3.5",
+                            BADGE_MD.icon,
                             isFavorite
                               ? "text-favorite fill-current"
                               : "text-overlay-text-muted"
                           )}
                         />
                       </button>
+
+                      {/* Type icon */}
+                      <div className={cn(BADGE_MD.wrapper, "rounded-md bg-black/60 backdrop-blur-sm flex items-center justify-center text-overlay-text")}>
+                        {isVideo ? (
+                          <Video className={BADGE_MD.icon} />
+                        ) : (
+                          <Image className={BADGE_MD.icon} />
+                        )}
+                      </div>
+
+                      {/* AI badge - only for generated elements */}
+                      {isGenerated && (
+                        <div className={cn(BADGE_MD.wrapper, "rounded-md bg-black/60 backdrop-blur-sm flex items-center justify-center")}>
+                          <span className="text-white font-bold leading-none text-[10px]">AI</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Video controls - positioned within bounds */}

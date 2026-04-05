@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   GripVertical,
@@ -17,7 +17,6 @@ import { ChargeIcon } from "@/components/ui/charge-icon";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -38,7 +37,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useScenesStore } from "@/lib/store/scenes";
 import { scenesApi } from "@/lib/api/scenes";
-import { SCENE_STATUSES } from "@/lib/utils/constants";
 import { formatElementCount, formatCurrency, formatStorage } from "@/lib/utils/format";
 import type { Scene } from "@/lib/types";
 
@@ -49,13 +47,6 @@ interface SceneCardProps {
   aspectClass?: string;
   fitClass?: string;
 }
-
-const STATUS_COLORS: Record<string, string> = {
-  DRAFT: "bg-secondary text-secondary-foreground",
-  IN_PROGRESS: "bg-primary/15 text-primary",
-  REVIEW: "bg-warning/15 text-warning",
-  APPROVED: "bg-success/15 text-success",
-};
 
 export function SceneCard({ scene, projectId, index, aspectClass = "aspect-video", fitClass = "object-cover" }: SceneCardProps) {
   const router = useRouter();
@@ -73,10 +64,6 @@ export function SceneCard({ scene, projectId, index, aspectClass = "aspect-video
     children_count: number;
     total_elements_affected: number;
   } | null>(null);
-
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  const statusConfig = SCENE_STATUSES.find((s) => s.value === scene.status);
 
   const {
     attributes,
@@ -135,12 +122,6 @@ export function SceneCard({ scene, projectId, index, aspectClass = "aspect-video
     }
   }
 
-  const isVideo =
-    scene.headliner_url &&
-    (scene.headliner_url.endsWith(".mp4") ||
-      scene.headliner_url.endsWith(".webm") ||
-      scene.headliner_url.includes("video"));
-
   return (
     <>
       <div
@@ -174,29 +155,13 @@ export function SceneCard({ scene, projectId, index, aspectClass = "aspect-video
                 );
               })}
             </div>
-          ) : scene.headliner_url ? (
-            isVideo ? (
-              <video
-                ref={videoRef}
-                src={scene.headliner_url}
-                className={cn("absolute inset-0 w-full h-full", fitClass)}
-                muted
-                loop
-                playsInline
-                onMouseEnter={() => videoRef.current?.play()}
-                onMouseLeave={() => {
-                  videoRef.current?.pause();
-                  if (videoRef.current) videoRef.current.currentTime = 0;
-                }}
-              />
-            ) : (
-              <img
-                src={scene.headliner_url}
-                alt={scene.name}
-                loading="lazy"
-                className={cn("absolute inset-0 w-full h-full", fitClass)}
-              />
-            )
+          ) : (scene.headliner_thumbnail_url || scene.headliner_url) ? (
+            <img
+              src={scene.headliner_thumbnail_url ?? scene.headliner_url!}
+              alt=""
+              loading="lazy"
+              className={cn("absolute inset-0 w-full h-full", fitClass)}
+            />
           ) : (
             <>
               <div
@@ -228,21 +193,11 @@ export function SceneCard({ scene, projectId, index, aspectClass = "aspect-video
             data-no-navigate
             className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity touch-none"
           >
-            <div className="h-6 w-6 bg-background/80 backdrop-blur-sm rounded border border-border/50 flex items-center justify-center cursor-grab active:cursor-grabbing shadow-sm">
-              <GripVertical className="h-3 w-3 text-muted-foreground" />
+            <div className="h-7 w-7 bg-background/80 backdrop-blur-sm rounded-md border border-border/50 flex items-center justify-center cursor-grab active:cursor-grabbing shadow-sm">
+              <GripVertical className="h-4 w-4 text-muted-foreground" />
             </div>
           </div>
 
-          {/* Status badge overlay */}
-          <div className="absolute bottom-1.5 left-1.5">
-            <span
-              className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                STATUS_COLORS[scene.status] ?? "bg-secondary text-secondary-foreground"
-              }`}
-            >
-              {statusConfig?.label ?? scene.status}
-            </span>
-          </div>
         </div>
 
         {/* Footer — compact info */}
@@ -258,12 +213,12 @@ export function SceneCard({ scene, projectId, index, aspectClass = "aspect-video
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 -mr-1"
+                    className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 -mr-1"
                     aria-label="Действия"
                     onPointerDown={blockCardNavigation}
                     onClick={blockCardNavigation}
                   >
-                    <MoreHorizontal className="h-3 w-3" />
+                    <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent

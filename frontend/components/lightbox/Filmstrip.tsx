@@ -5,6 +5,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import type { Element } from "@/lib/types";
 import { Video, Image, Star } from "lucide-react";
+import { BADGE_SM } from "@/lib/utils/constants";
 
 export interface FilmstripProps {
   elements: Element[];
@@ -32,6 +33,7 @@ export function Filmstrip({ elements, currentElementId, onSelect }: FilmstripPro
         {elements.map((el) => {
           const isActive = el.id === currentElementId;
           const isVideo = el.element_type === "VIDEO";
+          const isGenerated = el.source_type === "GENERATED";
 
           return (
             <button
@@ -66,21 +68,28 @@ export function Filmstrip({ elements, currentElementId, onSelect }: FilmstripPro
                 </div>
               )}
 
-              {/* Type and favorite icons - top right, like ElementCard */}
+              {/* Badges - top right: Star (leftmost) → Type → AI */}
               <div className="absolute top-1 right-1 flex items-center gap-0.5">
+                {/* Favorite icon */}
+                {el.is_favorite && (
+                  <div className={cn(BADGE_SM.wrapper, "rounded-md bg-black/60 backdrop-blur-sm flex items-center justify-center")}>
+                    <Star className={cn(BADGE_SM.icon, "text-favorite fill-current")} />
+                  </div>
+                )}
+
                 {/* Type icon */}
-                <div className="rounded-full bg-overlay-medium p-0.5">
+                <div className={cn(BADGE_SM.wrapper, "rounded-md bg-black/60 backdrop-blur-sm flex items-center justify-center text-overlay-text")}>
                   {isVideo ? (
-                    <Video className="w-2.5 h-2.5 text-overlay-text" />
+                    <Video className={BADGE_SM.icon} />
                   ) : (
-                    <Image className="w-2.5 h-2.5 text-overlay-text" />
+                    <Image className={BADGE_SM.icon} />
                   )}
                 </div>
 
-                {/* Favorite icon */}
-                {el.is_favorite && (
-                  <div className="rounded-full bg-overlay-medium p-0.5">
-                    <Star className="w-2.5 h-2.5 text-favorite fill-current" />
+                {/* AI badge - only for generated elements */}
+                {isGenerated && (
+                  <div className={cn(BADGE_SM.wrapper, "rounded-md bg-black/60 backdrop-blur-sm flex items-center justify-center")}>
+                    <span className="text-white font-bold leading-none text-[8px]">AI</span>
                   </div>
                 )}
               </div>

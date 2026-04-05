@@ -82,9 +82,9 @@ class SceneSerializer(serializers.ModelSerializer):
         return ''
 
     def get_headliner_thumbnail_url(self, obj: Scene) -> str:
-        """URL превью лучшего элемента."""
+        """URL превью лучшего элемента (800px preview)."""
         if obj.headliner:
-            return obj.headliner.thumbnail_url or obj.headliner.file_url
+            return obj.headliner.preview_url or obj.headliner.thumbnail_url or obj.headliner.file_url
         return ''
 
     def get_headliner_type(self, obj: Scene) -> str:
@@ -105,7 +105,7 @@ class SceneSerializer(serializers.ModelSerializer):
         return getattr(obj, '_storage_bytes', None) or 0
 
     def get_preview_thumbnails(self, obj) -> list[str]:
-        """First 4 element thumbnail URLs for preview grid."""
+        """First 4 element preview URLs (800px) for preview grid."""
         if hasattr(obj, '_preview_elements'):
             elements = obj._preview_elements[:4]
         else:
@@ -115,7 +115,7 @@ class SceneSerializer(serializers.ModelSerializer):
                 file_url=''
             ).order_by('-created_at')[:4]
         return [
-            e.thumbnail_url or e.file_url
+            e.preview_url or e.thumbnail_url or e.file_url
             for e in elements
             if e.file_url
         ]

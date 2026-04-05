@@ -1,9 +1,12 @@
 from decimal import Decimal
+import uuid
+from datetime import timedelta
 
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.utils import timezone
 
 
 class User(AbstractUser):
@@ -26,6 +29,12 @@ class User(AbstractUser):
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    is_email_verified = models.BooleanField(default=False, verbose_name='Email подтверждён')
+    email_verification_token = models.UUIDField(default=uuid.uuid4, editable=False)
+    email_verification_sent_at = models.DateTimeField(null=True, blank=True)
+    password_reset_token = models.UUIDField(null=True, blank=True)
+    password_reset_sent_at = models.DateTimeField(null=True, blank=True)
+    tos_accepted_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name = 'Пользователь'
@@ -33,6 +42,18 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.username
+
+    def is_password_reset_token_valid(self):
+        """Токен сброса пароля валиден 1 час."""
+        if not self.password_reset_token or not self.password_reset_sent_at:
+            return False
+        return timezone.now() - self.password_reset_sent_at < timedelta(hours=1)
+
+    def can_resend_verification(self):
+        """Можно отправлять повторно раз в 60 секунд."""
+        if not self.email_verification_sent_at:
+            return True
+        return timezone.now() - self.email_verification_sent_at > timedelta(seconds=60)
 
 
 class UserQuota(models.Model):

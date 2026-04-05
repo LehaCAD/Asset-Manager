@@ -384,8 +384,8 @@ export function ElementGrid({ className, onRequestDelete, groups = [], onGroupCl
             {!collapsedSections.groups && (
               <SortableContext items={prefixedGroupIds} strategy={rectSortingStrategy}>
                 <div
-                  className="grid gap-4 py-1"
-                  style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${groupDims.stackWidth}px, 1fr))` }}
+                  className={cn("grid py-1", gridConfig.gap)}
+                  style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${getMinCardWidth(preferences.size, preferences.aspectRatio)}px, 1fr))` }}
                 >
                   {sortedGroups.map((group) => {
                     const dndId = toDndId('group', group.id);

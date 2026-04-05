@@ -74,7 +74,7 @@ export default function SettingsPage() {
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            className="w-full bg-muted/50 border border-border rounded-sm px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary focus:bg-background"
           />
         </div>
         <div className="space-y-1.5">
@@ -82,14 +82,14 @@ export default function SettingsPage() {
           <input
             value={user?.email ?? ""}
             disabled
-            className="w-full bg-muted/40 border border-border rounded-lg px-3 py-2 text-sm text-muted-foreground cursor-not-allowed"
+            className="w-full bg-muted/30 border border-border rounded-sm px-3 py-2 text-sm text-muted-foreground cursor-not-allowed"
           />
           <p className="text-[11px] text-muted-foreground/60">Email нельзя изменить</p>
         </div>
         <button
           onClick={handleSaveName}
           disabled={saving || name === user?.username}
-          className="px-5 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50 transition-colors hover:bg-primary/90"
+          className="px-4 py-2 rounded-sm bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50 transition-colors hover:bg-primary/90"
         >
           {saving ? "Сохраняю..." : "Сохранить"}
         </button>
@@ -106,7 +106,7 @@ export default function SettingsPage() {
             type="password"
             value={currentPwd}
             onChange={(e) => setCurrentPwd(e.target.value)}
-            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            className="w-full bg-muted/50 border border-border rounded-sm px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary focus:bg-background"
           />
         </div>
         <div className="space-y-1.5">
@@ -115,13 +115,13 @@ export default function SettingsPage() {
             type="password"
             value={newPwd}
             onChange={(e) => setNewPwd(e.target.value)}
-            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            className="w-full bg-muted/50 border border-border rounded-sm px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary focus:bg-background"
           />
         </div>
         <button
           onClick={handleChangePassword}
           disabled={changingPwd || !currentPwd || !newPwd}
-          className="px-5 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50 transition-colors hover:bg-primary/90"
+          className="px-4 py-2 rounded-sm bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50 transition-colors hover:bg-primary/90"
         >
           {changingPwd ? "Меняю..." : "Сменить пароль"}
         </button>
@@ -138,7 +138,7 @@ export default function SettingsPage() {
               key={value}
               onClick={() => setTheme(value)}
               className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium border transition-colors",
+                "flex items-center gap-2 px-4 py-2 rounded-sm text-xs font-medium border transition-colors",
                 theme === value
                   ? "bg-primary text-primary-foreground border-primary"
                   : "bg-background text-muted-foreground border-border hover:text-foreground hover:bg-muted/50"
@@ -161,7 +161,7 @@ export default function SettingsPage() {
         </p>
         <button
           disabled
-          className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-muted-foreground text-xs font-medium cursor-not-allowed opacity-40"
+          className="flex items-center gap-2 px-4 py-2 rounded-sm border border-border text-muted-foreground text-xs font-medium cursor-not-allowed opacity-40"
           title="Скоро"
         >
           <Trash2 className="h-4 w-4" />

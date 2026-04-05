@@ -2,7 +2,7 @@ import logging
 import requests
 
 from django.http import StreamingHttpResponse
-from django.db.models import Sum, Subquery, OuterRef, DecimalField
+from django.db.models import Count, Q, Sum, Subquery, OuterRef, DecimalField
 from django.db.models.functions import Abs
 from rest_framework import viewsets, permissions, status
 from rest_framework.permissions import IsAuthenticated
@@ -97,7 +97,8 @@ class ElementViewSet(viewsets.ModelViewSet):
                     cost=Abs(Sum('amount'))
                 ).values('cost')[:1],
                 output_field=DecimalField()
-            )
+            ),
+            _comment_count=Count('comments', filter=Q(comments__is_system=False)),
         )
 
         return queryset.order_by('order_index', 'created_at')

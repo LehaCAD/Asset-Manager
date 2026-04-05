@@ -98,6 +98,11 @@ function LinkRow({ link, onCopy, onDelete }: LinkRowProps) {
         <p className="text-sm font-medium truncate">
           {link.name || 'Без названия'}
         </p>
+        {link.project_name && (
+          <p className="text-[11px] text-primary/70 truncate">
+            {link.project_name}
+          </p>
+        )}
         <p className="text-xs text-muted-foreground mt-0.5">
           {formatLinkMeta(link)}
         </p>

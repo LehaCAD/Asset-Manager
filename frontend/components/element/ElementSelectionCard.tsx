@@ -91,35 +91,36 @@ export function ElementSelectionCard({
               />
             )}
 
-            {/* Top-right corner: Type icon and Favorite star */}
-            <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5">
+            {/* Top-right badges: Star (leftmost) → Type → AI */}
+            <div className="absolute top-2 right-2 z-20 flex items-center gap-1">
+              {/* Favorite star - leftmost, read only */}
+              {element.is_favorite && (
+                <div
+                  className="rounded-md bg-black/60 backdrop-blur-sm h-6 w-6 flex items-center justify-center"
+                  title="В избранном"
+                >
+                  <Star className="h-3.5 w-3.5 text-white fill-amber-400" />
+                </div>
+              )}
+
               {/* Element type icon */}
               <div
-                className="rounded-full bg-overlay text-overlay-text p-2"
+                className="rounded-md bg-black/60 backdrop-blur-sm h-6 w-6 flex items-center justify-center"
                 title={isVideo ? "Видео" : "Изображение"}
               >
                 {isVideo ? (
-                  <Video className="w-5 h-5" />
+                  <Video className="h-3.5 w-3.5 text-white" />
                 ) : (
-                  <Image className="w-5 h-5" />
+                  <Image className="h-3.5 w-3.5 text-white" />
                 )}
               </div>
 
-              {/* Favorite star - read only */}
-              <div
-                className={cn(
-                  "rounded-full bg-overlay p-2",
-                  element.is_favorite ? "text-favorite" : "text-overlay-text-muted"
-                )}
-                title={element.is_favorite ? "В избранном" : "Не в избранном"}
-              >
-                <Star
-                  className={cn(
-                    "w-5 h-5",
-                    element.is_favorite && "fill-current"
-                  )}
-                />
-              </div>
+              {/* AI badge - only for generated */}
+              {element.source_type === "GENERATED" && (
+                <div className="rounded-md bg-black/60 backdrop-blur-sm h-6 w-6 flex items-center justify-center">
+                  <span className="text-white font-bold leading-none text-[10px]">AI</span>
+                </div>
+              )}
             </div>
           </button>
         </TooltipTrigger>

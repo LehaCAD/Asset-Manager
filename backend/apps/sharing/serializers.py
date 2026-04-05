@@ -53,15 +53,16 @@ class SharedLinkSerializer(serializers.ModelSerializer):
     element_count = serializers.SerializerMethodField()
     comment_count = serializers.SerializerMethodField()
     url = serializers.SerializerMethodField()
+    project_name = serializers.CharField(source='project.name', read_only=True)
 
     class Meta:
         model = SharedLink
         fields = [
-            'id', 'token', 'project', 'name',
+            'id', 'token', 'project', 'project_name', 'name',
             'element_ids', 'element_count', 'comment_count',
             'expires_at', 'created_at', 'url', 'display_preferences',
         ]
-        read_only_fields = ['id', 'token', 'created_at', 'url']
+        read_only_fields = ['id', 'token', 'created_at', 'url', 'project_name']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

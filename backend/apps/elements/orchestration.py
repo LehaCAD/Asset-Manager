@@ -70,6 +70,7 @@ def create_generation(project, scene, prompt, ai_model_id, generation_config, us
             'generation_config': generation_config,
             'status': Element.STATUS_PENDING,
             'source_type': source_type,
+            'original_filename': '',
         }
 
         with transaction.atomic():
@@ -154,6 +155,7 @@ def create_upload(project, scene, file, prompt_text='', is_favorite=False, ai_mo
             'is_favorite': is_favorite,
             'status': Element.STATUS_PROCESSING,
             'source_type': Element.SOURCE_UPLOADED,
+            'original_filename': file.name or '',
         }
 
         if ai_model_id:

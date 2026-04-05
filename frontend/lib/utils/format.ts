@@ -62,3 +62,22 @@ export function formatCurrency(amount: string | number): string {
   if (isNaN(num) || num === 0) return "0";
   return parseFloat(num.toFixed(2)).toString();
 }
+
+export function formatRelativeDate(dateStr: string | undefined | null): string {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHour = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHour / 24);
+
+  if (diffSec < 60) return 'Изменён только что';
+  if (diffMin < 60) return `Изменён ${diffMin} мин назад`;
+  if (diffHour < 24) return `Изменён ${diffHour} ч назад`;
+  if (diffDay === 1) return 'Изменён вчера';
+  if (diffDay < 7) return `Изменён ${diffDay} дн. назад`;
+  if (diffDay < 30) return `Изменён ${Math.floor(diffDay / 7)} нед. назад`;
+  return `Изменён ${date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}`;
+}

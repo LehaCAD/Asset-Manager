@@ -159,6 +159,7 @@ export interface WorkspaceElement extends Element {
   client_generation_submit_state?: GenerationSubmitState;
   client_upload_phase?: UploadPhase;
   client_upload_progress?: number; // 0–100
+  comment_count?: number;
 }
 
 export interface GeneratePayload {
@@ -332,6 +333,7 @@ export interface SharedLink {
   id: number
   token: string
   project: number
+  project_name: string
   created_by: number
   name: string
   element_ids: number[]

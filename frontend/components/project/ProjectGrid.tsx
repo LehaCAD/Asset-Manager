@@ -6,11 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProjectCard } from "./ProjectCard";
 import { CreateProjectDialog } from "./CreateProjectDialog";
+import { ShareLinksPanel } from "@/components/sharing/ShareLinksPanel";
 import { useProjectsStore } from "@/lib/store/projects";
 
 export function ProjectGrid() {
   const { projects, isLoading, loadProjects } = useProjectsStore();
   const [createOpen, setCreateOpen] = useState(false);
+  const [linksPanelOpen, setLinksPanelOpen] = useState(false);
 
   useEffect(() => {
     loadProjects();
@@ -34,12 +36,21 @@ export function ProjectGrid() {
           <Plus className="h-4 w-4" />
           Создать проект
         </button>
+        <div className="ml-auto">
+          <button
+            type="button"
+            onClick={() => setLinksPanelOpen(true)}
+            className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-muted-foreground bg-card hover:text-foreground transition-colors shrink-0"
+          >
+            Активные ссылки
+          </button>
+        </div>
       </div>
 
       {/* Grid - full width, no max-width */}
       <div className="flex-1 overflow-auto px-4 py-4">
         {isLoading ? (
-            <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
+            <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))' }}>
               {Array.from({ length: 8 }).map((_, i) => (
                 <ProjectCardSkeleton key={i} />
               ))}
@@ -47,7 +58,7 @@ export function ProjectGrid() {
           ) : projects.length === 0 ? (
             <EmptyState onCreateClick={() => setCreateOpen(true)} />
           ) : (
-            <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
+            <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))' }}>
               {projects.map((project) => (
                 <ProjectCard key={project.id} project={project} />
               ))}
@@ -56,23 +67,39 @@ export function ProjectGrid() {
       </div>
 
       <CreateProjectDialog open={createOpen} onOpenChange={setCreateOpen} />
+
+      {/* Global share links panel (slide-over) */}
+      {linksPanelOpen && (
+        <div className="fixed inset-y-0 right-0 z-50 w-80 bg-background border-l shadow-xl flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 border-b">
+            <h3 className="text-sm font-medium">Все ссылки для просмотра</h3>
+            <button
+              type="button"
+              onClick={() => setLinksPanelOpen(false)}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="flex-1 overflow-auto">
+            <ShareLinksPanel />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 function ProjectCardSkeleton() {
   return (
-    <div className="rounded-md overflow-hidden border border-border bg-card">
-      <Skeleton className="aspect-video w-full" />
-      <div className="p-3 space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <Skeleton className="h-4 w-3/4" />
-          <Skeleton className="h-5 w-14 rounded-full" />
-        </div>
-        <div className="flex items-center gap-3">
-          <Skeleton className="h-3 w-16" />
-          <Skeleton className="h-3 w-20" />
-        </div>
+    <div className="rounded-md border border-border bg-card overflow-hidden">
+      <div className="aspect-video p-1.5">
+        <Skeleton className="w-full h-full rounded-md" />
+      </div>
+      <div className="p-3 space-y-1.5">
+        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="h-3 w-1/2" />
+        <Skeleton className="h-3 w-1/3" />
       </div>
     </div>
   );
