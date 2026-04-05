@@ -18,6 +18,7 @@ interface ShareableElement {
   id: number
   element_type: string
   is_favorite: boolean
+  source_type: string
 }
 
 interface CreateLinkDialogProps {
