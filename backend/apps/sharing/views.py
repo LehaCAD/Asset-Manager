@@ -1,5 +1,6 @@
 import logging
 
+from django.core.exceptions import ValidationError
 from django.db.models import Count, Q
 from django.utils.html import strip_tags
 from django.shortcuts import get_object_or_404
@@ -160,6 +161,27 @@ def public_comment_view(request, token):
     # Validate target belongs to this shared link
     shared_element_ids = set(link.elements.values_list('id', flat=True))
 
+    # Validate parent_id if provided
+    parent_id = data.get('parent_id')
+    if parent_id is not None:
+        try:
+            parent_comment = Comment.objects.get(id=parent_id)
+        except Comment.DoesNotExist:
+            return Response(
+                {'detail': 'Parent comment not found.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if data.get('element_id') and parent_comment.element_id != data['element_id']:
+            return Response(
+                {'detail': 'Parent comment belongs to a different element.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if data.get('scene_id') and parent_comment.scene_id != data['scene_id']:
+            return Response(
+                {'detail': 'Parent comment belongs to a different scene.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
     if data.get('element_id'):
         if data['element_id'] not in shared_element_ids:
             return Response(
@@ -174,7 +196,13 @@ def public_comment_view(request, token):
             parent_id=data.get('parent_id'),
             is_system=False,
         )
-        comment.full_clean()
+        try:
+            comment.full_clean()
+        except ValidationError as e:
+            return Response(
+                {'detail': e.message_dict if hasattr(e, 'message_dict') else str(e)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         comment.save()
     elif data.get('scene_id'):
         # Validate scene has at least one shared element
@@ -195,7 +223,13 @@ def public_comment_view(request, token):
             parent_id=data.get('parent_id'),
             is_system=False,
         )
-        comment.full_clean()
+        try:
+            comment.full_clean()
+        except ValidationError as e:
+            return Response(
+                {'detail': e.message_dict if hasattr(e, 'message_dict') else str(e)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         comment.save()
 
     # Send notifications
@@ -218,6 +252,10 @@ def public_review_action(request, token):
         return Response({'detail': 'Срок ссылки истёк.'}, status=status.HTTP_410_GONE)
 
     element_id = request.data.get('element_id')
+    try:
+        element_id = int(element_id)
+    except (TypeError, ValueError):
+        return Response({'detail': 'element_id must be an integer.'}, status=400)
     action = request.data.get('action')
     session_id = request.data.get('session_id', '')
     author_name = request.data.get('author_name', '')
@@ -265,6 +303,10 @@ def public_reaction_view(request, token):
         return Response({'detail': 'Срок ссылки истёк.'}, status=status.HTTP_410_GONE)
 
     element_id = request.data.get('element_id')
+    try:
+        element_id = int(element_id)
+    except (TypeError, ValueError):
+        return Response({'detail': 'element_id must be an integer.'}, status=400)
     session_id = request.data.get('session_id')
     value = request.data.get('value')  # 'like', 'dislike', or null to remove
     author_name = request.data.get('author_name', '')
