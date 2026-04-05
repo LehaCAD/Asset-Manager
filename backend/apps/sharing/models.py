@@ -139,3 +139,25 @@ class ElementReaction(models.Model):
 
     def __str__(self):
         return f"{self.value} on element {self.element_id} by {self.session_id}"
+
+
+class ElementReview(models.Model):
+    class Action(models.TextChoices):
+        APPROVED = 'approved', 'Согласовано'
+        CHANGES_REQUESTED = 'changes_requested', 'На доработку'
+        REJECTED = 'rejected', 'Отклонено'
+
+    element = models.ForeignKey(
+        'elements.Element', on_delete=models.CASCADE, related_name='reviews'
+    )
+    session_id = models.CharField(max_length=36)
+    author_name = models.CharField(max_length=100, default='')
+    action = models.CharField(max_length=20, choices=Action.choices)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ['element', 'session_id']
+
+    def __str__(self):
+        return f"{self.action} on element {self.element_id} by {self.author_name or self.session_id}"
