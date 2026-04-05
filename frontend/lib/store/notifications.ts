@@ -2,10 +2,13 @@ import { create } from "zustand";
 import { notificationsApi } from "@/lib/api/notifications";
 import type { Notification } from "@/lib/types";
 
-interface NotificationFilters {
-  projectId: number | null;
-  types: string[] | null; // null = all types
-}
+type NotificationTab = 'all' | 'feedback' | 'content';
+
+const TAB_TYPES: Record<NotificationTab, string[] | null> = {
+  all: null,
+  feedback: ['comment_new', 'reaction_new'],
+  content: ['generation_completed', 'generation_failed', 'upload_completed'],
+};
 
 interface NotificationState {
   notifications: Notification[];
@@ -13,18 +16,19 @@ interface NotificationState {
   hasMore: boolean;
   isLoading: boolean;
   error: boolean;
-  filters: NotificationFilters;
-  lastFetchedFilters: NotificationFilters | null;
+  activeTab: NotificationTab;
+  projectId: number | null;
 
   fetchUnreadCount: () => Promise<void>;
   fetchNotifications: (offset?: number) => Promise<void>;
-  setFilters: (update: Partial<NotificationFilters>) => void;
+  setActiveTab: (tab: NotificationTab) => void;
+  setProjectId: (id: number | null) => void;
   markRead: (id: number) => Promise<void>;
   markAllRead: () => Promise<void>;
   addNotification: (notification: Notification) => void;
 }
 
-const DEFAULT_FILTERS: NotificationFilters = { projectId: null, types: null };
+export type { NotificationTab };
 
 export const useNotificationStore = create<NotificationState>((set, get) => ({
   notifications: [],
@@ -32,8 +36,8 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   hasMore: false,
   isLoading: false,
   error: false,
-  filters: { ...DEFAULT_FILTERS },
-  lastFetchedFilters: null,
+  activeTab: 'all',
+  projectId: null,
 
   fetchUnreadCount: async () => {
     try {
@@ -45,12 +49,13 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   },
 
   fetchNotifications: async (offset = 0) => {
-    const { filters } = get();
+    const { activeTab, projectId } = get();
     set({ isLoading: true, error: false });
     try {
       const params: Record<string, unknown> = { offset };
-      if (filters.projectId) params.project = filters.projectId;
-      if (filters.types && filters.types.length > 0) params.type = filters.types.join(',');
+      if (projectId) params.project = projectId;
+      const types = TAB_TYPES[activeTab];
+      if (types) params.type = types.join(',');
 
       const data = await notificationsApi.list(params as any);
       set((state) => ({
@@ -60,18 +65,19 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
             : [...state.notifications, ...data.results],
         hasMore: data.has_more,
         isLoading: false,
-        lastFetchedFilters: { ...filters },
       }));
     } catch {
       set({ isLoading: false, error: offset === 0 });
     }
   },
 
-  setFilters: (update) => {
-    set((state) => ({
-      filters: { ...state.filters, ...update },
-    }));
-    // Auto-refetch with new filters
+  setActiveTab: (tab) => {
+    set({ activeTab: tab });
+    get().fetchNotifications(0);
+  },
+
+  setProjectId: (id) => {
+    set({ projectId: id });
     get().fetchNotifications(0);
   },
 
