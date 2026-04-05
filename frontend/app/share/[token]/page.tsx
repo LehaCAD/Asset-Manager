@@ -463,58 +463,38 @@ export default function PublicSharePage() {
     if (!sessionId || reactingRef.current.has(elementId)) return
     reactingRef.current.add(elementId)
 
-    // Capture previous value before any mutation
     const previousValue = reactionsMap[elementId] ?? null
     const newValue = previousValue === value ? null : value
 
-    try {
-      // Optimistic update of reactionsMap
-      setReactionsMap((prev) => ({ ...prev, [elementId]: newValue }))
+    // Optimistic update of button highlight only (not counts)
+    setReactionsMap((prev) => ({ ...prev, [elementId]: newValue }))
 
-      // Optimistic update of element counts in project
+    try {
+      const res = await sharingApi.setReaction(token, {
+        element_id: elementId,
+        session_id: sessionId,
+        value: newValue,
+        author_name: reviewerName,
+      })
+
+      // Use SERVER counts — source of truth, no drift
+      const serverData = res.data ?? res
+      const serverLikes = serverData.likes ?? 0
+      const serverDislikes = serverData.dislikes ?? 0
+
       setProject((prev) => {
         if (!prev) return prev
-        const updateEl = (el: PublicElement): PublicElement => {
-          if (el.id !== elementId) return el
-          let likes = el.likes ?? 0
-          let dislikes = el.dislikes ?? 0
-          if (previousValue === 'like') likes = Math.max(0, likes - 1)
-          if (previousValue === 'dislike') dislikes = Math.max(0, dislikes - 1)
-          if (newValue === 'like') likes++
-          if (newValue === 'dislike') dislikes++
-          return { ...el, likes, dislikes }
-        }
+        const updateEl = (el: PublicElement): PublicElement =>
+          el.id === elementId ? { ...el, likes: serverLikes, dislikes: serverDislikes } : el
         return {
           ...prev,
           ungrouped_elements: prev.ungrouped_elements.map(updateEl),
           scenes: prev.scenes.map((s) => ({ ...s, elements: s.elements.map(updateEl) })),
         }
       })
-
-      await sharingApi.setReaction(token, {
-        element_id: elementId,
-        session_id: sessionId,
-        value: newValue,
-        author_name: reviewerName,
-      })
     } catch {
-      // Revert to captured previous value
+      // Revert button highlight
       setReactionsMap((prev) => ({ ...prev, [elementId]: previousValue }))
-      // Re-fetch to get correct counts from server and rebuild reactionsMap
-      sharingApi.getPublicProject(token).then(data => {
-        setProject(data)
-        // Rebuild reactionsMap from fresh data
-        const sid = sessionId
-        if (sid) {
-          const rMap: Record<number, string | null> = {}
-          const allEls = [...data.ungrouped_elements, ...data.scenes.flatMap(s => s.elements)]
-          for (const el of allEls) {
-            const myReaction = el.reactions?.find(r => r.session_id === sid)
-            rMap[el.id] = myReaction?.value ?? null
-          }
-          setReactionsMap(rMap)
-        }
-      }).catch(() => {})
     } finally {
       reactingRef.current.delete(elementId)
     }

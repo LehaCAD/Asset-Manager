@@ -286,7 +286,10 @@ def public_reaction_view(request, token):
     if not value:
         # Remove reaction
         ElementReaction.objects.filter(element_id=element_id, session_id=session_id).delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        # Return actual counts after removal
+        likes = ElementReaction.objects.filter(element_id=element_id, value='like').count()
+        dislikes = ElementReaction.objects.filter(element_id=element_id, value='dislike').count()
+        return Response({'element_id': element_id, 'value': None, 'likes': likes, 'dislikes': dislikes})
 
     if value not in ('like', 'dislike'):
         return Response({'detail': 'value must be "like" or "dislike"'}, status=400)
@@ -317,7 +320,10 @@ def public_reaction_view(request, token):
         except Exception as e:
             logger.warning(f'Failed to send reaction notification: {e}')
 
-    return Response({'element_id': element_id, 'value': value}, status=status.HTTP_200_OK)
+    # Return actual counts — the source of truth, no optimistic drift
+    likes = ElementReaction.objects.filter(element_id=element_id, value='like').count()
+    dislikes = ElementReaction.objects.filter(element_id=element_id, value='dislike').count()
+    return Response({'element_id': element_id, 'value': value, 'likes': likes, 'dislikes': dislikes})
 
 
 @api_view(['GET', 'POST'])

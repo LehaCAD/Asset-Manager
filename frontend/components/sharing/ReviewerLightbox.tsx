@@ -65,6 +65,8 @@ export function ReviewerLightbox({
   const [sessionId, setSessionId] = useState('')
   const [mobileCommentsOpen, setMobileCommentsOpen] = useState(false)
   const [reviewLoading, setReviewLoading] = useState(false)
+  // Track review decision per element: elementId → 'approved' | 'changes_requested' | 'rejected' | null
+  const [reviewMap, setReviewMap] = useState<Record<number, string | null>>({})
   const activeThumbRef = useRef<HTMLButtonElement>(null)
 
   // Load reviewer identity from localStorage
@@ -151,6 +153,14 @@ export function ReviewerLightbox({
       return
     }
     if (!current || reviewLoading) return
+
+    // Toggle: if same action is already active, deselect (no API call)
+    const currentReview = reviewMap[current.id] ?? null
+    if (currentReview === action) {
+      setReviewMap((prev) => ({ ...prev, [current.id]: null }))
+      return
+    }
+
     setReviewLoading(true)
     try {
       await sharingApi.submitReview(token, {
@@ -159,12 +169,8 @@ export function ReviewerLightbox({
         session_id: sessionId,
         author_name: reviewerName,
       })
-      const actionLabels: Record<string, string> = {
-        approved: 'Согласовано',
-        changes_requested: 'Отправлено на доработку',
-        rejected: 'Отклонено',
-      }
-      toast.success(actionLabels[action] || action)
+      // Set active state — mutually exclusive
+      setReviewMap((prev) => ({ ...prev, [current.id]: action }))
     } catch {
       toast.error('Ошибка при отправке оценки')
     } finally {
@@ -299,32 +305,50 @@ export function ReviewerLightbox({
               </button>
             </div>
 
-            {/* Row 2: Review actions — separate row */}
+            {/* Row 2: Review actions — neutral by default, active when clicked, mutually exclusive */}
             <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => handleReview('approved')}
-                disabled={reviewLoading}
-                className="rounded-md px-3 py-1.5 text-xs font-medium bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
-              >
-                <Check className="w-3.5 h-3.5 inline mr-1" />
-                Согласовано
-              </button>
-              <button
-                onClick={() => handleReview('changes_requested')}
-                disabled={reviewLoading}
-                className="rounded-md px-3 py-1.5 text-xs font-medium bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 transition-colors disabled:opacity-50"
-              >
-                <RotateCcw className="w-3.5 h-3.5 inline mr-1" />
-                На доработку
-              </button>
-              <button
-                onClick={() => handleReview('rejected')}
-                disabled={reviewLoading}
-                className="rounded-md px-3 py-1.5 text-xs font-medium bg-muted text-muted-foreground hover:bg-muted/80 transition-colors disabled:opacity-50"
-              >
-                <X className="w-3.5 h-3.5 inline mr-1" />
-                Отклонить
-              </button>
+              {(() => {
+                const activeReview = current ? (reviewMap[current.id] ?? null) : null
+                const baseClass = 'rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50'
+                const neutralClass = 'bg-card text-muted-foreground hover:bg-muted'
+                return (
+                  <>
+                    <button
+                      onClick={() => handleReview('approved')}
+                      disabled={reviewLoading}
+                      className={cn(baseClass, activeReview === 'approved'
+                        ? 'bg-emerald-500/20 text-emerald-400'
+                        : neutralClass
+                      )}
+                    >
+                      <Check className="w-3.5 h-3.5 inline mr-1" />
+                      Согласовано
+                    </button>
+                    <button
+                      onClick={() => handleReview('changes_requested')}
+                      disabled={reviewLoading}
+                      className={cn(baseClass, activeReview === 'changes_requested'
+                        ? 'bg-orange-500/20 text-orange-400'
+                        : neutralClass
+                      )}
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 inline mr-1" />
+                      На доработку
+                    </button>
+                    <button
+                      onClick={() => handleReview('rejected')}
+                      disabled={reviewLoading}
+                      className={cn(baseClass, activeReview === 'rejected'
+                        ? 'bg-red-500/20 text-red-400'
+                        : neutralClass
+                      )}
+                    >
+                      <X className="w-3.5 h-3.5 inline mr-1" />
+                      Отклонить
+                    </button>
+                  </>
+                )
+              })()}
             </div>
           </div>
 
