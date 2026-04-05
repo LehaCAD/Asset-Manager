@@ -12,9 +12,14 @@ from .serializers import NotificationSerializer
 def notification_list(request):
     qs = Notification.objects.filter(user=request.user)
 
+    project_id = request.query_params.get('project')
+    if project_id:
+        qs = qs.filter(project_id=project_id)
+
     type_filter = request.query_params.get('type')
     if type_filter:
-        qs = qs.filter(type=type_filter)
+        type_list = [t.strip() for t in type_filter.split(',')]
+        qs = qs.filter(type__in=type_list)
 
     is_read = request.query_params.get('is_read')
     if is_read is not None:

@@ -457,7 +457,7 @@ def project_element_ids(request, project_id):
     elements = list(
         Element.objects.filter(project=project)
         .exclude(status='FAILED')
-        .values('id', 'element_type', 'is_favorite')
+        .values('id', 'element_type', 'is_favorite', 'source_type')
     )
     return Response({'elements': elements})
 
@@ -489,7 +489,7 @@ def group_element_ids(request, scene_id):
     elements = list(
         Element.objects.filter(scene_id__in=scene_ids)
         .exclude(status='FAILED')
-        .values('id', 'element_type', 'is_favorite')
+        .values('id', 'element_type', 'is_favorite', 'source_type')
     )
     return Response({'elements': elements})
 

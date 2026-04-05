@@ -8,6 +8,7 @@ class Notification(models.Model):
         REACTION_NEW = 'reaction_new', 'Новая реакция'
         GENERATION_COMPLETED = 'generation_completed', 'Генерация завершена'
         GENERATION_FAILED = 'generation_failed', 'Ошибка генерации'
+        UPLOAD_COMPLETED = 'upload_completed', 'Загрузка завершена'
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE,

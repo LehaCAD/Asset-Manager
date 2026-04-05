@@ -23,7 +23,7 @@ from apps.credits.models import CreditsTransaction
 from apps.credits.services import CreditsService
 from apps.ai_providers.validators import validate_model_admin_config
 
-from apps.notifications.services import notify_element_status
+from apps.notifications.services import notify_element_status, create_notification
 
 logger = logging.getLogger(__name__)
 
@@ -157,11 +157,22 @@ def start_generation(self, element_id: int) -> dict:
         
         logger.info("Element #%s обновлен: task_id=%s, status=PROCESSING", element_id, task_id)
         
-        # Запускаем polling задачу
-        check_generation_status.apply_async(
-            args=[element_id],
-            countdown=10  # Начинаем проверку через 10 секунд
-        )
+        # Polling: aggressive without callback, safety-net with callback
+        has_callback = bool(callback_url)
+        if has_callback:
+            # Callback will deliver result. One safety-net poll after 2 min.
+            check_generation_status.apply_async(
+                args=[element_id],
+                kwargs={'has_callback': True},
+                countdown=120,
+            )
+        else:
+            # No callback (e.g. localhost). Poll every 10s as before.
+            check_generation_status.apply_async(
+                args=[element_id],
+                kwargs={'has_callback': False},
+                countdown=10,
+            )
         
         return {
             'element_id': element_id,
@@ -191,14 +202,18 @@ def start_generation(self, element_id: int) -> dict:
         raise
 
 
-@shared_task(bind=True, max_retries=60)
-def check_generation_status(self, element_id: int) -> dict:
+@shared_task(bind=True, max_retries=60)  # Default for no-callback mode; overridden to 10 when has_callback=True
+def check_generation_status(self, element_id: int, has_callback: bool = False) -> dict:
     """
     Проверка статуса генерации через polling (GET /recordInfo).
-    
+
+    With callback (production): sparse safety-net — 60s intervals, max 10 retries.
+    Without callback (localhost): aggressive — 10s intervals, max 60 retries.
+
     Args:
         element_id: ID элемента
-    
+        has_callback: True if webhook callback is configured (reduces polling frequency)
+
     Returns:
         Статус генерации
     """
@@ -210,7 +225,15 @@ def check_generation_status(self, element_id: int) -> dict:
 
         if element.status in (Element.STATUS_COMPLETED, Element.STATUS_FAILED):
             return {'element_id': element_id, 'status': element.status, 'skipped': True}
-        
+
+        retry_count = self.request.retries or 0
+        if retry_count == 0:
+            mode = "callback-safety-net" if has_callback else "polling"
+            logger.info(
+                "check_generation_status Element #%s: mode=%s, interval=%ss, max_retries=%s",
+                element_id, mode, 60 if has_callback else 10, 10 if has_callback else 60,
+            )
+
         if not element.external_task_id:
             raise ValueError("External task_id не найден")
         
@@ -301,16 +324,17 @@ def check_generation_status(self, element_id: int) -> dict:
                 )
 
             # Если после 10 попыток state всё ещё не распознан —
-            # скорее всего маппинг кривой, логируем WARNING с полным ответом
-            if retry_count == 10:
+            # скорее всего маппинг кривой (только в polling-режиме)
+            if retry_count == 10 and not has_callback:
                 logger.warning(
                     "Element #%s: 10 попыток, state=%s. Возможно кривой response_mapping. "
                     "Raw response: %s",
                     element_id, state, str(result)[:500],
                 )
 
-            # Retry через 10 секунд
-            raise self.retry(countdown=10, max_retries=60)
+            retry_cd = 60 if has_callback else 10
+            retry_max = 10 if has_callback else 60
+            raise self.retry(countdown=retry_cd, max_retries=retry_max)
         
     except Retry:
         raise
@@ -319,7 +343,9 @@ def check_generation_status(self, element_id: int) -> dict:
         
         # Retry при сетевых ошибках
         if isinstance(e, (requests.RequestException, requests.Timeout)):
-            raise self.retry(exc=e, countdown=10)
+            retry_cd = 60 if has_callback else 10
+            retry_max = 10 if has_callback else 60
+            raise self.retry(exc=e, countdown=retry_cd, max_retries=retry_max)
         
         # Обновляем статус элемента при критической ошибке
         try:
@@ -371,6 +397,18 @@ def process_uploaded_file(self, element_id: int, staging_path: str) -> dict:
 
         notify_element_status(element, 'COMPLETED', file_url=file_url)
 
+        try:
+            create_notification(
+                user=element.project.user,
+                type='upload_completed',
+                project=element.project,
+                title='Файл загружен',
+                message=element.original_filename or 'Загрузка завершена',
+                element=element,
+            )
+        except Exception as e:
+            logger.warning('Failed to create upload notification: %s', e)
+
         return {'element_id': element_id, 'status': 'completed', 'file_url': file_url}
 
     except Retry:
@@ -386,7 +424,14 @@ def process_uploaded_file(self, element_id: int, staging_path: str) -> dict:
         except Element.DoesNotExist:
             pass
 
-        if isinstance(e, (IOError, OSError)):
+        # Retry only transient I/O errors; skip permanent S3 errors
+        # (UserSuspended, AccessDenied, etc.)
+        err_str = str(e)
+        permanent_s3 = any(code in err_str for code in (
+            'UserSuspended', 'AccessDenied', 'InvalidAccessKeyId',
+            'SignatureDoesNotMatch', 'AccountProblem',
+        ))
+        if isinstance(e, (IOError, OSError)) and not permanent_s3:
             raise self.retry(exc=e, countdown=30)
         raise
     finally:
