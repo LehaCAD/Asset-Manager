@@ -572,6 +572,27 @@ export interface CreditsEstimateResponse {
   error: string | null;
 }
 
+// ── Top-Up ──
+export type PaymentMethodType = 'sbp' | 'bank_card' | 'sberbank';
+
+export interface TopUpCreateRequest {
+  amount: number;
+  payment_method_type: PaymentMethodType;
+}
+
+export interface TopUpCreateResponse {
+  payment_id: string;
+  confirmation_url: string;
+  amount: string;
+  status: string;
+}
+
+export interface TopUpStatusResponse {
+  status: 'pending' | 'succeeded' | 'canceled' | 'expired';
+  amount: string;
+  balance?: string;
+}
+
 /* ── Cabinet ─────────────────────────────────────────────── */
 
 export interface CabinetAnalytics {
