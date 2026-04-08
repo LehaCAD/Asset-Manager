@@ -1,8 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { formatStorage, formatCurrency } from '@/lib/utils/format';
 import { BADGE_MD } from '@/lib/utils/constants';
+import { useSubscriptionStore } from '@/lib/store/subscription';
+import { ProBadge } from '@/components/subscription/ProBadge';
+import { UpgradeModal } from '@/components/subscription/UpgradeModal';
 import { Layers, Check, Trash2, HardDrive, MoreHorizontal, Pencil, Share2, ImageIcon } from 'lucide-react';
 import { ChargeIcon } from '@/components/ui/charge-icon';
 import { Button } from '@/components/ui/button';
@@ -53,6 +57,9 @@ export function GroupCard({
   style,
   size = 'medium',
 }: GroupCardProps) {
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const hasFeature = useSubscriptionStore((s) => s.hasFeature);
+  const canShare = hasFeature("sharing");
   const elementCount = group.element_count ?? group.elements_count ?? 0;
   const headlinerUrl = group.headliner_thumbnail_url || group.headliner_url || (group.preview_thumbnails && group.preview_thumbnails.length > 0 ? group.preview_thumbnails[0] : null);
 
@@ -84,6 +91,7 @@ export function GroupCard({
   };
 
   return (
+    <>
     <div
       className={cn('group relative cursor-pointer', className)}
       style={{ paddingTop: totalPad, ...style }}
@@ -179,10 +187,17 @@ export function GroupCard({
                   {onShare && (
                     <DropdownMenuItem
                       className="cursor-pointer"
-                      onSelect={() => { onShare(group.id); }}
+                      onSelect={() => {
+                        if (!canShare) {
+                          setUpgradeOpen(true);
+                          return;
+                        }
+                        onShare(group.id);
+                      }}
                     >
                       <Share2 className="mr-2 h-3.5 w-3.5" />
                       Поделиться
+                      {!canShare && <ProBadge className="ml-auto" />}
                     </DropdownMenuItem>
                   )}
                   {(onRename || onShare) && onDelete && <DropdownMenuSeparator />}
@@ -253,5 +268,11 @@ export function GroupCard({
         </button>
       </div>
     </div>
+    <UpgradeModal
+      open={upgradeOpen}
+      onOpenChange={setUpgradeOpen}
+      featureCode="sharing"
+    />
+    </>
   );
 }

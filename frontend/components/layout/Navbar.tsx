@@ -22,6 +22,7 @@ import { useNotificationStore } from "@/lib/store/notifications";
 import { notificationWS } from "@/lib/api/notification-ws";
 import { authApi } from "@/lib/api/auth";
 import { formatCurrency, formatStorage } from "@/lib/utils/format";
+import { TrialBanner } from "@/components/subscription/TrialBanner";
 
 export function Navbar() {
   const user = useAuthStore((s) => s.user);
@@ -111,6 +112,9 @@ export function Navbar() {
 
         {/* Right side */}
         <div className="flex items-center gap-1 shrink-0">
+          {/* Триал-баннер */}
+          {user && <TrialBanner />}
+
           {/* Баланс */}
           {user && (
             <div className="flex items-center gap-1.5 h-7 px-3 rounded bg-success/10 border border-success/20">
@@ -181,13 +185,7 @@ export function Navbar() {
                         </div>
                         <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
                           <div
-                            className={`h-full rounded-full transition-all ${
-                              (user.quota.storage_used_bytes ?? 0) / (user.quota.storage_limit_bytes || 1) >= 0.9
-                                ? "bg-error"
-                                : (user.quota.storage_used_bytes ?? 0) / (user.quota.storage_limit_bytes || 1) >= 0.7
-                                  ? "bg-warning"
-                                  : "bg-success"
-                            }`}
+                            className="h-full rounded-full transition-all bg-primary"
                             style={{
                               width: `${Math.max(Math.min(Math.round(((user.quota.storage_used_bytes ?? 0) / (user.quota.storage_limit_bytes || 1)) * 100), 100), (user.quota.storage_used_bytes ?? 0) > 0 ? 4 : 0)}%`,
                             }}
