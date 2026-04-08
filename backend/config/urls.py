@@ -32,4 +32,5 @@ urlpatterns = [
     path('api/cabinet/', include('apps.cabinet.urls')),
     path('api/sharing/', include('apps.sharing.urls')),
     path('api/notifications/', include('apps.notifications.urls')),
+    path('api/subscriptions/', include('apps.subscriptions.urls')),
 ]

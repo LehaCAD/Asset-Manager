@@ -14,6 +14,7 @@ class CreditsTransaction(models.Model):
     REASON_REFUND_PROVIDER_ERROR = "refund_provider_error"
     REASON_REFUND_PRICING_FAILURE = "refund_pricing_failure"
     REASON_PAYMENT_TOPUP = "payment_topup"
+    REASON_TRIAL_BONUS = "trial_bonus"
 
     REASON_CHOICES = [
         (REASON_ADMIN_TOPUP, "Пополнение администратором"),
@@ -23,6 +24,7 @@ class CreditsTransaction(models.Model):
         (REASON_REFUND_PROVIDER_ERROR, "Возврат: ошибка провайдера"),
         (REASON_REFUND_PRICING_FAILURE, "Возврат: ошибка ценообразования"),
         (REASON_PAYMENT_TOPUP, "Пополнение (онлайн-оплата)"),
+        (REASON_TRIAL_BONUS, "Бонус за триал"),
     ]
     
     user = models.ForeignKey(

@@ -103,6 +103,23 @@ class UserQuota(models.Model):
 
 @receiver(post_save, sender=User)
 def create_user_quota(sender, instance, created, **kwargs):
-    """Автоматически создаём UserQuota при создании нового пользователя."""
+    """Автоматически создаём UserQuota и триальную подписку при создании нового пользователя."""
     if created:
         UserQuota.objects.create(user=instance)
+        # Create trial subscription
+        from apps.subscriptions.models import Plan, Subscription
+        from apps.credits.services import CreditsService
+        default_plan = Plan.objects.filter(is_default=True).first()
+        if default_plan:
+            Subscription.objects.create(
+                user=instance,
+                plan=default_plan,
+                status='trial',
+                expires_at=timezone.now() + timedelta(days=7),
+            )
+            CreditsService().topup(
+                instance,
+                Decimal('50'),
+                reason='trial_bonus',
+                metadata={'source': 'registration_trial'},
+            )
