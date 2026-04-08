@@ -199,8 +199,12 @@ class PaymentWebhookLog(models.Model):
     )
     raw_body = models.JSONField(verbose_name="Сырые данные")
     ip_address = models.GenericIPAddressField(verbose_name="IP адрес")
+    is_trusted_ip = models.BooleanField(
+        default=False, verbose_name="Доверенный IP",
+    )
     processing_result = models.CharField(
-        max_length=20, choices=RESULT_CHOICES,
+        max_length=32, choices=RESULT_CHOICES,
+        default="", blank=True,
         verbose_name="Результат обработки",
     )
     error_message = models.TextField(
