@@ -48,7 +48,11 @@ class MeView(generics.RetrieveUpdateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_object(self) -> User:
-        return self.request.user
+        return User.objects.select_related(
+            'subscription', 'subscription__plan'
+        ).prefetch_related(
+            'subscription__plan__features'
+        ).get(pk=self.request.user.pk)
 
 
 class VerifyEmailView(views.APIView):

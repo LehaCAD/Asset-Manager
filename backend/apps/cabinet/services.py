@@ -301,11 +301,12 @@ def get_analytics(
     ]
 
     # Storage
-    quota = getattr(user, 'quota', None)
+    from apps.subscriptions.services import SubscriptionService
+    plan = SubscriptionService.get_active_plan(user)
     storage_used = Element.objects.filter(
         project__user=user, file_size__isnull=False
     ).aggregate(total=Coalesce(Sum('file_size'), 0))['total']
-    storage_limit = quota.storage_limit_bytes if quota else 300 * 1024 * 1024
+    storage_limit = plan.storage_limit_bytes or (1024 ** 4)  # fallback 1TB for unlimited
 
     return AnalyticsResult(
         period_start=period_start,
@@ -332,8 +333,9 @@ def get_analytics(
 
 def get_storage(user: User) -> StorageResult:
     """Get storage usage breakdown by project."""
-    quota = getattr(user, 'quota', None)
-    storage_limit = quota.storage_limit_bytes if quota else 300 * 1024 * 1024
+    from apps.subscriptions.services import SubscriptionService
+    plan = SubscriptionService.get_active_plan(user)
+    storage_limit = plan.storage_limit_bytes or (1024 ** 4)  # fallback 1TB for unlimited
 
     storage_used = Element.objects.filter(
         project__user=user, file_size__isnull=False
