@@ -33,6 +33,12 @@ class SharedLinkViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsProjectOwner]
     http_method_names = ['get', 'post', 'patch', 'delete']
 
+    def get_permissions(self):
+        from apps.subscriptions.permissions import feature_required
+        if self.action == 'create':
+            return [IsAuthenticated(), IsProjectOwner(), feature_required('sharing')()]
+        return [IsAuthenticated(), IsProjectOwner()]
+
     def get_queryset(self):
         qs = SharedLink.objects.filter(created_by=self.request.user).select_related('project')
         project_id = self.request.query_params.get('project')

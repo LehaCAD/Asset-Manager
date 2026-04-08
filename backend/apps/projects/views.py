@@ -1,5 +1,6 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.db.models import Sum, Count, Value, DecimalField, BigIntegerField, Subquery, OuterRef
@@ -68,15 +69,14 @@ class ProjectViewSet(viewsets.ModelViewSet):
         """При создании автоматически устанавливает текущего пользователя и проверяет лимиты."""
         user = self.request.user
 
-        # # Проверяем лимит проектов
-        # user_quota = user.quota
-        # current_projects_count = Project.objects.filter(user=user).count()
-        # if current_projects_count >= user_quota.max_projects:
-        #     from rest_framework.exceptions import PermissionDenied
-        #     raise PermissionDenied(
-        #         f'Достигнут лимит проектов ({user_quota.max_projects}). Обратитесь к администратору.'
-        #     )
-        #
+        # Проверяем лимит проектов
+        from apps.subscriptions.services import SubscriptionService
+        if not SubscriptionService.can_create_project(user):
+            plan = SubscriptionService.get_active_plan(user)
+            raise PermissionDenied(
+                f'Достигнут лимит проектов ({plan.max_projects}). Перейдите на другой тариф для увеличения.'
+            )
+
         serializer.save(user=user)
 
     @action(detail=True, methods=['post'], url_path='reorder-items')
@@ -103,6 +103,11 @@ class ProjectViewSet(viewsets.ModelViewSet):
     def presign(self, request, pk=None):
         """Generate presigned URLs for direct S3 upload at project level (no group)."""
         project = self.get_object()
+
+        from apps.subscriptions.services import SubscriptionService
+        if not SubscriptionService.check_storage(request.user):
+            return Response({'detail': 'Хранилище заполнено. Перейдите на другой тариф.'}, status=status.HTTP_403_FORBIDDEN)
+
         from apps.storage.services import generate_upload_presigned_urls, validate_file_type, detect_element_type
 
         filename = request.data.get('filename', '')

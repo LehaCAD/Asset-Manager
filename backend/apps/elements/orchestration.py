@@ -38,6 +38,11 @@ def create_generation(project, scene, prompt, ai_model_id, generation_config, us
     except AIModel.DoesNotExist:
         return {'error': 'AI model not found or inactive'}, http_status.HTTP_400_BAD_REQUEST
 
+    # Storage limit check
+    from apps.subscriptions.services import SubscriptionService
+    if not SubscriptionService.check_storage(user):
+        raise ValueError('Хранилище заполнено. Перейдите на другой тариф для увеличения.')
+
     element_type = ai_model.model_type
 
     generation_config = generation_config or {}
@@ -129,6 +134,11 @@ def create_upload(project, scene, file, prompt_text='', is_favorite=False, ai_mo
     Save file to staging and create Element with PROCESSING status.
     Returns: tuple (data_dict, http_status_code)
     """
+    # Storage limit check (user derived from project)
+    from apps.subscriptions.services import SubscriptionService
+    if not SubscriptionService.check_storage(project.user):
+        raise ValueError('Хранилище заполнено. Перейдите на другой тариф для увеличения.')
+
     if not validate_file_type(file.name):
         return (
             {'error': 'Неподдерживаемый формат файла. Допустимые форматы: JPG, PNG, MP4'},

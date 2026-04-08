@@ -175,15 +175,15 @@ class SceneViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # # Проверяем лимит сцен в проекте
-        # user_quota = request.user.quota
-        # current_scenes_count = Scene.objects.filter(project=project).count()
-        # if current_scenes_count >= user_quota.max_scenes_per_project:
-        #     return Response(
-        #         {'detail': f'Достигнут лимит групп в проекте ({user_quota.max_scenes_per_project}). Обратитесь к администратору.'},
-        #         status=status.HTTP_403_FORBIDDEN
-        #     )
-        #
+        # Проверяем лимит групп в проекте
+        from apps.subscriptions.services import SubscriptionService
+        if not SubscriptionService.can_create_scene(request.user, project):
+            plan = SubscriptionService.get_active_plan(request.user)
+            return Response(
+                {'detail': f'Достигнут лимит групп в проекте ({plan.max_scenes_per_project}). Перейдите на другой тариф.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         return super().create(request, *args, **kwargs)
     
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsProjectOwner])
@@ -210,6 +210,11 @@ class SceneViewSet(viewsets.ModelViewSet):
     def presign(self, request, pk=None):
         """Generate presigned URLs for direct S3 upload."""
         scene = self.get_object()
+
+        from apps.subscriptions.services import SubscriptionService
+        if not SubscriptionService.check_storage(request.user):
+            return Response({'detail': 'Хранилище заполнено. Перейдите на другой тариф.'}, status=status.HTTP_403_FORBIDDEN)
+
         from apps.storage.services import generate_upload_presigned_urls, validate_file_type, detect_element_type
         from apps.elements.models import Element
 
