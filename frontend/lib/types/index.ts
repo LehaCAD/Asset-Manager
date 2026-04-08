@@ -6,6 +6,40 @@ export interface User {
   email: string;
   is_email_verified?: boolean;
   quota?: UserQuota;
+  subscription?: UserSubscription;
+}
+
+export interface UserSubscription {
+  plan_code: string;
+  plan_name: string;
+  status: 'active' | 'trial' | 'expired' | 'cancelled';
+  expires_at: string | null;
+  features: string[];
+  is_trial: boolean;
+  trial_days_left: number | null;
+}
+
+export interface FeatureGateInfo {
+  code: string;
+  title: string;
+  description: string;
+  icon: string;
+  min_plan_name: string;
+  min_plan_price: number;
+}
+
+export interface PlanInfo {
+  code: string;
+  name: string;
+  price: number;
+  credits_per_month: number;
+  max_projects: number;
+  max_scenes_per_project: number;
+  max_elements_per_scene: number;
+  storage_limit_gb: number;
+  features: { code: string; title: string; description: string; icon: string }[];
+  is_recommended: boolean;
+  display_order: number;
 }
 
 export interface UserQuota {
