@@ -26,6 +26,65 @@ export function ModelSelector({
 
   const filteredModels = models.filter((model) => model.model_type === activeTab);
 
+  const selectedModel = models.find(m => m.id === selectedModelId) ?? null;
+
+  // Build display items: one entry per family or standalone model
+  type DisplayItem = {
+      type: 'family';
+      familyId: number;
+      name: string;
+      preview_url: string;
+      description: string;
+      tags: string[];
+      defaultVariant: AIModel;
+      isSelected: boolean;
+  } | {
+      type: 'standalone';
+      model: AIModel;
+      isSelected: boolean;
+  };
+
+  const displayItems: DisplayItem[] = (() => {
+      const familiesSeen = new Map<number, DisplayItem>();
+      const items: DisplayItem[] = [];
+
+      for (const model of filteredModels) {
+          if (model.family) {
+              if (!familiesSeen.has(model.family.id)) {
+                  const item: DisplayItem = {
+                      type: 'family',
+                      familyId: model.family.id,
+                      name: model.family.name,
+                      preview_url: model.family.preview_url,
+                      description: model.family.description,
+                      tags: model.family.tags,
+                      defaultVariant: model,
+                      isSelected: selectedModelId != null && model.family.id === selectedModel?.family?.id,
+                  };
+                  familiesSeen.set(model.family.id, item);
+                  items.push(item);
+              }
+              // Update default variant if found
+              const existing = familiesSeen.get(model.family.id)!;
+              if (existing.type === 'family' && model.is_default_variant) {
+                  existing.defaultVariant = model;
+              }
+              // Update isSelected
+              if (existing.type === 'family' && model.id === selectedModelId) {
+                  existing.isSelected = true;
+              }
+          } else {
+              items.push({
+                  type: 'standalone',
+                  model,
+                  isSelected: model.id === selectedModelId,
+              });
+          }
+      }
+
+      return items;
+  })();
+
   const handleSelect = (model: AIModel) => {
     onSelectModel(model);
   };
@@ -113,14 +172,32 @@ export function ModelSelector({
               Нет доступных моделей
             </p>
           ) : (
-            filteredModels.map((model) => (
-              <ModelCard
-                key={model.id}
-                model={model}
-                isSelected={model.id === selectedModelId}
-                onSelect={handleSelect}
-              />
-            ))
+            displayItems.map(item => {
+              if (item.type === 'family') {
+                return (
+                  <ModelCard
+                    key={`family-${item.familyId}`}
+                    model={{
+                      ...item.defaultVariant,
+                      name: item.name,
+                      preview_url: item.preview_url,
+                      description: item.description,
+                      tags: item.tags,
+                    }}
+                    isSelected={item.isSelected}
+                    onSelect={() => handleSelect(item.defaultVariant)}
+                  />
+                );
+              }
+              return (
+                <ModelCard
+                  key={item.model.id}
+                  model={item.model}
+                  isSelected={item.isSelected}
+                  onSelect={() => handleSelect(item.model)}
+                />
+              );
+            })
           )}
         </div>
       </div>
