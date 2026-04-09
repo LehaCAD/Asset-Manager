@@ -6,7 +6,8 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.authentication import SessionAuthentication
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 
@@ -171,7 +172,13 @@ def mark_read_view(request):
 
 # ─── Admin endpoints ──────────────────────────────────────
 
+from rest_framework_simplejwt.authentication import JWTAuthentication
+
+ADMIN_AUTH = [SessionAuthentication, JWTAuthentication]
+
+
 @api_view(["GET"])
+@authentication_classes(ADMIN_AUTH)
 @permission_classes([IsAdminUser])
 def admin_conversations_list(request):
     """Список всех диалогов с фильтрами."""
@@ -196,6 +203,7 @@ def admin_conversations_list(request):
 
 
 @api_view(["GET", "PATCH"])
+@authentication_classes(ADMIN_AUTH)
 @permission_classes([IsAdminUser])
 def admin_conversation_detail(request, conversation_id):
     """GET: детали диалога. PATCH: обновить status/tag."""
@@ -219,6 +227,7 @@ def admin_conversation_detail(request, conversation_id):
 
 
 @api_view(["GET", "POST"])
+@authentication_classes(ADMIN_AUTH)
 @permission_classes([IsAdminUser])
 def admin_conversation_messages(request, conversation_id):
     """GET: сообщения диалога. POST: ответ админа."""
@@ -250,6 +259,7 @@ def admin_conversation_messages(request, conversation_id):
 
 
 @api_view(["POST"])
+@authentication_classes(ADMIN_AUTH)
 @permission_classes([IsAdminUser])
 def admin_reward_view(request, conversation_id):
     """Начислить Кадры юзеру."""
@@ -275,6 +285,7 @@ def admin_reward_view(request, conversation_id):
 
 
 @api_view(["POST"])
+@authentication_classes(ADMIN_AUTH)
 @permission_classes([IsAdminUser])
 def admin_mark_read_view(request, conversation_id):
     """Обновить admin_last_read_at."""
@@ -285,6 +296,7 @@ def admin_mark_read_view(request, conversation_id):
 
 
 @api_view(["DELETE"])
+@authentication_classes(ADMIN_AUTH)
 @permission_classes([IsAdminUser])
 def admin_delete_message(request, message_id):
     """Удалить сообщение (модерация)."""
