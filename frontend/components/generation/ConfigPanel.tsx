@@ -5,10 +5,11 @@ import { useGenerationStore } from "@/lib/store/generation";
 import { useCreditsStore } from "@/lib/store/credits";
 import { ModelSelector } from "@/components/generation/ModelSelector";
 import { ParametersForm } from "@/components/generation/ParametersForm";
+import { VariantSwitcher } from "@/components/generation/VariantSwitcher";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { PanelLeftClose, PanelLeft, ChevronRight, AlertCircle } from "lucide-react";
-import { ChargeIcon } from "@/components/ui/charge-icon";
+import { KadrIcon } from "@/components/ui/kadr-icon";
 
 interface ConfigPanelProps {
   className?: string;
@@ -27,6 +28,7 @@ export function ConfigPanel({ className }: ConfigPanelProps) {
     toggleConfigPanel,
     openModelSelector,
     closeModelSelector,
+    familyVariants,
   } = useGenerationStore();
   
   const estimateCost = useCreditsStore((s) => s.estimateCost);
@@ -59,6 +61,9 @@ export function ConfigPanel({ className }: ConfigPanelProps) {
   const hasParameters = !!selectedModel?.parameters_schema.some(
     (param) => param.visible !== false
   );
+
+  const variants = familyVariants();
+  const showVariantSwitcher = variants.length >= 2 && selectedModel?.family != null;
 
   return (
     <div
@@ -117,6 +122,15 @@ export function ConfigPanel({ className }: ConfigPanelProps) {
             </button>
           </div>
 
+          {showVariantSwitcher && selectedModel?.family && (
+            <VariantSwitcher
+              variants={variants}
+              currentId={selectedModel.id}
+              uiControl={selectedModel.family.variant_ui_control}
+              onSelect={selectModel}
+            />
+          )}
+
           {/* Parameters form */}
           {hasParameters && (
             <div className="mt-3">
@@ -141,7 +155,7 @@ export function ConfigPanel({ className }: ConfigPanelProps) {
                       ? "text-destructive"
                       : "text-foreground"
                 )}>
-                  <ChargeIcon size="sm" />
+                  <KadrIcon size="sm" />
                   {isEstimateLoading ? (
                     <span className="w-5 h-3 rounded bg-muted animate-pulse inline-block" />
                   ) : estimateError && !estimateCost ? (
