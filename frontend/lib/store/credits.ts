@@ -4,6 +4,7 @@ import { creditsApi } from "@/lib/api/credits";
 import type {
   CreditsBalanceResponse,
   CreditsEstimateRequest,
+  PaymentMethodType,
 } from "@/lib/types";
 
 interface CreditsState {
@@ -15,13 +16,25 @@ interface CreditsState {
   isBalanceLoading: boolean;
   isEstimateLoading: boolean;
 
+  // Top-up state
+  selectedAmount: number;
+  customAmount: string;
+  paymentMethod: PaymentMethodType;
+  isTopUpProcessing: boolean;
+
   loadBalance: () => Promise<void>;
   estimateGeneration: (payload: CreditsEstimateRequest) => Promise<void>;
   applyBalanceSnapshot: (payload: CreditsBalanceResponse) => void;
   clearEstimate: () => void;
+
+  // Top-up actions
+  setSelectedAmount: (amount: number) => void;
+  setCustomAmount: (value: string) => void;
+  setPaymentMethod: (method: PaymentMethodType) => void;
+  createTopUp: () => Promise<void>;
 }
 
-export const useCreditsStore = create<CreditsState>()((set) => ({
+export const useCreditsStore = create<CreditsState>()((set, get) => ({
   balance: "0.00",
   pricingPercent: 100,
   estimateCost: null,
@@ -29,6 +42,12 @@ export const useCreditsStore = create<CreditsState>()((set) => ({
   estimateError: null,
   isBalanceLoading: false,
   isEstimateLoading: false,
+
+  // Top-up defaults
+  selectedAmount: 1000,
+  customAmount: '',
+  paymentMethod: 'sbp' as PaymentMethodType,
+  isTopUpProcessing: false,
 
   loadBalance: async () => {
     set({ isBalanceLoading: true });
@@ -80,5 +99,28 @@ export const useCreditsStore = create<CreditsState>()((set) => ({
       canAfford: false,
       estimateError: null,
     });
+  },
+
+  // Top-up actions
+  setSelectedAmount: (amount) => set({ selectedAmount: amount, customAmount: '' }),
+  setCustomAmount: (value) => set({ customAmount: value, selectedAmount: 0 }),
+  setPaymentMethod: (method) => set({ paymentMethod: method }),
+  createTopUp: async () => {
+    const { selectedAmount, customAmount, paymentMethod } = get();
+    const amount = customAmount ? parseInt(customAmount, 10) : selectedAmount;
+    if (!amount || amount < 100) return;
+
+    set({ isTopUpProcessing: true });
+    try {
+      const response = await creditsApi.createTopUp({
+        amount,
+        payment_method_type: paymentMethod,
+      });
+      // Redirect to YooKassa payment page
+      window.location.href = response.confirmation_url;
+    } catch (error) {
+      toast.error('Сервис оплаты временно недоступен');
+      set({ isTopUpProcessing: false });
+    }
   },
 }));

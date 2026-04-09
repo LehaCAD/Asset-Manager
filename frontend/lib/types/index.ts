@@ -4,8 +4,43 @@ export interface User {
   id: number;
   username: string;
   email: string;
+  is_staff?: boolean;
   is_email_verified?: boolean;
   quota?: UserQuota;
+  subscription?: UserSubscription;
+}
+
+export interface UserSubscription {
+  plan_code: string;
+  plan_name: string;
+  status: 'active' | 'trial' | 'expired' | 'cancelled';
+  expires_at: string | null;
+  features: string[];
+  is_trial: boolean;
+  trial_days_left: number | null;
+}
+
+export interface FeatureGateInfo {
+  code: string;
+  title: string;
+  description: string;
+  icon: string;
+  min_plan_name: string;
+  min_plan_price: number;
+}
+
+export interface PlanInfo {
+  code: string;
+  name: string;
+  price: number;
+  credits_per_month: number;
+  max_projects: number;
+  max_scenes_per_project: number;
+  max_elements_per_scene: number;
+  storage_limit_gb: number;
+  features: { code: string; title: string; description: string; icon: string }[];
+  is_recommended: boolean;
+  display_order: number;
 }
 
 export interface UserQuota {
@@ -444,6 +479,7 @@ export interface WSElementStatusChangedEvent {
 }
 
 export type NotificationType = 'comment_new' | 'reaction_new' | 'review_new' | 'generation_completed' | 'generation_failed' | 'upload_completed'
+  | 'feedback_new' | 'feedback_reply' | 'feedback_reward'
 
 export interface Notification {
   id: number
@@ -538,6 +574,27 @@ export interface CreditsEstimateResponse {
   error: string | null;
 }
 
+// ── Top-Up ──
+export type PaymentMethodType = 'sbp' | 'bank_card' | 'sberbank';
+
+export interface TopUpCreateRequest {
+  amount: number;
+  payment_method_type: PaymentMethodType;
+}
+
+export interface TopUpCreateResponse {
+  payment_id: string;
+  confirmation_url: string;
+  amount: string;
+  status: string;
+}
+
+export interface TopUpStatusResponse {
+  status: 'pending' | 'succeeded' | 'canceled' | 'expired';
+  amount: string;
+  balance?: string;
+}
+
 /* ── Cabinet ─────────────────────────────────────────────── */
 
 export interface CabinetAnalytics {
@@ -620,4 +677,95 @@ export interface SceneStats {
   elements_count: number;
   storage_bytes: number;
   storage_display: string;
+}
+
+// ─── Feedback ─────────────────────────────────────────
+
+export interface FeedbackAttachment {
+  id: number
+  file_name: string
+  file_size: number
+  content_type: string
+  url: string | null
+  is_expired: boolean
+  created_at: string
+}
+
+export interface FeedbackMessage {
+  id: number
+  sender_name: string
+  is_admin: boolean
+  text: string
+  attachments: FeedbackAttachment[]
+  created_at: string
+}
+
+export interface FeedbackConversation {
+  id: number
+  status: 'open' | 'resolved'
+  tag: '' | 'bug' | 'question' | 'idea'
+  created_at: string
+  updated_at: string
+  last_message_preview: { text: string; is_admin: boolean; created_at: string } | null
+  unread_count: number
+}
+
+export interface AdminConversationUser {
+  id: number
+  username: string
+  email: string
+  date_joined: string
+  balance: string
+}
+
+export interface AdminConversation {
+  id: number
+  user: AdminConversationUser
+  status: 'open' | 'resolved'
+  tag: '' | 'bug' | 'question' | 'idea'
+  created_at: string
+  updated_at: string
+  last_message_preview: { text: string; is_admin: boolean; created_at: string } | null
+  unread_by_admin: number
+  rewards_total: string
+}
+
+// Onboarding
+export interface OnboardingTaskEmptyState {
+  title: string;
+  description: string;
+  cta: string;
+  page: string;
+}
+
+export interface OnboardingTaskDTO {
+  code: string;
+  title: string;
+  description: string;
+  icon: string;
+  reward: number;
+  order: number;
+  completed: boolean;
+  completed_at: string | null;
+  empty_state: OnboardingTaskEmptyState | null;
+}
+
+export interface OnboardingStateResponse {
+  welcome_seen: boolean;
+  tasks: OnboardingTaskDTO[];
+  total_earned: number;
+  total_possible: number;
+  completed_count: number;
+  total_count: number;
+}
+
+// WebSocket event
+export interface WSOnboardingTaskCompletedEvent {
+  type: 'onboarding_task_completed';
+  task_code: string;
+  task_title: string;
+  reward: string;
+  new_balance: string;
+  completed_count: number;
+  total_count: number;
 }

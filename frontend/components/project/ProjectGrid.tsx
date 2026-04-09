@@ -7,12 +7,25 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ProjectCard } from "./ProjectCard";
 import { CreateProjectDialog } from "./CreateProjectDialog";
 import { ShareLinksPanel } from "@/components/sharing/ShareLinksPanel";
+import { LimitBar } from "@/components/subscription/LimitBar";
+import { UpgradeModal } from "@/components/subscription/UpgradeModal";
 import { useProjectsStore } from "@/lib/store/projects";
+import { useAuthStore } from "@/lib/store/auth";
+import { useOnboardingStore } from "@/lib/store/onboarding";
+import { OnboardingEmptyState } from "@/components/onboarding/OnboardingEmptyState";
 
 export function ProjectGrid() {
   const { projects, isLoading, loadProjects } = useProjectsStore();
+  const user = useAuthStore((s) => s.user);
+  const getTaskForPage = useOnboardingStore((s) => s.getTaskForPage);
+  const quota = user?.quota;
   const [createOpen, setCreateOpen] = useState(false);
   const [linksPanelOpen, setLinksPanelOpen] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+
+  const isAtProjectLimit = quota
+    ? quota.max_projects > 0 && quota.used_projects >= quota.max_projects
+    : false;
 
   useEffect(() => {
     loadProjects();
@@ -30,8 +43,12 @@ export function ProjectGrid() {
         )}
         <button
           type="button"
-          onClick={() => setCreateOpen(true)}
-          className="flex items-center gap-1.5 h-7 px-3 ml-3 rounded text-xs font-medium text-primary bg-card hover:bg-card/80 transition-colors shrink-0"
+          onClick={() => isAtProjectLimit ? setUpgradeOpen(true) : setCreateOpen(true)}
+          className={`flex items-center gap-1.5 h-7 px-3 ml-3 rounded text-xs font-medium transition-colors shrink-0 ${
+            isAtProjectLimit
+              ? "text-muted-foreground bg-muted cursor-not-allowed"
+              : "text-primary bg-card hover:bg-card/80"
+          }`}
         >
           <Plus className="h-4 w-4" />
           Создать проект
@@ -47,6 +64,19 @@ export function ProjectGrid() {
         </div>
       </div>
 
+      {/* Project limit bar */}
+      {quota && quota.max_projects > 0 && isAtProjectLimit && (
+        <div className="px-4 pt-3">
+          <LimitBar
+            used={quota.used_projects}
+            max={quota.max_projects}
+            label="Проекты"
+            upgradeText="Открыть новые возможности"
+            onUpgrade={() => setUpgradeOpen(true)}
+          />
+        </div>
+      )}
+
       {/* Grid - full width, no max-width */}
       <div className="flex-1 overflow-auto px-4 py-4">
         {isLoading ? (
@@ -56,7 +86,9 @@ export function ProjectGrid() {
               ))}
             </div>
           ) : projects.length === 0 ? (
-            <EmptyState onCreateClick={() => setCreateOpen(true)} />
+            getTaskForPage('projects')
+              ? <OnboardingEmptyState task={getTaskForPage('projects')!} onAction={() => setCreateOpen(true)} />
+              : <EmptyState onCreateClick={() => setCreateOpen(true)} />
           ) : (
             <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))' }}>
               {projects.map((project) => (
@@ -67,6 +99,14 @@ export function ProjectGrid() {
       </div>
 
       <CreateProjectDialog open={createOpen} onOpenChange={setCreateOpen} />
+
+      <UpgradeModal
+        open={upgradeOpen}
+        onOpenChange={setUpgradeOpen}
+        limitTitle="Проекты"
+        limitUsed={quota?.used_projects}
+        limitMax={quota?.max_projects}
+      />
 
       {/* Global share links panel (slide-over) */}
       {linksPanelOpen && (

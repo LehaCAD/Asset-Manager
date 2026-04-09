@@ -114,6 +114,32 @@ class CreditsService:
         return BalanceMutationResult(balance_after=user.balance)
 
     @transaction.atomic
+    def debit_flat(self, user, amount, reason, element=None, metadata=None):
+        """Debit a fixed amount (not tied to AIModel pricing)."""
+        if amount <= 0:
+            return DebitResult(ok=True, cost=Decimal("0"), balance_after=user.balance, error=None)
+
+        locked_user = type(user).objects.select_for_update().get(pk=user.pk)
+        if locked_user.balance < amount:
+            return DebitResult(
+                ok=False, cost=Decimal("0"), balance_after=locked_user.balance,
+                error="Недостаточно кадров",
+            )
+        locked_user.balance -= amount
+        locked_user.save(update_fields=["balance"])
+
+        CreditsTransaction.objects.create(
+            user=locked_user,
+            amount=-amount,
+            balance_after=locked_user.balance,
+            reason=reason,
+            element=element,
+            metadata=metadata or {},
+        )
+
+        return DebitResult(ok=True, cost=amount, balance_after=locked_user.balance, error=None)
+
+    @transaction.atomic
     def debit_for_generation(
         self,
         user: User,
@@ -344,3 +370,72 @@ class CreditsService:
         multiplier = Decimal(pricing_percent) / Decimal(100)
         final_cost = base_cost * multiplier
         return self._round_up_to_half(final_cost)
+
+
+class PaymentService:
+    """Handles YooKassa payment lifecycle: creation, webhook processing, reconciliation."""
+
+    @staticmethod
+    def create_payment(user, amount: Decimal, payment_method_type: str) -> "Payment":
+        """Create a Payment record and initiate YooKassa payment.
+
+        Returns Payment with yookassa_payment_id and confirmation_url in metadata.
+        """
+        from .models import Payment
+        from . import yookassa_client
+
+        yk_response = yookassa_client.create_payment(
+            amount=str(amount),
+            payment_method_type=payment_method_type,
+            description=f"Пополнение баланса: {amount}₽",
+            metadata={"user_id": str(user.id)},
+        )
+
+        payment = Payment.objects.create(
+            user=user,
+            yookassa_payment_id=yk_response["id"],
+            amount=amount,
+            payment_method_type=payment_method_type,
+            status=Payment.STATUS_PENDING,
+            metadata={"confirmation_url": yk_response["confirmation_url"]},
+        )
+        return payment
+
+    @staticmethod
+    @transaction.atomic
+    def process_succeeded(payment_id: int) -> bool:
+        """Process a succeeded payment: topup user balance.
+
+        Returns True if credits were added, False if already processed (idempotent).
+        """
+        from .models import Payment
+
+        payment = Payment.objects.select_for_update().get(id=payment_id)
+        if payment.status == Payment.STATUS_SUCCEEDED:
+            return False  # Already processed — idempotent
+
+        payment.status = Payment.STATUS_SUCCEEDED
+        CreditsService().topup(
+            payment.user,
+            payment.amount,
+            reason=CreditsTransaction.REASON_PAYMENT_TOPUP,
+            metadata={"yookassa_payment_id": payment.yookassa_payment_id},
+        )
+        payment.credits_transaction = CreditsTransaction.objects.filter(
+            user=payment.user,
+            metadata__yookassa_payment_id=payment.yookassa_payment_id,
+        ).first()
+        payment.save()
+        return True
+
+    @staticmethod
+    def process_canceled(payment_id: int, reason: str = "") -> None:
+        """Mark payment as canceled."""
+        from .models import Payment
+
+        payment = Payment.objects.get(id=payment_id)
+        if payment.status in (Payment.STATUS_SUCCEEDED, Payment.STATUS_CANCELED):
+            return
+        payment.status = Payment.STATUS_CANCELED
+        payment.error_message = reason
+        payment.save()

@@ -1,0 +1,369 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}Входящие — Обратная связь{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block extrahead %}
+<style>
+  /* Убираем скролл и отступы страницы — inbox занимает весь экран */
+  body { overflow: hidden; }
+  #content { padding: 0 !important; height: calc(100vh - 92px) !important; overflow: hidden !important; }
+
+  /* Основной контейнер */
+  #inbox { display: flex; height: 100%; overflow: hidden; background: var(--body-bg, #fff); border-top: 1px solid var(--border-color, #ccc); }
+
+  /* Левая панель — список диалогов */
+  #conv-list { width: 300px; border-right: 1px solid var(--border-color, #ccc); display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
+  #conv-list-header { padding: 10px 12px; border-bottom: 1px solid var(--border-color, #ccc); }
+  #conv-list-title { font-size: 13px; font-weight: 600; color: var(--body-fg, #333); margin-bottom: 8px; }
+  #conv-list-header input { width: 100%; padding: 6px 10px; border: 1px solid var(--border-color, #ccc); border-radius: 6px; font-size: 13px; box-sizing: border-box; background: var(--body-bg, #fff); color: var(--body-fg, #333); }
+  #conv-filters { display: flex; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--border-color, #ccc); }
+  .filter-btn { padding: 3px 10px; font-size: 11px; border: 1px solid var(--border-color, #ccc); border-radius: 12px; cursor: pointer; background: transparent; color: var(--body-fg, #333); }
+  .filter-btn.active { background: var(--link-fg, #417690); color: #fff; border-color: var(--link-fg, #417690); }
+  #conversations { flex: 1; overflow-y: auto; }
+  .conv-item { display: flex; gap: 10px; padding: 10px 12px; cursor: pointer; border-bottom: 1px solid var(--border-color, #eee); align-items: flex-start; transition: background 0.1s; }
+  .conv-item:hover { background: var(--darkened-bg, #f5f5f5); }
+  .conv-item.active { background: rgba(65, 118, 144, 0.12); border-left: 3px solid var(--link-fg, #417690); padding-left: 9px; }
+  .conv-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--link-fg, #417690); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; flex-shrink: 0; }
+  .conv-info { flex: 1; min-width: 0; }
+  .conv-name { font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; align-items: baseline; gap: 4px; }
+  .conv-time { font-size: 10px; color: var(--body-quiet-color, #999); white-space: nowrap; }
+  .conv-preview { font-size: 12px; color: var(--body-quiet-color, #999); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+  .conv-badges { display: flex; gap: 4px; margin-top: 4px; align-items: center; }
+  .conv-tag { font-size: 10px; padding: 1px 6px; border-radius: 8px; border: 1px solid var(--border-color, #ccc); color: var(--body-quiet-color, #999); }
+  .conv-unread { width: 18px; height: 18px; border-radius: 50%; background: var(--link-fg, #417690); color: #fff; font-size: 10px; display: flex; align-items: center; justify-content: center; font-weight: 600; }
+
+  /* Правая панель — чат */
+  #chat-panel { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #chat-empty { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--body-quiet-color, #999); font-size: 14px; }
+  #chat-header { padding: 12px 16px; border-bottom: 1px solid var(--border-color, #ccc); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+  #chat-user-info { display: flex; align-items: center; gap: 10px; }
+  #chat-user-info .conv-avatar { width: 40px; height: 40px; font-size: 16px; }
+  #chat-user-details a { color: var(--link-fg, #417690); text-decoration: none; font-size: 12px; }
+  #chat-actions { display: flex; gap: 6px; align-items: center; }
+  #chat-actions button { padding: 4px 12px; font-size: 12px; border: 1px solid var(--border-color, #ccc); border-radius: 6px; cursor: pointer; background: transparent; color: var(--body-fg, #333); }
+  #chat-actions button:hover { background: var(--darkened-bg, #f5f5f5); }
+
+  #chat-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+  .msg { max-width: 70%; padding: 8px 12px; border-radius: 12px; font-size: 13px; line-height: 1.4; word-wrap: break-word; }
+  .msg-user { align-self: flex-start; background: var(--darkened-bg, #f0f0f0); }
+  .msg-admin { align-self: flex-end; background: var(--link-fg, #417690); color: #fff; }
+  .msg-system { align-self: center; background: transparent; color: var(--body-quiet-color, #999); font-size: 12px; text-align: center; }
+  .msg-meta { font-size: 10px; opacity: 0.7; margin-top: 2px; }
+  .msg-attachment { margin-top: 6px; }
+  .msg-attachment img { max-width: 200px; border-radius: 6px; cursor: pointer; }
+  .msg-attachment a { color: inherit; text-decoration: underline; font-size: 12px; }
+
+  #chat-input { padding: 12px 16px; border-top: 1px solid var(--border-color, #ccc); display: flex; gap: 8px; align-items: flex-end; flex-shrink: 0; }
+  #chat-input textarea { flex: 1; padding: 8px 12px; border: 1px solid var(--border-color, #ccc); border-radius: 8px; font-size: 13px; resize: none; min-height: 38px; max-height: 100px; font-family: inherit; background: var(--body-bg, #fff); color: var(--body-fg, #333); }
+  #chat-input button { padding: 8px 16px; background: var(--link-fg, #417690); color: #fff; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; }
+  #chat-input button:hover { opacity: 0.9; }
+  #chat-input button:disabled { opacity: 0.5; cursor: default; }
+
+  /* Модальное окно начисления */
+  .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+  .modal-box { background: var(--body-bg, #fff); border-radius: 10px; padding: 24px; width: 360px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+  .modal-box h3 { margin: 0 0 16px; font-size: 16px; color: var(--body-fg, #333); }
+  .modal-box label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; color: var(--body-fg, #333); }
+  .modal-box input, .modal-box textarea { width: 100%; padding: 6px 10px; border: 1px solid var(--border-color, #ccc); border-radius: 6px; font-size: 13px; margin-bottom: 12px; box-sizing: border-box; background: var(--body-bg, #fff); color: var(--body-fg, #333); }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="inbox">
+  <div id="conv-list">
+    <div id="conv-list-header">
+      <div id="conv-list-title">Входящие</div>
+      <input type="text" id="search-input" placeholder="Поиск по имени...">
+    </div>
+    <div id="conv-filters">
+      <button class="filter-btn active" data-status="">Все</button>
+      <button class="filter-btn" data-status="open">Открытые</button>
+      <button class="filter-btn" data-status="resolved">Решённые</button>
+    </div>
+    <div id="conversations"></div>
+  </div>
+  <div id="chat-panel">
+    <div id="chat-empty">Выберите диалог</div>
+  </div>
+</div>
+
+<div id="reward-modal" style="display:none"></div>
+
+<script>
+const CSRF = '{{ csrf_token }}';
+const API = '/api/feedback/admin';
+const TAG_LABELS = {bug: 'Баг', question: 'Вопрос', idea: 'Идея'};
+
+let conversations = [];
+let activeId = null;
+let messages = [];
+let pollTimer = null;
+let statusFilter = '';
+let searchQuery = '';
+
+// ─── API helpers ─────────────────────────────────────
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': CSRF,
+      ...(opts.headers || {}),
+    },
+    credentials: 'same-origin',
+  });
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+// ─── Conversations ───────────────────────────────────
+async function loadConversations() {
+  const params = new URLSearchParams();
+  if (statusFilter) params.set('status', statusFilter);
+  if (searchQuery) params.set('search', searchQuery);
+  const qs = params.toString();
+  conversations = await api(`${API}/conversations/${qs ? '?' + qs : ''}`);
+  renderConversations();
+}
+
+function renderConversations() {
+  const el = document.getElementById('conversations');
+  if (!conversations.length) {
+    el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--body-quiet-color,#999);font-size:13px">Нет обращений</div>';
+    return;
+  }
+  el.innerHTML = conversations.map(c => {
+    const initial = c.user.username.charAt(0).toUpperCase();
+    const preview = c.last_message_preview;
+    const time = preview ? formatTime(preview.created_at) : '';
+    const previewText = preview ? ((preview.is_admin ? 'Вы: ' : '') + preview.text) : '';
+    const isActive = c.id === activeId;
+    const tag = c.tag ? `<span class="conv-tag">${TAG_LABELS[c.tag] || c.tag}</span>` : '';
+    const unread = c.unread_by_admin > 0 ? `<span class="conv-unread">${c.unread_by_admin}</span>` : '';
+    return `
+      <div class="conv-item ${isActive ? 'active' : ''}" onclick="selectConv(${c.id})">
+        <div class="conv-avatar">${initial}</div>
+        <div class="conv-info">
+          <div class="conv-name"><span>${c.user.username}</span><span class="conv-time">${time}</span></div>
+          <div class="conv-preview">${escHtml(previewText)}</div>
+          <div class="conv-badges">${tag}${unread}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ─── Select conversation ─────────────────────────────
+async function selectConv(id) {
+  activeId = id;
+  renderConversations();
+  const conv = conversations.find(c => c.id === id);
+  if (!conv) return;
+
+  messages = await api(`${API}/conversations/${id}/messages/`);
+  api(`${API}/conversations/${id}/read/`, {method: 'POST'});
+
+  renderChat(conv);
+  startPolling(id);
+}
+
+function renderChat(conv) {
+  const panel = document.getElementById('chat-panel');
+  const u = conv.user;
+  panel.innerHTML = `
+    <div id="chat-header">
+      <div id="chat-user-info">
+        <div class="conv-avatar">${u.username.charAt(0).toUpperCase()}</div>
+        <div id="chat-user-details">
+          <div style="font-weight:600;font-size:14px">${u.username}
+            <a href="/admin/users/user/${u.id}/change/" target="_blank" style="margin-left:4px">&#8599;</a>
+          </div>
+          <div style="font-size:12px;color:var(--body-quiet-color,#999)">${u.email} &middot; ${u.balance} Кадров</div>
+        </div>
+      </div>
+      <div id="chat-actions">
+        <button onclick="openRewardModal(${conv.id}, '${escAttr(u.username)}')">&#9889; Начислить</button>
+        <button onclick="toggleStatus(${conv.id}, '${conv.status}')">${conv.status === 'open' ? '&#10003; Решено' : '&#8634; Открыть'}</button>
+        <select onchange="setTag(${conv.id}, this.value)" style="padding:4px 8px;font-size:12px;border:1px solid var(--border-color,#ccc);border-radius:6px;background:var(--body-bg,#fff);color:var(--body-fg,#333)">
+          <option value="" ${!conv.tag ? 'selected' : ''}>Без тега</option>
+          <option value="bug" ${conv.tag === 'bug' ? 'selected' : ''}>Баг</option>
+          <option value="question" ${conv.tag === 'question' ? 'selected' : ''}>Вопрос</option>
+          <option value="idea" ${conv.tag === 'idea' ? 'selected' : ''}>Идея</option>
+        </select>
+      </div>
+    </div>
+    <div id="chat-messages"></div>
+    <div id="chat-input">
+      <textarea id="reply-text" placeholder="Ответить..." onkeydown="handleKey(event)"></textarea>
+      <button onclick="sendReply()">Отправить</button>
+    </div>`;
+  renderMessages();
+  scrollToBottom();
+}
+
+function renderMessages() {
+  const el = document.getElementById('chat-messages');
+  if (!el) return;
+  el.innerHTML = messages.map(m => {
+    if (m.text.startsWith('\u26a1')) {
+      return `<div class="msg msg-system">${escHtml(m.text)}<div class="msg-meta">${formatTime(m.created_at)}</div></div>`;
+    }
+    const cls = m.is_admin ? 'msg-admin' : 'msg-user';
+    const attachments = (m.attachments || []).map(a => {
+      if (a.is_expired) return '<div class="msg-attachment" style="font-size:11px;color:var(--body-quiet-color,#999)">Вложение удалено</div>';
+      if (a.content_type.startsWith('image/') && a.url) {
+        return `<div class="msg-attachment"><a href="${a.url}" target="_blank"><img src="${a.url}" alt="${escAttr(a.file_name)}"></a></div>`;
+      }
+      return `<div class="msg-attachment"><a href="${a.url || '#'}" target="_blank">${escHtml(a.file_name)}</a></div>`;
+    }).join('');
+    return `<div class="msg ${cls}"><div>${escHtml(m.text)}</div>${attachments}<div class="msg-meta">${m.sender_name} &middot; ${formatTime(m.created_at)}</div></div>`;
+  }).join('');
+  scrollToBottom();
+}
+
+// ─── Actions ─────────────────────────────────────────
+async function sendReply() {
+  const textarea = document.getElementById('reply-text');
+  const text = textarea.value.trim();
+  if (!text) return;
+  textarea.value = '';
+  const msg = await api(`${API}/conversations/${activeId}/messages/`, {
+    method: 'POST',
+    body: JSON.stringify({text}),
+  });
+  if (msg) {
+    messages.push(msg);
+    renderMessages();
+  }
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    sendReply();
+  }
+}
+
+async function toggleStatus(id, current) {
+  const newStatus = current === 'open' ? 'resolved' : 'open';
+  const updated = await api(`${API}/conversations/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify({status: newStatus}),
+  });
+  if (updated) {
+    const idx = conversations.findIndex(c => c.id === id);
+    if (idx >= 0) conversations[idx] = updated;
+    renderConversations();
+    renderChat(updated);
+  }
+}
+
+async function setTag(id, tag) {
+  const updated = await api(`${API}/conversations/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify({tag}),
+  });
+  if (updated) {
+    const idx = conversations.findIndex(c => c.id === id);
+    if (idx >= 0) conversations[idx] = updated;
+    renderConversations();
+  }
+}
+
+// ─── Reward modal ────────────────────────────────────
+function openRewardModal(convId, username) {
+  const modal = document.getElementById('reward-modal');
+  modal.style.display = 'block';
+  modal.innerHTML = `
+    <div class="modal-overlay" onclick="closeRewardModal(event)">
+      <div class="modal-box" onclick="event.stopPropagation()">
+        <h3>&#9889; Начислить Кадры</h3>
+        <p style="font-size:13px;color:var(--body-quiet-color,#999);margin-bottom:12px">Награда для <b>${escHtml(username)}</b></p>
+        <label>Сумма</label>
+        <input type="number" id="reward-amount" min="1" placeholder="100">
+        <label>Комментарий</label>
+        <textarea id="reward-comment" rows="2" placeholder="За репорт бага"></textarea>
+        <div class="modal-actions">
+          <button onclick="closeRewardModal()" style="padding:6px 16px;border:1px solid var(--border-color,#ccc);border-radius:6px;background:transparent;cursor:pointer;color:var(--body-fg,#333)">Отмена</button>
+          <button onclick="submitReward(${convId})" style="padding:6px 16px;background:var(--link-fg,#417690);color:#fff;border:none;border-radius:6px;cursor:pointer">Начислить</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function closeRewardModal(e) {
+  if (e && e.target !== e.currentTarget) return;
+  document.getElementById('reward-modal').style.display = 'none';
+}
+
+async function submitReward(convId) {
+  const amount = document.getElementById('reward-amount').value;
+  const comment = document.getElementById('reward-comment').value;
+  if (!amount || Number(amount) < 1) return alert('Укажите сумму');
+  await api(`${API}/conversations/${convId}/reward/`, {
+    method: 'POST',
+    body: JSON.stringify({amount: Number(amount), comment}),
+  });
+  closeRewardModal();
+  messages = await api(`${API}/conversations/${convId}/messages/`);
+  renderMessages();
+  loadConversations();
+}
+
+// ─── Polling ─────────────────────────────────────────
+function startPolling(convId) {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    if (activeId !== convId) return;
+    const fresh = await api(`${API}/conversations/${convId}/messages/`);
+    if (fresh && fresh.length !== messages.length) {
+      messages = fresh;
+      renderMessages();
+    }
+    loadConversations();
+  }, 5000);
+}
+
+// ─── Filters ─────────────────────────────────────────
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    statusFilter = btn.dataset.status;
+    loadConversations();
+  });
+});
+
+let searchTimer;
+document.getElementById('search-input').addEventListener('input', (e) => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    searchQuery = e.target.value;
+    loadConversations();
+  }, 300);
+});
+
+// ─── Helpers ─────────────────────────────────────────
+function formatTime(iso) {
+  const d = new Date(iso);
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) {
+    return d.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'});
+  }
+  return d.toLocaleDateString('ru-RU', {day: 'numeric', month: 'short'});
+}
+
+function scrollToBottom() {
+  const el = document.getElementById('chat-messages');
+  if (el) setTimeout(() => el.scrollTop = el.scrollHeight, 50);
+}
+
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+function escAttr(s) { return (s || '').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
+
+// ─── Init ────────────────────────────────────────────
+loadConversations();
+</script>
+{% endblock %}

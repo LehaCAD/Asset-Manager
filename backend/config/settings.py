@@ -63,6 +63,10 @@ INSTALLED_APPS = [
     'apps.storage',
     'apps.notifications',
     'apps.cabinet',
+    'apps.subscriptions',
+    'apps.ai_services',
+    'apps.feedback',
+    'apps.onboarding',
 ]
 
 MIDDLEWARE = [
@@ -214,6 +218,35 @@ CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 РјРёРЅСѓС‚
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 CELERY_TASK_SOFT_TIME_LIMIT = 5 * 60  # 5 РјРёРЅ soft limit РґР»СЏ thumbnail-Р·Р°РґР°С‡
+
+
+# YooKassa Configuration
+YOOKASSA_SHOP_ID = os.getenv('YOOKASSA_SHOP_ID', '')
+YOOKASSA_SECRET_KEY = os.getenv('YOOKASSA_SECRET_KEY', '')
+YOOKASSA_RETURN_URL = os.getenv('YOOKASSA_RETURN_URL', 'http://localhost:3000/cabinet/balance')
+YOOKASSA_WEBHOOK_IPS = [
+    '185.71.76.0/27',
+    '185.71.77.0/27',
+    '77.75.153.0/25',
+    '77.75.156.11',
+    '77.75.156.35',
+]
+
+# Celery Beat Schedule
+CELERY_BEAT_SCHEDULE = {
+    'reconcile-pending-payments': {
+        'task': 'reconcile_pending_payments',
+        'schedule': 900.0,  # every 15 minutes
+    },
+    'cleanup-feedback-tmp': {
+        'task': 'apps.feedback.tasks.cleanup_feedback_tmp',
+        'schedule': 3600.0,  # every hour
+    },
+    'cleanup-old-feedback-attachments': {
+        'task': 'apps.feedback.tasks.cleanup_old_attachments',
+        'schedule': 86400.0,  # every 24 hours
+    },
+}
 
 # AWS S3 Configuration
 AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')

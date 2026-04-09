@@ -56,53 +56,23 @@ class User(AbstractUser):
         return timezone.now() - self.email_verification_sent_at > timedelta(seconds=60)
 
 
-class UserQuota(models.Model):
-    """Модель квот пользователя."""
-    user = models.OneToOneField(
-        User,
-        on_delete=models.CASCADE,
-        related_name='quota',
-        verbose_name='Пользователь'
-    )
-    max_projects = models.IntegerField(
-        default=5,
-        verbose_name='Максимум проектов',
-        help_text='Максимальное количество проектов пользователя'
-    )
-    max_scenes_per_project = models.IntegerField(
-        default=20,
-        verbose_name='Макс. групп в проекте',
-        help_text='Максимальное количество групп в одном проекте'
-    )
-    max_elements_per_scene = models.IntegerField(
-        default=10,
-        verbose_name='Макс. элементов в группе',
-        help_text='Максимальное количество элементов в одной группе'
-    )
-    storage_limit_bytes = models.BigIntegerField(
-        default=300 * 1024 * 1024,  # 300 MB
-        verbose_name='Лимит хранилища (байт)',
-        help_text='Максимальный объём файлов в S3. По умолчанию 300 МБ.'
-    )
-    created_at = models.DateTimeField(
-        auto_now_add=True,
-        verbose_name='Дата создания'
-    )
-    updated_at = models.DateTimeField(
-        auto_now=True,
-        verbose_name='Дата обновления'
-    )
-
-    class Meta:
-        verbose_name = 'Квота пользователя'
-        verbose_name_plural = 'Квоты пользователей'
-
-    def __str__(self) -> str:
-        return f'Квота: {self.user.username} (Проекты: {self.max_projects}, Группы: {self.max_scenes_per_project}, Элементы: {self.max_elements_per_scene})'
-
-
 @receiver(post_save, sender=User)
-def create_user_quota(sender, instance, created, **kwargs):
-    """Автоматически создаём UserQuota при создании нового пользователя."""
+def create_user_subscription(sender, instance, created, **kwargs):
+    """Автоматически создаём триальную подписку при создании нового пользователя."""
     if created:
-        UserQuota.objects.create(user=instance)
+        from apps.subscriptions.models import Plan, Subscription
+        from apps.credits.services import CreditsService
+        default_plan = Plan.objects.filter(is_default=True).first()
+        if default_plan:
+            Subscription.objects.create(
+                user=instance,
+                plan=default_plan,
+                status='trial',
+                expires_at=timezone.now() + timedelta(days=7),
+            )
+            CreditsService().topup(
+                instance,
+                Decimal('50'),
+                reason='trial_bonus',
+                metadata={'source': 'registration_trial'},
+            )

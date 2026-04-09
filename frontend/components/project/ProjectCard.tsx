@@ -25,6 +25,9 @@ import { ProjectSettingsDialog } from "./ProjectSettingsDialog";
 import { CreateLinkDialog } from "@/components/sharing/CreateLinkDialog";
 import { sharingApi } from "@/lib/api/sharing";
 import { useProjectsStore } from "@/lib/store/projects";
+import { useSubscriptionStore } from "@/lib/store/subscription";
+import { UpgradeModal } from "@/components/subscription/UpgradeModal";
+import { ProBadge } from "@/components/subscription/ProBadge";
 import { PROJECT_STATUSES } from "@/lib/utils/constants";
 import { formatStorage, formatCurrency, formatRelativeDate } from "@/lib/utils/format";
 import type { Project } from "@/lib/types";
@@ -43,6 +46,9 @@ export function ProjectCard({ project }: ProjectCardProps) {
   const [shareLoading, setShareLoading] = useState(false);
   const [shareElements, setShareElements] = useState<Array<{ id: number; element_type: string; is_favorite: boolean; source_type: string }>>([]);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const hasFeature = useSubscriptionStore((s) => s.hasFeature);
+  const canShare = hasFeature("sharing");
 
   const statusConfig = PROJECT_STATUSES.find((s) => s.value === project.status);
 
@@ -153,6 +159,10 @@ export function ProjectCard({ project }: ProjectCardProps) {
                   <DropdownMenuItem
                     className="cursor-pointer"
                     onSelect={async () => {
+                      if (!canShare) {
+                        setUpgradeOpen(true);
+                        return;
+                      }
                       setShareLoading(true);
                       try {
                         const els = await sharingApi.getProjectElements(project.id);
@@ -165,6 +175,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
                   >
                     <Share2 className="mr-2 h-3.5 w-3.5" />
                     {shareLoading ? 'Загрузка...' : 'Поделиться'}
+                    {!canShare && <ProBadge className="ml-auto" />}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
@@ -236,6 +247,12 @@ export function ProjectCard({ project }: ProjectCardProps) {
         projectId={project.id}
         elementIds={shareElements.map(e => e.id)}
         elements={shareElements}
+      />
+
+      <UpgradeModal
+        open={upgradeOpen}
+        onOpenChange={setUpgradeOpen}
+        featureCode="sharing"
       />
 
       {/* Delete confirmation */}

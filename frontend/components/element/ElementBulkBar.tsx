@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { FeatureGate } from "@/components/subscription/FeatureGate";
 import { CheckSquare, Square, FolderInput, Trash2, Share2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -56,15 +57,17 @@ export function ElementBulkBar({
       {/* Center: actions — always rendered, no conditional show/hide */}
       <div className="flex items-center gap-0.5">
         {onShareSelected && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onShareSelected}
-            className="gap-1.5 h-8 px-3 text-xs"
-          >
-            <Share2 className="h-3.5 w-3.5" />
-            Поделиться
-          </Button>
+          <FeatureGate feature="sharing">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onShareSelected}
+              className="gap-1.5 h-8 px-3 text-xs"
+            >
+              <Share2 className="h-3.5 w-3.5" />
+              Поделиться
+            </Button>
+          </FeatureGate>
         )}
 
         {onMoveSelected && (

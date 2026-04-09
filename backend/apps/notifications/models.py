@@ -10,6 +10,9 @@ class Notification(models.Model):
         GENERATION_COMPLETED = 'generation_completed', 'Генерация завершена'
         GENERATION_FAILED = 'generation_failed', 'Ошибка генерации'
         UPLOAD_COMPLETED = 'upload_completed', 'Загрузка завершена'
+        FEEDBACK_NEW = 'feedback_new', 'Новое обращение'
+        FEEDBACK_REPLY = 'feedback_reply', 'Ответ на обращение'
+        FEEDBACK_REWARD = 'feedback_reward', 'Награда за обратную связь'
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE,

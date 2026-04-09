@@ -1,0 +1,231 @@
+/* ─── Subscriptions Admin Styles ──────────────────────────────────────────── */
+
+/* ─── Badges ─────────────────────────────────────────────────────────────── */
+
+.sub-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    line-height: 1.5;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.sub-badge--default {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.sub-badge--recommended {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.sub-badge--trial {
+    background: #ede9fe;
+    color: #5b21b6;
+}
+
+.sub-badge--plan {
+    background: #e0e7ff;
+    color: #3730a3;
+    font-weight: 700;
+}
+
+.sub-badge--plan-sm {
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 10px;
+    padding: 1px 6px;
+}
+
+.sub-badge--feature {
+    background: #f0fdf4;
+    color: #166534;
+    font-size: 10px;
+    padding: 1px 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.sub-badge--feature-more {
+    background: #f8fafc;
+    color: #94a3b8;
+    font-size: 10px;
+    padding: 1px 6px;
+}
+
+/* ─── Status indicators ──────────────────────────────────────────────────── */
+
+.sub-status {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.sub-status--active {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.sub-status--trial {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.sub-status--expired {
+    background: #f1f5f9;
+    color: #64748b;
+}
+
+.sub-status--cancelled {
+    background: #fff7ed;
+    color: #c2410c;
+}
+
+.sub-status--hidden {
+    background: #f1f5f9;
+    color: #94a3b8;
+}
+
+/* ─── Expiration warnings ────────────────────────────────────────────────── */
+
+.sub-expires--past {
+    color: #dc2626;
+}
+
+.sub-expires--past small {
+    font-weight: 600;
+}
+
+.sub-expires--soon {
+    color: #d97706;
+}
+
+.sub-expires--soon small {
+    font-weight: 600;
+}
+
+/* ─── Utilities ──────────────────────────────────────────────────────────── */
+
+.sub-text-muted {
+    color: #94a3b8;
+}
+
+.sub-text-accent {
+    color: #2563eb;
+    font-weight: 700;
+    font-size: 15px;
+}
+
+.sub-code-badge {
+    display: inline-block;
+    background: #f1f5f9;
+    color: #475569;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* ─── Fieldset descriptions ──────────────────────────────────────────────── */
+
+.module .description {
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    color: #64748b;
+    font-size: 12px;
+    border-left: 3px solid #e2e8f0;
+}
+
+/* ─── Dark mode support (Django 3.2+ admin) ──────────────────────────────── */
+
+@media (prefers-color-scheme: dark) {
+    .sub-badge--default {
+        background: #1e3a5f;
+        color: #93c5fd;
+    }
+
+    .sub-badge--recommended {
+        background: #451a03;
+        color: #fcd34d;
+    }
+
+    .sub-badge--trial {
+        background: #2e1065;
+        color: #c4b5fd;
+    }
+
+    .sub-badge--plan {
+        background: #1e1b4b;
+        color: #a5b4fc;
+    }
+
+    .sub-badge--plan-sm {
+        background: #1e293b;
+        color: #94a3b8;
+    }
+
+    .sub-badge--feature {
+        background: #052e16;
+        color: #86efac;
+    }
+
+    .sub-badge--feature-more {
+        background: #1e293b;
+        color: #64748b;
+    }
+
+    .sub-status--active {
+        background: #052e16;
+        color: #86efac;
+    }
+
+    .sub-status--trial {
+        background: #1e3a5f;
+        color: #93c5fd;
+    }
+
+    .sub-status--expired {
+        background: #1e293b;
+        color: #94a3b8;
+    }
+
+    .sub-status--cancelled {
+        background: #431407;
+        color: #fdba74;
+    }
+
+    .sub-status--hidden {
+        background: #1e293b;
+        color: #64748b;
+    }
+
+    .sub-text-muted {
+        color: #64748b;
+    }
+
+    .sub-text-accent {
+        color: #60a5fa;
+    }
+
+    .sub-code-badge {
+        background: #1e293b;
+        color: #94a3b8;
+    }
+
+    .sub-expires--past {
+        color: #f87171;
+    }
+
+    .sub-expires--soon {
+        color: #fbbf24;
+    }
+}

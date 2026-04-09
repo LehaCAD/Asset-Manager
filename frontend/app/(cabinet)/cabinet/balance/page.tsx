@@ -6,12 +6,15 @@ import type { DateRange } from "react-day-picker";
 import { getTransactions } from "@/lib/api/cabinet";
 import { formatDateTime, formatCurrency } from "@/lib/utils/format";
 import { useCreditsStore } from "@/lib/store/credits";
-import { ChargeIcon } from "@/components/ui/charge-icon";
 import type { CabinetTransaction, PaginatedResponse } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { ChevronLeft, ChevronRight, CheckCircle2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { BalanceCard } from "@/components/cabinet/BalanceCard";
+import { AmountPresets } from "@/components/cabinet/AmountPresets";
+import { PaymentMethods } from "@/components/cabinet/PaymentMethods";
+import { TopUpSummary } from "@/components/cabinet/TopUpSummary";
 
 function defaultRange(): DateRange {
   const now = new Date();
@@ -31,7 +34,6 @@ export default function BalancePage() {
   const [error, setError] = useState(false);
   const [page, setPage] = useState(1);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(defaultRange);
-  const balance = useCreditsStore((s) => s.balance);
   const loadBalance = useCreditsStore((s) => s.loadBalance);
 
   useEffect(() => { loadBalance(); }, [loadBalance]);
@@ -72,19 +74,11 @@ export default function BalancePage() {
       </div>
 
       {/* Balance + Top up */}
-      <div className="rounded-md border border-border bg-card shadow-[var(--shadow-card)] p-5">
-        <p className="text-sm text-muted-foreground mb-2">Баланс</p>
-        <div className="flex items-center gap-3 mb-5">
-          <ChargeIcon size="xl" />
-          <span className="text-2xl font-bold font-mono text-foreground">{formatCurrency(balance)}</span>
-        </div>
-        <button
-          disabled
-          className="px-4 py-2 rounded-sm bg-primary text-primary-foreground text-sm font-semibold opacity-40 cursor-not-allowed"
-        >
-          Пополнить баланс
-        </button>
-        <p className="text-[11px] text-muted-foreground/50 mt-2">Онлайн-оплата будет доступна в ближайшее время</p>
+      <div className="mx-auto max-w-[520px] space-y-5">
+        <BalanceCard />
+        <AmountPresets />
+        <PaymentMethods />
+        <TopUpSummary />
       </div>
 
       {/* Payment history */}

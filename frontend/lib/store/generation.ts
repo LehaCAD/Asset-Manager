@@ -42,6 +42,7 @@ interface GenerationState {
   isGenerating: boolean;
   submitState: GenerationSubmitState;
   lastSubmitResult: GenerationSubmitResult | null;
+  enhancePrompt: boolean;
 
   // UI
   configPanelOpen: boolean;
@@ -54,6 +55,7 @@ interface GenerationState {
   clearGroup: () => void;
   setParameter: (key: string, value: unknown) => void;
   setPrompt: (text: string) => void;
+  setEnhancePrompt: (value: boolean) => void;
   setImageInput: (key: string, files: ImageFileEntry[]) => void;
   clearImageInput: (key: string) => void;
   generate: (projectId: number, groupId?: number) => Promise<GenerationSubmitResult>;
@@ -81,6 +83,9 @@ export const useGenerationStore = create<GenerationState>()((set, get) => ({
   isGenerating: false,
   submitState: "idle",
   lastSubmitResult: null,
+  enhancePrompt: typeof window !== 'undefined'
+    ? localStorage.getItem('enhance_prompt') === 'true'
+    : false,
   configPanelOpen: true,
   modelSelectorOpen: false,
 
@@ -209,6 +214,13 @@ export const useGenerationStore = create<GenerationState>()((set, get) => ({
     set({ prompt: text });
   },
 
+  setEnhancePrompt: (value) => {
+    set({ enhancePrompt: value });
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('enhance_prompt', String(value));
+    }
+  },
+
   setImageInput: (key, files) => {
     const { imageInputs } = get();
     const input = imageInputs.find((i) => i.key === key);
@@ -326,6 +338,7 @@ export const useGenerationStore = create<GenerationState>()((set, get) => ({
       ...get().parameters,
       ...imageInputsMap,
       ...schemaExtraParams,
+      ...(get().enhancePrompt ? { enhance_prompt: true } : {}),
     };
 
     // Create optimistic generation item FIRST (before API call)

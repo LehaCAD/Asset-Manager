@@ -26,6 +26,8 @@ import { CreateSceneDialog } from "./CreateSceneDialog";
 import { DisplaySettingsPopover } from "@/components/display/DisplaySettingsPopover";
 import { useScenesStore } from "@/lib/store/scenes";
 import { useDisplayStore } from "@/lib/store/project-display";
+import { useOnboardingStore } from "@/lib/store/onboarding";
+import { OnboardingEmptyState } from "@/components/onboarding/OnboardingEmptyState";
 import { projectsApi } from "@/lib/api/projects";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { DISPLAY_GRID_CONFIG, ASPECT_RATIO_CLASSES, FIT_MODE_CLASSES, CARD_SIZES } from "@/lib/utils/constants";
@@ -50,6 +52,7 @@ function pluralizeScenes(count: number): string {
 export function ScenarioTableClient({ projectId }: ScenarioTableClientProps) {
   const { scenes, isLoading, loadScenes, reorderScenes, setScenes } = useScenesStore();
   const { preferences, hydratePreferences } = useDisplayStore();
+  const getTaskForPage = useOnboardingStore((s) => s.getTaskForPage);
   const [createOpen, setCreateOpen] = useState(false);
   const [project, setProject] = useState<Project | null>(null);
 
@@ -128,7 +131,9 @@ export function ScenarioTableClient({ projectId }: ScenarioTableClientProps) {
             ))}
           </div>
         ) : scenes.length === 0 ? (
-          <EmptyState onCreateClick={() => setCreateOpen(true)} />
+          getTaskForPage('scenes')
+            ? <OnboardingEmptyState task={getTaskForPage('scenes')!} onAction={() => setCreateOpen(true)} />
+            : <EmptyState onCreateClick={() => setCreateOpen(true)} />
         ) : (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={scenes.map((s) => s.id)} strategy={rectSortingStrategy}>
