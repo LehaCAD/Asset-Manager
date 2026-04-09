@@ -33,4 +33,5 @@ urlpatterns = [
     path('api/sharing/', include('apps.sharing.urls')),
     path('api/notifications/', include('apps.notifications.urls')),
     path('api/subscriptions/', include('apps.subscriptions.urls')),
+    path('api/feedback/', include('apps.feedback.urls')),
 ]
