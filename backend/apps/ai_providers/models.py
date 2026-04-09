@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -303,7 +304,7 @@ class AIModel(models.Model):
         return self.pricing_schema
 
     def clean(self):
-        from django.core.exceptions import ValidationError
+        super().clean()
 
         if self.family:
             if self.family.model_type != self.model_type:
