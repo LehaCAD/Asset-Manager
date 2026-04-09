@@ -1,5 +1,5 @@
 import { WS_BASE_URL } from "@/lib/utils/constants";
-import type { WSNewNotificationEvent } from "@/lib/types";
+import type { WSNewNotificationEvent, WSOnboardingTaskCompletedEvent } from "@/lib/types";
 
 type NotificationHandler = (event: WSNewNotificationEvent) => void;
 
@@ -56,9 +56,22 @@ class NotificationWSManager {
 
     this.ws.onmessage = (event: MessageEvent) => {
       try {
-        const data = JSON.parse(event.data as string) as WSNewNotificationEvent;
+        const data = JSON.parse(event.data as string) as { type: string };
         if (data.type === "new_notification") {
-          this.handlers.forEach((h) => h(data));
+          const notifData = data as WSNewNotificationEvent;
+          this.handlers.forEach((h) => h(notifData));
+        } else if (data.type === "onboarding_task_completed") {
+          const onboardingData = data as unknown as WSOnboardingTaskCompletedEvent;
+          // Lazy imports to avoid circular dependencies
+          void Promise.all([
+            import("@/lib/store/onboarding"),
+            import("@/lib/store/credits"),
+            import("sonner"),
+          ]).then(([{ useOnboardingStore }, { useCreditsStore }, { toast }]) => {
+            useOnboardingStore.getState().handleTaskCompleted(onboardingData);
+            useCreditsStore.getState().loadBalance();
+            toast.success(`Задание выполнено: ${onboardingData.task_title} — +${onboardingData.reward} кадров`);
+          });
         }
       } catch {
         // ignore malformed messages

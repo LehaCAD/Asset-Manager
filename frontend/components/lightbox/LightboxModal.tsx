@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import type { Element, ElementFilter } from "@/lib/types";
 import { BADGE_MD } from "@/lib/utils/constants";
+import { useOnboardingStore } from "@/lib/store/onboarding";
 
 // URL helpers for display hierarchy
 function getPreviewUrl(element: Element): string {
@@ -307,6 +308,8 @@ export function LightboxModal({
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
+      // Onboarding: open_lightbox trigger
+      useOnboardingStore.getState().completeTask('open_lightbox');
     } else {
       document.body.style.overflow = "";
     }
@@ -538,6 +541,7 @@ export function LightboxModal({
                 <button
                   type="button"
                   onClick={async () => {
+                    useOnboardingStore.getState().completeTask('download_original');
                     const fileUrl = currentElement.file_url;
                     const ext = fileUrl.split("/").pop()?.split("?")[0]?.split(".").pop() ?? "file";
                     const fileName = `element-${currentElement.id}.${ext}`;

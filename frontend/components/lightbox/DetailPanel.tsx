@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { elementsApi } from "@/lib/api/elements";
 import { sharingApi } from "@/lib/api/sharing";
 import { useGenerationStore } from "@/lib/store/generation";
+import { useOnboardingStore } from "@/lib/store/onboarding";
 import { CommentThread } from "@/components/sharing/CommentThread";
 import { ThumbsUp, ThumbsDown } from "lucide-react";
 import type { Element, Comment, PublicElementReaction } from "@/lib/types";
@@ -194,6 +195,7 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
 
   const handleRepeat = () => {
     retryFromElement(element);
+    useOnboardingStore.getState().completeTask('retry_generation');
   };
 
   const handleCommentSubmit = async (text: string, parentId?: number) => {
