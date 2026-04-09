@@ -16,6 +16,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/utils/format";
+import { PromptEnhanceToggle } from "./PromptEnhanceToggle";
 import { Sparkles, Loader2, ImagePlus } from "lucide-react";
 import type { Element, ModalSelectionByScene } from "@/lib/types";
 import { isGroupsSchema } from "@/lib/types";
@@ -246,12 +247,14 @@ export function PromptBar({ projectId, sceneId, groupId, className }: PromptBarP
   }, [activeInput, effectiveGroupId]);
 
   return (
-    <div
-      className={cn(
-        "relative flex items-start gap-3 rounded-xl bg-card p-3 px-4 m-4 shadow-lg shadow-black/20 border border-border",
-        className
-      )}
-    >
+    <div className={cn("m-4", className)}>
+      {/* Pill container for features above PromptBar */}
+      <div className="flex items-center gap-3 px-4 mb-2">
+        <PromptEnhanceToggle />
+      </div>
+
+      {/* Existing PromptBar */}
+      <div className="relative flex items-start gap-3 rounded-xl bg-card p-3 px-4 shadow-lg shadow-black/20 border border-border">
           {/* Add-кнопка */}
           {canSelectImages ? (
             groupsSchema ? (
@@ -393,6 +396,8 @@ export function PromptBar({ projectId, sceneId, groupId, className }: PromptBarP
               Создать
             </button>
           </div>
+
+      </div>
 
       {/* Element Selection Modal */}
       {activeInput && (
