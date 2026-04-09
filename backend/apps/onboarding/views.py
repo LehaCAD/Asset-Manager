@@ -81,12 +81,7 @@ class CompleteTaskView(APIView):
         service = OnboardingService()
         completion = service.complete_by_code(request.user, task_code)
         if completion and completion.reward_paid:
-            from apps.credits.models import CreditsTransaction
-            tx = CreditsTransaction.objects.filter(
-                user=request.user,
-                reason='onboarding_task',
-            ).order_by('-id').first()
-            new_balance = str(tx.balance_after) if tx else None
+            new_balance = str(completion._balance_after) if getattr(completion, '_balance_after', None) is not None else None
             return Response({
                 'ok': True,
                 'reward': str(task.reward),

@@ -53,6 +53,9 @@ class OnboardingService:
                 completion.reward_paid = True
                 completion.save(update_fields=['reward_paid'])
                 new_balance = result.balance_after
+                # Attach balance to completion for the caller to avoid a
+                # separate re-query that could race with concurrent requests.
+                completion._balance_after = new_balance
                 transaction.on_commit(
                     lambda: self._notify_task_completed(user, task, new_balance)
                 )
