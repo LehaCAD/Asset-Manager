@@ -413,6 +413,13 @@ def process_uploaded_file(self, element_id: int, staging_path: str) -> dict:
         except Exception as e:
             logger.warning('Failed to create upload notification: %s', e)
 
+        # Onboarding: mark first upload
+        try:
+            from apps.onboarding.services import OnboardingService
+            OnboardingService().try_complete(element.scene.project.user, 'element.upload_success')
+        except Exception:
+            pass
+
         return {'element_id': element_id, 'status': 'completed', 'file_url': file_url}
 
     except Retry:

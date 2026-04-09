@@ -205,6 +205,14 @@ def finalize_generation_success(element_id: int, source_url: str) -> tuple[bool,
     except Exception:
         pass  # Don't break generation flow if notification fails
 
+    # Onboarding: mark first generation
+    try:
+        from apps.onboarding.services import OnboardingService
+        el = Element.objects.select_related('scene__project__user').get(id=element_id)
+        OnboardingService().try_complete(el.scene.project.user, 'element.generation_success')
+    except Exception:
+        pass
+
     return updated > 0, file_url
 
 
