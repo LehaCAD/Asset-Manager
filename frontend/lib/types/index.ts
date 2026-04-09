@@ -4,6 +4,7 @@ export interface User {
   id: number;
   username: string;
   email: string;
+  is_staff?: boolean;
   is_email_verified?: boolean;
   quota?: UserQuota;
   subscription?: UserSubscription;
@@ -478,6 +479,7 @@ export interface WSElementStatusChangedEvent {
 }
 
 export type NotificationType = 'comment_new' | 'reaction_new' | 'review_new' | 'generation_completed' | 'generation_failed' | 'upload_completed'
+  | 'feedback_new' | 'feedback_reply' | 'feedback_reward'
 
 export interface Notification {
   id: number
@@ -675,4 +677,55 @@ export interface SceneStats {
   elements_count: number;
   storage_bytes: number;
   storage_display: string;
+}
+
+// ─── Feedback ─────────────────────────────────────────
+
+export interface FeedbackAttachment {
+  id: number
+  file_name: string
+  file_size: number
+  content_type: string
+  url: string | null
+  is_expired: boolean
+  created_at: string
+}
+
+export interface FeedbackMessage {
+  id: number
+  sender_name: string
+  is_admin: boolean
+  text: string
+  attachments: FeedbackAttachment[]
+  created_at: string
+}
+
+export interface FeedbackConversation {
+  id: number
+  status: 'open' | 'resolved'
+  tag: '' | 'bug' | 'question' | 'idea'
+  created_at: string
+  updated_at: string
+  last_message_preview: { text: string; is_admin: boolean; created_at: string } | null
+  unread_count: number
+}
+
+export interface AdminConversationUser {
+  id: number
+  username: string
+  email: string
+  date_joined: string
+  balance: string
+}
+
+export interface AdminConversation {
+  id: number
+  user: AdminConversationUser
+  status: 'open' | 'resolved'
+  tag: '' | 'bug' | 'question' | 'idea'
+  created_at: string
+  updated_at: string
+  last_message_preview: { text: string; is_admin: boolean; created_at: string } | null
+  unread_by_admin: number
+  rewards_total: string
 }
