@@ -1,7 +1,5 @@
 'use client'
 
-import { formatDistanceToNow } from 'date-fns'
-import { ru } from 'date-fns/locale'
 import type { FeedbackMessage } from '@/lib/types'
 import { AttachmentPreview } from './AttachmentPreview'
 
@@ -47,7 +45,7 @@ export function MessageBubble({ message, isOwnMessage, showAvatar = true }: Mess
           )}
 
           <p className="text-[10px] text-muted-foreground text-right mt-1">
-            {formatDistanceToNow(new Date(message.created_at), { addSuffix: true, locale: ru })}
+            {new Date(message.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
           </p>
         </div>
       </div>
