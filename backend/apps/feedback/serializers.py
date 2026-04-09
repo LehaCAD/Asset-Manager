@@ -1,24 +1,14 @@
-import boto3
 from rest_framework import serializers
 from django.conf import settings
 from .models import Conversation, Message, Attachment, FeedbackReward
-
-
-def _get_s3():
-    return boto3.client(
-        "s3",
-        endpoint_url=settings.AWS_S3_ENDPOINT_URL,
-        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-        region_name=settings.AWS_S3_REGION_NAME,
-    )
+from .utils import get_s3_client
 
 
 def _presigned_get_url(file_key: str) -> str:
     """Generate a presigned GET URL for an attachment."""
     if not file_key:
         return ""
-    return _get_s3().generate_presigned_url(
+    return get_s3_client().generate_presigned_url(
         "get_object",
         Params={"Bucket": settings.AWS_STORAGE_BUCKET_NAME, "Key": file_key},
         ExpiresIn=3600,
@@ -71,7 +61,7 @@ class ConversationSerializer(serializers.ModelSerializer):
 
 
 class SendMessageSerializer(serializers.Serializer):
-    text = serializers.CharField(max_length=5000)
+    text = serializers.CharField(max_length=5000, allow_blank=True)
 
 
 class PresignRequestSerializer(serializers.Serializer):

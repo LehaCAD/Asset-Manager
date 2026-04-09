@@ -89,6 +89,9 @@ def grant_reward(
 
 def notify_new_message(conversation: Conversation, message: Message):
     """Отправить WS-событие о новом сообщении + notification."""
+    if not message.text:
+        return
+
     _send_to_conversation(conversation.id, {
         "type": "new_message",
         "message": {

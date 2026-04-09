@@ -9,7 +9,7 @@ import { SystemMessage } from './SystemMessage'
 import { Button } from '@/components/ui/button'
 
 export function FeedbackDropdown() {
-  const { conversation, messages, isLoading, loadConversation, loadMessages, sendMessage, connectWS, markAsRead } = useFeedbackStore()
+  const { conversation, messages, isLoading, loadConversation, loadMessages, sendMessage, connectWS, disconnectWS, markAsRead } = useFeedbackStore()
   const [text, setText] = useState('')
   const [isSending, setIsSending] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -22,6 +22,7 @@ export function FeedbackDropdown() {
       markAsRead()
     }
     init()
+    return () => disconnectWS()
   }, [])
 
   useEffect(() => {
@@ -38,7 +39,7 @@ export function FeedbackDropdown() {
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
       e.preventDefault()
       handleSend()
     }
@@ -61,13 +62,15 @@ export function FeedbackDropdown() {
           </p>
         )}
 
-        {lastMessages.map((msg) =>
-          msg.text.startsWith('⚡') ? (
+        {lastMessages.map((msg, index) => {
+          const prevMsg = index > 0 ? lastMessages[index - 1] : null
+          const showAvatar = !prevMsg || prevMsg.is_admin !== msg.is_admin
+          return msg.text.startsWith('⚡') ? (
             <SystemMessage key={msg.id} text={msg.text} createdAt={msg.created_at} />
           ) : (
-            <MessageBubble key={msg.id} message={msg} isOwnMessage={!msg.is_admin} />
+            <MessageBubble key={msg.id} message={msg} isOwnMessage={!msg.is_admin} showAvatar={showAvatar} />
           )
-        )}
+        })}
         <div ref={messagesEndRef} />
       </div>
 
@@ -80,7 +83,7 @@ export function FeedbackDropdown() {
             onKeyDown={handleKeyDown}
             placeholder="Написать сообщение..."
             rows={1}
-            className="flex-1 resize-none bg-transparent text-sm border-0 outline-none placeholder:text-muted-foreground min-h-[36px] max-h-[80px] py-2"
+            className="flex-1 resize-none bg-transparent text-sm text-foreground border border-border/50 rounded-lg outline-none focus:border-primary/50 placeholder:text-muted-foreground min-h-[36px] max-h-[80px] px-3 py-2 transition-colors"
           />
           <Button
             size="icon"

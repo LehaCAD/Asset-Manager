@@ -69,15 +69,20 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => {
     },
 
     uploadAttachment: async (messageId, file) => {
-      const presign = await feedbackApi.presignAttachment(messageId, file.name, file.type)
-      await fetch(presign.upload_url, {
-        method: 'PUT',
-        body: file,
-        headers: { 'Content-Type': file.type },
-      })
-      await feedbackApi.confirmAttachment(
-        messageId, presign.file_key, file.name, file.size, file.type,
-      )
+      try {
+        const presign = await feedbackApi.presignAttachment(messageId, file.name, file.type)
+        await fetch(presign.upload_url, {
+          method: 'PUT',
+          body: file,
+          headers: { 'Content-Type': file.type },
+        })
+        await feedbackApi.confirmAttachment(
+          messageId, presign.file_key, file.name, file.size, file.type,
+        )
+        // No optimistic update here — the WS attachment_ready event will carry the real attachment with URL
+      } catch (err) {
+        throw err
+      }
     },
 
     markAsRead: async () => {
@@ -94,19 +99,22 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => {
         if (event.type === 'new_message' || event.type === 'reward_granted') {
           const msg = 'message' in event ? event.message : null
           if (msg) {
-            set((s) => ({
-              messages: [...s.messages, msg],
-              hasUnreadReply: msg.is_admin ? true : s.hasUnreadReply,
-            }))
+            set((s) => {
+              if (s.messages.some((m) => m.id === msg.id)) return s
+              return {
+                messages: [...s.messages, msg],
+                hasUnreadReply: msg.is_admin ? true : s.hasUnreadReply,
+              }
+            })
           }
         }
         if (event.type === 'attachment_ready') {
           set((s) => ({
-            messages: s.messages.map((m) =>
-              m.id === event.message_id
-                ? { ...m, attachments: [...m.attachments, event.attachment] }
-                : m,
-            ),
+            messages: s.messages.map((m) => {
+              if (m.id !== event.message_id) return m
+              if (m.attachments.some((a) => a.id === event.attachment.id)) return m
+              return { ...m, attachments: [...m.attachments, event.attachment] }
+            }),
           }))
         }
         if (event.type === 'conversation_updated') {

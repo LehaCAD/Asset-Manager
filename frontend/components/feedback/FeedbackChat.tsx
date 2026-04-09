@@ -50,7 +50,7 @@ export function FeedbackChat() {
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
       e.preventDefault()
       handleSend()
     }
@@ -73,7 +73,7 @@ export function FeedbackChat() {
       // Need a message to attach to — send one if no recent message
       let msg = messages[messages.length - 1]
       if (!msg || msg.is_admin) {
-        const newMsg = await sendMessage(`📎 ${file.name}`)
+        const newMsg = await sendMessage('')
         if (!newMsg) {
           toast.error('Не удалось отправить сообщение')
           continue
@@ -92,27 +92,30 @@ export function FeedbackChat() {
 
   // Group messages by date
   const renderMessages = () => {
-    let lastDate = ''
-    return messages.map((msg) => {
+    return messages.map((msg, index) => {
       const msgDate = new Date(msg.created_at).toLocaleDateString('ru-RU')
-      const showDateSeparator = msgDate !== lastDate
-      lastDate = msgDate
+      const prevMsg = index > 0 ? messages[index - 1] : null
+      const prevDate = prevMsg ? new Date(prevMsg.created_at).toLocaleDateString('ru-RU') : null
+      const showDateSeparator = msgDate !== prevDate
 
       const isSystemMessage = msg.text.startsWith('⚡')
+      const showAvatar = !prevMsg || prevMsg.is_admin !== msg.is_admin
 
       return (
         <div key={msg.id}>
           {showDateSeparator && (
-            <div className="flex justify-center py-2">
-              <span className="text-[10px] text-muted-foreground bg-muted/50 rounded-full px-3 py-0.5">
+            <div className="flex items-center gap-3 py-3">
+              <div className="flex-1 h-px bg-border/50" />
+              <span className="text-[10px] text-muted-foreground font-medium px-2">
                 {msgDate}
               </span>
+              <div className="flex-1 h-px bg-border/50" />
             </div>
           )}
           {isSystemMessage ? (
             <SystemMessage text={msg.text} createdAt={msg.created_at} />
           ) : (
-            <MessageBubble message={msg} isOwnMessage={!msg.is_admin} />
+            <MessageBubble message={msg} isOwnMessage={!msg.is_admin} showAvatar={showAvatar} />
           )}
         </div>
       )
@@ -148,43 +151,35 @@ export function FeedbackChat() {
       </div>
 
       {/* Input bar */}
-      <div className="border-t px-6 py-3">
+      <div className="border-t border-border/50 px-4 py-3 flex flex-col gap-2">
         <div className="flex items-end gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 shrink-0"
+          <button
+            type="button"
+            className="h-9 w-9 shrink-0 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
             onClick={() => fileInputRef.current?.click()}
           >
             <Paperclip className="w-4 h-4" />
-          </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,application/pdf"
-            multiple
-            className="hidden"
-            onChange={handleFileSelect}
-          />
+          </button>
+          <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple className="hidden" onChange={handleFileSelect} />
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Написать сообщение... (Ctrl+Enter — отправить)"
+            placeholder="Написать сообщение..."
             rows={1}
-            className="flex-1 resize-none bg-muted/50 rounded-lg text-sm border-0 outline-none placeholder:text-muted-foreground min-h-[40px] max-h-[120px] px-3 py-2.5"
+            className="flex-1 resize-none bg-muted/30 text-foreground rounded-lg text-sm border border-border/50 outline-none focus:border-primary/50 placeholder:text-muted-foreground min-h-[36px] max-h-[120px] px-3 py-2 transition-colors"
           />
           <Button
             size="icon"
             onClick={handleSend}
             disabled={!text.trim() || isSending}
-            className="h-9 w-9 shrink-0"
+            className="h-9 w-9 shrink-0 rounded-lg bg-primary hover:bg-primary/90"
           >
             <Send className="w-4 h-4" />
           </Button>
         </div>
-        <p className="text-[10px] text-muted-foreground mt-1 ml-11">
-          Вложения хранятся 90 дней
+        <p className="text-[10px] text-muted-foreground pl-11">
+          Enter — отправить · Ctrl+Enter / Alt+Enter — новая строка
         </p>
       </div>
     </div>

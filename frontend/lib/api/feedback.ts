@@ -55,7 +55,7 @@ export const feedbackApi = {
   },
   confirmAttachment: async (messageId: number, fileKey: string, fileName: string, fileSize: number, contentType: string) => {
     try {
-      const { data } = await apiClient.post(
+      const { data } = await apiClient.post<{ status: string }>(
         `/api/feedback/messages/${messageId}/confirm-attach/`,
         { file_key: fileKey, file_name: fileName, file_size: fileSize, content_type: contentType },
       )

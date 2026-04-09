@@ -1,8 +1,5 @@
 'use client'
 
-import { formatDistanceToNow } from 'date-fns'
-import { ru } from 'date-fns/locale'
-
 interface SystemMessageProps {
   text: string
   createdAt: string
@@ -10,13 +7,17 @@ interface SystemMessageProps {
 
 export function SystemMessage({ text, createdAt }: SystemMessageProps) {
   return (
-    <div className="flex justify-center py-1">
-      <div className="text-xs text-muted-foreground bg-muted/50 rounded-full px-3 py-1 text-center">
-        {text}
-        <span className="ml-2 text-[10px] opacity-70">
-          {formatDistanceToNow(new Date(createdAt), { addSuffix: true, locale: ru })}
+    <div>
+      <div className="flex items-center gap-3 py-2 px-4">
+        <div className="flex-1 h-px bg-border" />
+        <span className="text-[10px] text-muted-foreground bg-muted/50 rounded-full px-3 py-0.5 whitespace-nowrap">
+          {text.replace(/^⚡\s*/, '')}
         </span>
+        <div className="flex-1 h-px bg-border" />
       </div>
+      <p className="text-center text-[10px] text-muted-foreground/60 -mt-1 mb-1">
+        {new Date(createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+      </p>
     </div>
   )
 }

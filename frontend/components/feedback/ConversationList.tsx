@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Search } from 'lucide-react'
 import { useFeedbackAdminStore } from '@/lib/store/feedback-admin'
 import { Input } from '@/components/ui/input'
@@ -23,16 +23,24 @@ const TAG_LABELS: Record<string, string> = {
 export function ConversationList() {
   const { conversations, activeConversation, filters, loadConversations, selectConversation, setFilters } = useFeedbackAdminStore()
   const [search, setSearch] = useState('')
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     loadConversations()
   }, [])
 
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [])
+
   const handleSearchChange = (value: string) => {
     setSearch(value)
-    // Debounce search
-    const timer = setTimeout(() => setFilters({ ...filters, search: value || undefined }), 300)
-    return () => clearTimeout(timer)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      setFilters((f) => ({ ...f, search: value || undefined }))
+    }, 300)
   }
 
   const handleStatusFilter = (status: string) => {
@@ -57,7 +65,7 @@ export function ConversationList() {
             placeholder="Поиск..."
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
-            className="pl-8 h-9 text-sm"
+            className="pl-8 h-9 text-sm bg-muted/30 border border-border/50 rounded-lg"
           />
         </div>
         <div className="flex gap-1">
@@ -69,7 +77,7 @@ export function ConversationList() {
                 'text-xs px-2 py-1 rounded-full transition-colors',
                 (filters.status || '') === f.value
                   ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/80',
+                  : 'bg-muted/50 text-muted-foreground hover:bg-muted',
               )}
             >
               {f.label}
@@ -85,8 +93,10 @@ export function ConversationList() {
             key={conv.id}
             onClick={() => selectConversation(conv.id)}
             className={cn(
-              'w-full text-left px-3 py-2.5 border-b border-border/50 hover:bg-muted/50 transition-colors',
-              activeConversation?.id === conv.id && 'bg-muted border-l-2 border-l-primary',
+              'w-full text-left px-3 py-2.5 border-b border-border/50 transition-colors',
+              activeConversation?.id === conv.id
+                ? 'bg-[#14213D] border-l-2 border-l-primary/50'
+                : 'border-l-2 border-l-transparent hover:bg-muted/30',
             )}
           >
             <div className="flex items-start gap-2.5">

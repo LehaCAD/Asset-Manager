@@ -3,13 +3,13 @@ import logging
 import uuid
 from datetime import timedelta
 
-import boto3
 from celery import shared_task
 from django.conf import settings
 from django.utils import timezone
 from PIL import Image
 
 from .models import Attachment, Message
+from .utils import get_s3_client
 
 logger = logging.getLogger(__name__)
 
@@ -17,22 +17,12 @@ MAX_DIMENSION = 800
 JPEG_QUALITY = 85
 
 
-def _get_s3():
-    return boto3.client(
-        "s3",
-        endpoint_url=settings.AWS_S3_ENDPOINT_URL,
-        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-        region_name=settings.AWS_S3_REGION_NAME,
-    )
-
-
 @shared_task(bind=True, max_retries=3, soft_time_limit=60)
 def process_feedback_attachment(
     self, conversation_id, message_id, tmp_file_key, file_name, content_type,
 ):
     """Скачать из S3 tmp, resize, upload в final, удалить tmp."""
-    s3 = _get_s3()
+    s3 = get_s3_client()
     bucket = settings.AWS_STORAGE_BUCKET_NAME
 
     try:
@@ -95,6 +85,13 @@ def process_feedback_attachment(
             content_type=final_ct,
         )
 
+        # Generate presigned GET URL for the processed attachment
+        presigned_url = s3.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": bucket, "Key": final_key},
+            ExpiresIn=3600,
+        )
+
         # Notify via WS
         from .services import notify_attachment_ready
         notify_attachment_ready(conversation_id, message_id, {
@@ -103,6 +100,8 @@ def process_feedback_attachment(
             "file_size": attachment.file_size,
             "content_type": attachment.content_type,
             "is_expired": False,
+            "created_at": attachment.created_at.isoformat(),
+            "url": presigned_url,
         })
 
         logger.info("Feedback attachment processed: %s → %s", tmp_file_key, final_key)
@@ -115,7 +114,7 @@ def process_feedback_attachment(
 @shared_task
 def cleanup_feedback_tmp():
     """Удалить файлы в feedback/tmp/ старше 1 часа."""
-    s3 = _get_s3()
+    s3 = get_s3_client()
     bucket = settings.AWS_STORAGE_BUCKET_NAME
     cutoff = timezone.now() - timedelta(hours=1)
 
@@ -137,7 +136,7 @@ def cleanup_old_attachments():
     cutoff = timezone.now() - timedelta(days=90)
     attachments = Attachment.objects.filter(created_at__lt=cutoff, is_expired=False)
 
-    s3 = _get_s3()
+    s3 = get_s3_client()
     bucket = settings.AWS_STORAGE_BUCKET_NAME
     count = 0
 

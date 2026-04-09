@@ -31,7 +31,7 @@ export function AttachmentPreview({ attachment }: AttachmentPreviewProps) {
         <img
           src={attachment.url}
           alt={attachment.file_name}
-          className="rounded max-w-[200px] max-h-[150px] object-cover cursor-pointer hover:opacity-80 transition-opacity"
+          className="rounded max-w-[260px] max-h-[200px] object-cover cursor-pointer hover:opacity-80 transition-opacity"
         />
         <span className="text-[10px] text-muted-foreground mt-0.5 block">
           {attachment.file_name} · {formatFileSize(attachment.file_size)}

@@ -85,15 +85,18 @@ export const useFeedbackAdminStore = create<FeedbackAdminState>((set, get) => {
       wsUnsub = feedbackWS.on((event) => {
         if (event.type === 'new_message' || event.type === 'reward_granted') {
           const msg = 'message' in event ? event.message : null
-          if (msg) set((s) => ({ messages: [...s.messages, msg] }))
+          if (msg) set((s) => {
+            if (s.messages.some((m) => m.id === msg.id)) return s
+            return { messages: [...s.messages, msg] }
+          })
         }
         if (event.type === 'attachment_ready') {
           set((s) => ({
-            messages: s.messages.map((m) =>
-              m.id === event.message_id
-                ? { ...m, attachments: [...m.attachments, event.attachment] }
-                : m,
-            ),
+            messages: s.messages.map((m) => {
+              if (m.id !== event.message_id) return m
+              if (m.attachments.some((a) => a.id === event.attachment.id)) return m
+              return { ...m, attachments: [...m.attachments, event.attachment] }
+            }),
           }))
         }
       })
