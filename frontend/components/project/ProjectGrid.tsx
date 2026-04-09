@@ -11,10 +11,13 @@ import { LimitBar } from "@/components/subscription/LimitBar";
 import { UpgradeModal } from "@/components/subscription/UpgradeModal";
 import { useProjectsStore } from "@/lib/store/projects";
 import { useAuthStore } from "@/lib/store/auth";
+import { useOnboardingStore } from "@/lib/store/onboarding";
+import { OnboardingEmptyState } from "@/components/onboarding/OnboardingEmptyState";
 
 export function ProjectGrid() {
   const { projects, isLoading, loadProjects } = useProjectsStore();
   const user = useAuthStore((s) => s.user);
+  const getTaskForPage = useOnboardingStore((s) => s.getTaskForPage);
   const quota = user?.quota;
   const [createOpen, setCreateOpen] = useState(false);
   const [linksPanelOpen, setLinksPanelOpen] = useState(false);
@@ -83,7 +86,9 @@ export function ProjectGrid() {
               ))}
             </div>
           ) : projects.length === 0 ? (
-            <EmptyState onCreateClick={() => setCreateOpen(true)} />
+            getTaskForPage('projects')
+              ? <OnboardingEmptyState task={getTaskForPage('projects')!} onAction={() => setCreateOpen(true)} />
+              : <EmptyState onCreateClick={() => setCreateOpen(true)} />
           ) : (
             <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))' }}>
               {projects.map((project) => (
