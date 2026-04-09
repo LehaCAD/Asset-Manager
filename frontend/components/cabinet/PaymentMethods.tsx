@@ -1,7 +1,7 @@
 'use client';
 
 import { useCreditsStore } from '@/lib/store/credits';
-import { cn } from '@/lib/utils/cn';
+import { cn } from '@/lib/utils';
 import type { PaymentMethodType } from '@/lib/types';
 
 const METHODS: {

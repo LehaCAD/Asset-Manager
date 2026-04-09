@@ -1,7 +1,7 @@
 'use client';
 
 import { useCreditsStore } from '@/lib/store/credits';
-import { cn } from '@/lib/utils/cn';
+import { cn } from '@/lib/utils';
 
 const PRESETS = [
   { amount: 100, label: '100 ₽', equiv: '~20 изобр.' },
