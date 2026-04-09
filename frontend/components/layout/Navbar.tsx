@@ -23,6 +23,7 @@ import { notificationWS } from "@/lib/api/notification-ws";
 import { authApi } from "@/lib/api/auth";
 import { formatCurrency, formatStorage } from "@/lib/utils/format";
 import { TrialBanner } from "@/components/subscription/TrialBanner";
+import { FeedbackButton } from "@/components/feedback/FeedbackButton";
 
 export function Navbar() {
   const user = useAuthStore((s) => s.user);
@@ -123,6 +124,9 @@ export function Navbar() {
             </div>
           )}
           
+          {/* Обратная связь */}
+          {user && <FeedbackButton />}
+
           {/* Колокольчик уведомлений */}
           {user && (
             <NotificationDropdown>
