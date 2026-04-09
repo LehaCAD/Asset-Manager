@@ -1,0 +1,243 @@
+# Подписки и ограничение фич
+
+> Актуальное состояние подсистемы. Обновлять при внесении изменений.
+> Последнее обновление: 2026-04-09
+
+---
+
+## Назначение
+
+Система тарифных планов с feature gating. Пользователь видит заблокированные фичи с предложением апгрейда. Администратор управляет тарифами, фичами и подписками через Django Admin.
+
+## Приложение
+
+`backend/apps/subscriptions/`
+
+## Модели
+
+### Plan (Тарифный план)
+
+Файл: `backend/apps/subscriptions/models.py`
+
+| Поле | Тип | Назначение |
+|------|-----|------------|
+| `code` | CharField, unique | Идентификатор (`free`, `creator`, `creator_pro`, `team`, `enterprise`) |
+| `name` | CharField | Название для пользователя |
+| `price` | DecimalField | Цена ₽/мес |
+| `credits_per_month` | IntegerField | Кадров при автоматической оплате (0 = не начисляются) |
+| `max_projects` | IntegerField | Лимит проектов (0 = безлимит) |
+| `max_scenes_per_project` | IntegerField | Лимит групп в проекте (0 = безлимит) |
+| `max_elements_per_scene` | IntegerField | Лимит элементов в группе (0 = безлимит) |
+| `storage_limit_gb` | IntegerField | Хранилище в ГБ (0 = безлимит) |
+| `features` | ManyToMany → Feature | Бинарные фичи, включённые в тариф |
+| `is_default` | BooleanField | Тариф для новых пользователей (только один) |
+| `is_recommended` | BooleanField | Подсвечивается на странице тарифов |
+| `is_trial_reference` | BooleanField | Используется как план во время триала (только один) |
+| `is_active` | BooleanField | Отображается на фронтенде |
+| `display_order` | IntegerField | Порядок отображения |
+
+Свойство `storage_limit_bytes` — конвертирует ГБ в байты для обратной совместимости.
+
+`save()` автоматически снимает `is_default` / `is_trial_reference` с других планов.
+
+### Feature (Фича)
+
+| Поле | Тип | Назначение |
+|------|-----|------------|
+| `code` | CharField, unique | Идентификатор (`sharing`, `batch_download`, `ai_prompt`, `analytics_export`) |
+| `title` | CharField | Заголовок в модалке апгрейда |
+| `description` | TextField | Описание в модалке |
+| `icon` | CharField | Имя иконки Lucide |
+| `min_plan` | FK → Plan | Минимальный тариф (для лейбла «Доступно начиная с...») |
+
+### Subscription (Подписка)
+
+| Поле | Тип | Назначение |
+|------|-----|------------|
+| `user` | OneToOne → User | Один юзер = одна подписка |
+| `plan` | FK → Plan | Текущий тариф |
+| `status` | CharField | `active`, `trial`, `expired`, `cancelled` |
+| `started_at` | DateTimeField | Начало периода |
+| `expires_at` | DateTimeField | Конец периода |
+| `cancelled_at` | DateTimeField, null | Дата отмены |
+
+Свойства: `is_trial` (bool), `trial_days_left` (int или None).
+
+## Текущие тарифы
+
+| Код | Название | Цена | Проекты | Хранилище | Фичи |
+|-----|----------|------|---------|-----------|-------|
+| `free` | Старт | 0 ₽ | 1 | 1 ГБ | — |
+| `creator` | Создатель | 990 ₽ | 5 | 20 ГБ | Доступ по ссылке |
+| `creator_pro` | Создатель Pro | 1 990 ₽ | ∞ | 100 ГБ | + Массовое скачивание, Усиление промпта |
+| `team` | Команда | 4 990 ₽ | ∞ | 500 ГБ | + Экспорт аналитики |
+| `enterprise` | Корпоративный | — | ∞ | ∞ | Все (скрыт) |
+
+## Сервис
+
+`backend/apps/subscriptions/services.py` — `SubscriptionService`
+
+Единая точка входа для всех проверок. Все методы — `@staticmethod`.
+
+| Метод | Назначение |
+|-------|------------|
+| `get_active_plan(user)` | Текущий план. Ленивая проверка истечения встроена. |
+| `has_feature(user, code)` | Есть ли фича у пользователя |
+| `can_create_project(user)` | Не превышен ли лимит проектов |
+| `can_create_scene(user, project)` | Не превышен ли лимит групп |
+| `check_storage(user)` | Не заполнено ли хранилище |
+| `get_limits(user)` | Все лимиты + usage (для сериализатора) |
+| `get_feature_gate_info(code)` | Данные для модалки апгрейда |
+
+### Ленивая проверка истечения
+
+Встроена в `get_active_plan()`. Если `expires_at <= now()`:
+- Статус меняется на `expired`
+- План откатывается на дефолтный
+- Сохраняется в БД
+
+Celery Beat не нужен — проверка при каждом обращении.
+
+### Триал
+
+При регистрации:
+1. Создаётся `Subscription(plan=free, status='trial', expires_at=+7 дней)`
+2. Начисляется 50 бонусных Кадров (`CreditsService.topup`, reason=`trial_bonus`)
+
+Во время триала `get_active_plan()` возвращает план с `is_trial_reference=True` (Pro).
+После истечения — откат на Старт. Кадры не сгорают.
+
+## Enforcement (бэкенд)
+
+| Где | Проверка | Файл |
+|-----|----------|------|
+| Создание проекта | `can_create_project()` | `projects/views.py` |
+| Создание группы | `can_create_scene()` | `scenes/views.py` |
+| Создание shared link | `has_feature('sharing')` | `sharing/views.py` |
+| Генерация | `check_storage()` | `elements/orchestration.py` |
+| Upload | `check_storage()` | `elements/orchestration.py` |
+| Presign | `check_storage()` | `projects/views.py`, `scenes/views.py` |
+
+Паттерн для фич: `FeatureGatePermission` — DRF permission class.
+Фабрика: `feature_required('sharing')` создаёт permission class.
+
+## API
+
+| Endpoint | Метод | Авторизация | Назначение |
+|----------|-------|-------------|------------|
+| `/api/subscriptions/plans/` | GET | AllowAny | Список активных тарифов для /pricing |
+| `/api/subscriptions/feature-gate/{code}/` | GET | IsAuthenticated | Данные для модалки апгрейда |
+
+Подписка также доступна в `/api/auth/me/` как поле `subscription`:
+```json
+{
+  "subscription": {
+    "plan_code": "creator_pro",
+    "plan_name": "Создатель Pro",
+    "status": "active",
+    "features": ["sharing", "batch_download", "ai_prompt"],
+    "is_trial": false,
+    "trial_days_left": null
+  }
+}
+```
+
+Поле `quota` вычисляется из Plan (UserQuota удалена).
+
+## Django Admin
+
+Файл: `backend/apps/subscriptions/admin.py`
+
+Три раздела в «Подписки и тарифы»:
+
+- **Тарифные планы** — таблица с бейджами, 4 fieldset-а, list_editable для порядка
+- **Фичи** — редактирование текстов модалок
+- **Подписки** — управление подписками пользователей. Быстрые действия:
+  - Назначить Создатель Pro на 30 дней
+  - Продлить на 30 дней
+  - Сбросить на Старт
+
+CSS: `backend/static/admin/subscriptions/subscriptions_admin.css`
+
+## Frontend
+
+### Стор
+
+`frontend/lib/store/subscription.ts` — `useSubscriptionStore`
+
+Синхронизируется из `user.subscription` при авторизации. Основной хелпер: `hasFeature(code)`.
+
+### Компоненты
+
+| Компонент | Путь | Назначение |
+|-----------|------|------------|
+| `ProBadge` | `components/subscription/ProBadge.tsx` | Бейдж «PRO» на заблокированных кнопках |
+| `LimitBar` | `components/subscription/LimitBar.tsx` | Прогресс-бар лимита (всегда фиолетовый) |
+| `UpgradeModal` | `components/subscription/UpgradeModal.tsx` | Модалка апгрейда (фичи и лимиты) |
+| `FeatureGate` | `components/subscription/FeatureGate.tsx` | Обёртка: если фича заблокирована — muted + ProBadge |
+| `TrialBanner` | `components/subscription/TrialBanner.tsx` | Текст о триале в хедере |
+
+### Где используется гейтинг
+
+- **Navbar** — прогресс-бар хранилища (только фиолетовый), TrialBanner
+- **ProjectCard, GroupCard** — кнопка «Поделиться» обёрнута в FeatureGate
+- **ElementBulkBar** — bulk share обёрнут в FeatureGate
+- **ProjectGrid** — лимит проектов с LimitBar и блокировкой кнопки создания
+
+### Страница /pricing
+
+`frontend/app/(workspace)/pricing/page.tsx` — временная заглушка, будет заменена дизайнером.
+
+## Цветовая схема ограничений
+
+- **Фиолетовый** (primary) — бейджи PRO, кнопки апгрейда, прогресс-бар
+- **Серый** (muted) — заблокированные кнопки
+
+Красный, оранжевый — не используются. Тон позитивный.
+
+## Названия фич (русский)
+
+| Код | Название | Лейбл кнопки |
+|-----|----------|--------------|
+| `sharing` | Доступ по ссылке | Поделиться |
+| `batch_download` | Массовое скачивание | Скачать всё |
+| `ai_prompt` | Усиление промпта | Улучшить промпт |
+| `analytics_export` | Экспорт аналитики | Экспорт |
+
+## Тесты
+
+`backend/apps/subscriptions/tests/` — 111 тестов:
+
+| Файл | Кол-во | Что тестирует |
+|------|--------|---------------|
+| `test_models.py` | 18 | Свойства моделей, уникальность флагов, constraints |
+| `test_services.py` | 35 | Все методы SubscriptionService, ленивое истечение, триал |
+| `test_permissions.py` | 10 | FeatureGatePermission, фабрика feature_required |
+| `test_views.py` | 11 | API endpoints, фильтрация, авторизация |
+| `test_enforcement.py` | 17 | Проверки в views (проекты, сцены, шеринг, хранилище) |
+| `test_serializers.py` | 20 | Формат ответов API, обратная совместимость quota |
+
+```bash
+docker compose exec backend python manage.py test apps.subscriptions.tests -v 2
+```
+
+## Что НЕ реализовано
+
+- Интеграция с ЮKassa (отдельная подсистема)
+- Промо-коды и реферальная система
+- Командные аккаунты (team management)
+- Сгорание и перенос Кадров (50% перенос)
+- Массовое скачивание (endpoint)
+- Усиление промпта (endpoint)
+- Экспорт аналитики (endpoint)
+
+## Связанные изменения в других приложениях
+
+- `backend/apps/users/models.py` — сигнал `create_user_subscription` создаёт триал
+- `backend/apps/users/serializers.py` — `get_quota()` берёт лимиты из Plan
+- `backend/apps/users/views.py` — `select_related('subscription', 'subscription__plan')`
+- `backend/apps/users/admin.py` — UserQuotaAdmin удалён
+- `backend/apps/credits/models.py` — добавлен `REASON_TRIAL_BONUS`
+- `backend/apps/cabinet/services.py` — хранилище из `SubscriptionService.get_active_plan()`
+- `frontend/lib/types/index.ts` — типы `UserSubscription`, `FeatureGateInfo`, `PlanInfo`
+- `frontend/lib/store/auth.ts` — синхронизация subscription store при setUser
