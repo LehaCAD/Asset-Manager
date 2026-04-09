@@ -10,6 +10,7 @@ import {
   Bell,
   Settings,
   Clapperboard,
+  MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/lib/store/auth";
@@ -37,6 +38,7 @@ const NAV_SECTIONS = [
     items: [
       { href: "/cabinet/storage", label: "Хранилище", icon: HardDrive },
       { href: "/cabinet/notifications", label: "Уведомления", icon: Bell },
+      { href: "/cabinet/feedback", label: "Обратная связь", icon: MessageCircle },
       { href: "/cabinet/settings", label: "Профиль", icon: Settings },
     ],
   },
