@@ -11,6 +11,7 @@ import {
   Settings,
   Clapperboard,
   MessageCircle,
+  Inbox,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/lib/store/auth";
@@ -19,30 +20,43 @@ import { useCreditsStore } from "@/lib/store/credits";
 import { formatCurrency } from "@/lib/utils/format";
 import { useEffect } from "react";
 
-const NAV_SECTIONS = [
-  {
-    label: "Обзор",
-    items: [
-      { href: "/cabinet/analytics", label: "Аналитика", icon: TrendingUp },
-      { href: "/cabinet/history", label: "Журнал", icon: History },
-    ],
-  },
-  {
-    label: "Оплата",
-    items: [
-      { href: "/cabinet/balance", label: "Платежи", icon: Wallet },
-    ],
-  },
-  {
-    label: "Инструменты",
-    items: [
-      { href: "/cabinet/storage", label: "Хранилище", icon: HardDrive },
-      { href: "/cabinet/notifications", label: "Уведомления", icon: Bell },
-      { href: "/cabinet/feedback", label: "Обратная связь", icon: MessageCircle },
-      { href: "/cabinet/settings", label: "Профиль", icon: Settings },
-    ],
-  },
-];
+function getNavSections(isStaff: boolean) {
+  const sections = [
+    {
+      label: "Обзор",
+      items: [
+        { href: "/cabinet/analytics", label: "Аналитика", icon: TrendingUp },
+        { href: "/cabinet/history", label: "Журнал", icon: History },
+      ],
+    },
+    {
+      label: "Оплата",
+      items: [
+        { href: "/cabinet/balance", label: "Платежи", icon: Wallet },
+      ],
+    },
+    {
+      label: "Инструменты",
+      items: [
+        { href: "/cabinet/storage", label: "Хранилище", icon: HardDrive },
+        { href: "/cabinet/notifications", label: "Уведомления", icon: Bell },
+        { href: "/cabinet/feedback", label: "Обратная связь", icon: MessageCircle },
+        { href: "/cabinet/settings", label: "Профиль", icon: Settings },
+      ],
+    },
+  ];
+
+  if (isStaff) {
+    sections.push({
+      label: "Администрирование",
+      items: [
+        { href: "/cabinet/inbox", label: "Входящие", icon: Inbox },
+      ],
+    });
+  }
+
+  return sections;
+}
 
 export default function CabinetLayout({
   children,
@@ -55,6 +69,8 @@ export default function CabinetLayout({
   const loadBalance = useCreditsStore((s) => s.loadBalance);
 
   useEffect(() => { loadBalance(); }, [loadBalance]);
+
+  const NAV_SECTIONS = getNavSections(!!user?.is_staff);
 
   const initials = user?.username
     ? user.username.slice(0, 2).toUpperCase()
