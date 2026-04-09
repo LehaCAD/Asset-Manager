@@ -1,0 +1,56 @@
+{% extends "admin/change_form.html" %}
+{% load i18n %}
+
+{% block after_field_sets %}
+{{ block.super }}
+
+<div class="onboarding-admin-extra">
+
+  <!-- Icon Picker -->
+  <div class="onboarding-section">
+    <h3 class="onboarding-section__title">Визуальный выбор иконки</h3>
+    <div id="icon-picker-grid" class="icon-picker-grid">
+      <!-- Icons rendered by icon_picker.js -->
+    </div>
+    <p class="icon-picker-selected-name">Выбрана: <strong id="icon-picker-current">—</strong></p>
+  </div>
+
+  <!-- Live Preview -->
+  <div class="onboarding-section">
+    <h3 class="onboarding-section__title">Предпросмотр</h3>
+    <div class="preview-container">
+
+      <!-- Checklist row preview -->
+      <div class="preview-block">
+        <p class="preview-block__label">Строка в чеклисте (активное состояние):</p>
+        <div class="preview-task-row preview-task-row--active">
+          <span id="preview-icon" class="preview-task-icon">◆</span>
+          <div class="preview-task-body">
+            <span id="preview-title" class="preview-task-title">Название задания</span>
+            <span id="preview-desc" class="preview-task-desc">Описание задания</span>
+          </div>
+          <span id="preview-reward" class="preview-task-reward">+5 ⬡</span>
+        </div>
+      </div>
+
+      <!-- Empty state preview -->
+      <div class="preview-block" id="preview-empty-state-block" style="display:none">
+        <p class="preview-block__label">Пустой экран:</p>
+        <div class="preview-empty-state">
+          <span id="preview-es-icon" class="preview-es-icon">◆</span>
+          <h4 id="preview-es-title" class="preview-es-title"></h4>
+          <p id="preview-es-desc" class="preview-es-desc"></p>
+          <button type="button" id="preview-es-cta" class="preview-es-cta"></button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Pass current icon value to JS
+  window.ONBOARDING_CURRENT_ICON = "{{ adminform.form.icon.value|default:'' }}";
+</script>
+{% endblock %}
