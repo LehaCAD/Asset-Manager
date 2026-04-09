@@ -13,23 +13,23 @@ class OnboardingTask(models.Model):
         ('frontend_action', 'По действию (фронт)'),
     ]
 
-    code = models.CharField(max_length=60, unique=True)
+    code = models.CharField('Код', max_length=60, unique=True)
     title = models.CharField('Название', max_length=120)
     description = models.CharField('Описание', max_length=200)
     icon = models.CharField('Иконка (Lucide)', max_length=50, default='circle-dot')
     reward = models.DecimalField('Награда (кадров)', max_digits=10, decimal_places=2, default=0)
     order = models.PositiveIntegerField('Порядок', default=0)
     is_active = models.BooleanField('Активно', default=True)
-    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='onboarding')
-    trigger_type = models.CharField(max_length=20, choices=TRIGGER_TYPE_CHOICES, default='backend_signal')
-    trigger_event = models.CharField(max_length=100, blank=True, default='')
+    category = models.CharField('Категория', max_length=20, choices=CATEGORY_CHOICES, default='onboarding')
+    trigger_type = models.CharField('Тип триггера', max_length=20, choices=TRIGGER_TYPE_CHOICES, default='backend_signal')
+    trigger_event = models.CharField('Событие триггера', max_length=100, blank=True, default='')
 
     empty_state_title = models.CharField('Заголовок пустого экрана', max_length=120, blank=True, default='')
     empty_state_desc = models.CharField('Описание пустого экрана', max_length=200, blank=True, default='')
     empty_state_cta = models.CharField('Кнопка пустого экрана', max_length=60, blank=True, default='')
     empty_state_page = models.CharField('Страница', max_length=20, blank=True, default='')
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField('Создано', auto_now_add=True)
 
     class Meta:
         ordering = ['order']
@@ -53,6 +53,9 @@ class UserOnboardingState(models.Model):
         verbose_name = 'Состояние онбординга'
         verbose_name_plural = 'Состояния онбординга'
 
+    def __str__(self):
+        return f'Онбординг: {self.user}'
+
 
 class UserTaskCompletion(models.Model):
     user = models.ForeignKey(
@@ -72,3 +75,6 @@ class UserTaskCompletion(models.Model):
         unique_together = ('user', 'task')
         verbose_name = 'Выполнение задания'
         verbose_name_plural = 'Выполнения заданий'
+
+    def __str__(self):
+        return f'{self.user} — {self.task.code}'
