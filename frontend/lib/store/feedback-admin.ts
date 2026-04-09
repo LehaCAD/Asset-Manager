@@ -49,6 +49,12 @@ export const useFeedbackAdminStore = create<FeedbackAdminState>((set, get) => {
         const msgs = await feedbackApi.getConversationMessages(id)
         set({ messages: msgs })
         await feedbackApi.adminMarkRead(id)
+        // Clear unread badge locally — no need to reload the full list
+        set((s) => ({
+          conversations: s.conversations.map((c) =>
+            c.id === id ? { ...c, unread_by_admin: 0 } : c,
+          ),
+        }))
         get().connectWS(id)
       }
     },
@@ -89,6 +95,19 @@ export const useFeedbackAdminStore = create<FeedbackAdminState>((set, get) => {
             if (s.messages.some((m) => m.id === msg.id)) return s
             return { messages: [...s.messages, msg] }
           })
+          // Increment unread badge for conversations that are not currently open
+          if (event.type === 'new_message' && !event.message.is_admin) {
+            set((s) => {
+              if (s.activeConversation?.id === conversationId) return s
+              return {
+                conversations: s.conversations.map((c) =>
+                  c.id === conversationId
+                    ? { ...c, unread_by_admin: c.unread_by_admin + 1 }
+                    : c,
+                ),
+              }
+            })
+          }
         }
         if (event.type === 'attachment_ready') {
           set((s) => ({
