@@ -1,6 +1,8 @@
 import json
 
-from django.contrib import admin
+from django.contrib import admin, messages
+from django.db import transaction
+from django.shortcuts import redirect
 from django.utils.html import format_html
 
 from .admin_forms import AIModelAdminForm
@@ -263,6 +265,60 @@ class AIModelAdmin(admin.ModelAdmin):
             form._save_mapping_rows(instance, form._mapping_rows)
         if hasattr(form, '_pricing_mode'):
             form._save_pricing_config(instance)
+
+    def get_urls(self):
+        from django.urls import path
+        custom_urls = [
+            path('<int:pk>/clone-variant/',
+                 self.admin_site.admin_view(self.clone_as_variant_view),
+                 name='ai_providers_aimodel_clone_variant'),
+        ]
+        return custom_urls + super().get_urls()
+
+    def clone_as_variant_view(self, request, pk):
+        original = AIModel.objects.get(pk=pk)
+
+        with transaction.atomic():
+            # Create family if standalone
+            if not original.family:
+                family = ModelFamily.objects.create(
+                    name=original.name,
+                    model_type=original.model_type,
+                    preview_url=original.preview_url,
+                    description=original.description,
+                    tags=original.tags,
+                )
+                original.family = family
+                original.variant_label = original.name
+                original.is_default_variant = True
+                original.save(update_fields=['family', 'variant_label', 'is_default_variant'])
+            else:
+                family = original.family
+
+            # Clone model
+            clone = AIModel.objects.get(pk=pk)
+            clone.pk = None
+            clone.name = f'{original.name} (копия)'
+            clone.variant_label = '(заполнить)'
+            clone.is_default_variant = False
+            clone.family = family
+            clone.save()
+
+            # Clone parameter bindings
+            for binding in original.parameter_bindings.all():
+                binding.pk = None
+                binding.ai_model = clone
+                binding.save()
+
+            # Clone pricing config
+            if hasattr(original, 'pricing_config'):
+                pc = original.pricing_config
+                pc.pk = None
+                pc.ai_model = clone
+                pc.save()
+
+        messages.success(request, f'Создана копия "{clone.name}" в семействе "{family.name}".')
+        return redirect(f'/admin/ai_providers/aimodel/{clone.pk}/change/')
 
     def render_change_form(self, request, context, add=False, change=False, form_url='', obj=None):
         form = context.get('form')

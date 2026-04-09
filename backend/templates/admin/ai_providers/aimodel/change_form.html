@@ -236,6 +236,16 @@
         </div>
       </details>
     </section>
+    {% if original %}
+    <div style="text-align: right; padding: 16px 24px;">
+        <a href="{% url 'admin:ai_providers_aimodel_clone_variant' original.pk %}"
+           class="btn-clone-variant"
+           onclick="return confirm('Клонировать модель как новый вариант?');"
+           style="display:inline-block;padding:8px 16px;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none;font-size:13px;">
+            ⊕ Клонировать как вариант
+        </a>
+    </div>
+    {% endif %}
   </div>
 </div>
 {% endblock %}
