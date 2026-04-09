@@ -16,7 +16,7 @@ interface FeedbackAdminState {
   sendReply: (text: string) => Promise<void>
   updateConversation: (id: number, data: { status?: string; tag?: string }) => Promise<void>
   grantReward: (id: number, amount: number, comment: string) => Promise<void>
-  setFilters: (filters: { status?: string; tag?: string; search?: string }) => void
+  setFilters: (filtersOrUpdater: { status?: string; tag?: string; search?: string } | ((prev: { status?: string; tag?: string; search?: string }) => { status?: string; tag?: string; search?: string })) => void
   connectWS: (conversationId: number) => void
   disconnectWS: () => void
 }
@@ -78,8 +78,12 @@ export const useFeedbackAdminStore = create<FeedbackAdminState>((set, get) => {
       await feedbackApi.grantReward(id, amount, comment)
     },
 
-    setFilters: (filters) => {
-      set({ filters })
+    setFilters: (filtersOrUpdater) => {
+      const next =
+        typeof filtersOrUpdater === 'function'
+          ? filtersOrUpdater(get().filters)
+          : filtersOrUpdater
+      set({ filters: next })
       get().loadConversations()
     },
 

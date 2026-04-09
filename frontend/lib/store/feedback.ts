@@ -61,7 +61,10 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => {
           await get().loadConversation()
           get().connectWS()
         }
-        set((s) => ({ messages: [...s.messages, msg] }))
+        set((s) => {
+          if (s.messages.some((m) => m.id === msg.id)) return s
+          return { messages: [...s.messages, msg] }
+        })
         return msg
       } catch {
         return null
