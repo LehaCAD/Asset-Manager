@@ -85,6 +85,9 @@ class ConfirmAttachSerializer(serializers.Serializer):
     file_key = serializers.CharField(max_length=500)
     file_name = serializers.CharField(max_length=255)
     file_size = serializers.IntegerField(min_value=1, max_value=10 * 1024 * 1024)
+    content_type = serializers.ChoiceField(choices=[
+        "image/jpeg", "image/png", "image/webp", "application/pdf",
+    ])
 
 
 # --- Admin serializers ---

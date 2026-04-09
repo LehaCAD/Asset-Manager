@@ -21,7 +21,7 @@ from .serializers import (
     AdminConversationUpdateSerializer,
     RewardSerializer,
 )
-from .services import grant_reward, notify_new_message
+from .services import grant_reward, notify_new_message, notify_conversation_updated
 
 
 # ─── User endpoints ───────────────────────────────────────
@@ -153,7 +153,7 @@ def confirm_attach_view(request, message_id):
         message_id=msg.id,
         tmp_file_key=file_key,
         file_name=ser.validated_data["file_name"],
-        content_type=request.data.get("content_type", "image/jpeg"),
+        content_type=ser.validated_data.get("content_type", "image/jpeg"),
     )
     return Response({"status": "processing"}, status=status.HTTP_202_ACCEPTED)
 
@@ -214,6 +214,7 @@ def admin_conversation_detail(request, conversation_id):
         setattr(conv, field, value)
     conv.save(update_fields=list(ser.validated_data.keys()))
 
+    notify_conversation_updated(conv)
     return Response(AdminConversationListSerializer(conv).data)
 
 

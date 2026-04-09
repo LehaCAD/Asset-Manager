@@ -123,6 +123,15 @@ def notify_new_message(conversation: Conversation, message: Message):
         )
 
 
+def notify_conversation_updated(conversation: Conversation):
+    """Отправить WS-событие об изменении статуса/тега."""
+    _send_to_conversation(conversation.id, {
+        "type": "conversation_updated",
+        "status": conversation.status,
+        "tag": conversation.tag,
+    })
+
+
 def notify_attachment_ready(conversation_id: int, message_id: int, attachment_data: dict):
     """Отправить WS-событие что вложение обработано."""
     _send_to_conversation(conversation_id, {

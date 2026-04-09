@@ -123,7 +123,7 @@ def cleanup_feedback_tmp():
     deleted = 0
 
     for obj in response.get("Contents", []):
-        if obj["LastModified"].replace(tzinfo=None) < cutoff.replace(tzinfo=None):
+        if obj["LastModified"] < cutoff:
             s3.delete_object(Bucket=bucket, Key=obj["Key"])
             deleted += 1
 
