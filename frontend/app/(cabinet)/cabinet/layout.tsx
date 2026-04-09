@@ -148,8 +148,15 @@ export default function CabinetLayout({
       </nav>
 
       {/* Content — also in a rounded card */}
-      <div className="flex-1 rounded-md border border-border bg-background shadow-[var(--shadow-card)] overflow-y-auto">
-        <div className="max-w-5xl mx-auto p-8 space-y-6">{children}</div>
+      <div className={cn(
+        "flex-1 rounded-md border border-border bg-background shadow-[var(--shadow-card)]",
+        pathname === "/cabinet/inbox" ? "flex flex-col overflow-hidden" : "overflow-y-auto"
+      )}>
+        {pathname === "/cabinet/inbox" ? (
+          children
+        ) : (
+          <div className="max-w-5xl mx-auto p-8 space-y-6">{children}</div>
+        )}
       </div>
     </div>
   );

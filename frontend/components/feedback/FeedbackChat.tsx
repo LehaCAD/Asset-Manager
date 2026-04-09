@@ -98,7 +98,7 @@ export function FeedbackChat() {
       const prevDate = prevMsg ? new Date(prevMsg.created_at).toLocaleDateString('ru-RU') : null
       const showDateSeparator = msgDate !== prevDate
 
-      const isSystemMessage = msg.text.startsWith('⚡')
+      const isSystemMessage = msg.text.startsWith('[SYS]') || msg.text.startsWith('⚡')
       const showAvatar = !prevMsg || prevMsg.is_admin !== msg.is_admin
 
       return (

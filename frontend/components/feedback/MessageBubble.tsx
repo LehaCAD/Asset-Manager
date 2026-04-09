@@ -12,7 +12,7 @@ interface MessageBubbleProps {
 }
 
 export function MessageBubble({ message, isOwnMessage, showAvatar = true }: MessageBubbleProps) {
-  // System messages (start with ⚡) handled by SystemMessage component, not here
+  // System messages (start with [SYS]) handled by SystemMessage component, not here
 
   const bubbleCorners = showAvatar
     ? 'rounded-tl-[4px] rounded-tr-xl rounded-br-xl rounded-bl-xl'

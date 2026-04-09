@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Send, Zap, Check, Tag, ExternalLink } from 'lucide-react'
+import { Send, Check, Tag, ExternalLink } from 'lucide-react'
 import { useFeedbackAdminStore } from '@/lib/store/feedback-admin'
 import { MessageBubble } from './MessageBubble'
 import { SystemMessage } from './SystemMessage'
 import { RewardModal } from './RewardModal'
 import { Button } from '@/components/ui/button'
+import { ChargeIcon } from '@/components/ui/charge-icon'
 import { Badge } from '@/components/ui/badge'
 import {
   DropdownMenu,
@@ -101,7 +102,7 @@ export function AdminChatPanel() {
           {/* Actions */}
           <div className="flex items-center gap-1.5 shrink-0">
             <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5 border-border/50" onClick={() => setRewardOpen(true)}>
-              <Zap className="w-3 h-3" /> Начислить
+              <ChargeIcon size="xs" /> Начислить
             </Button>
             <Button
               size="sm"
@@ -156,7 +157,7 @@ export function AdminChatPanel() {
                   <div className="flex-1 h-px bg-border/50" />
                 </div>
               )}
-              {msg.text.startsWith('⚡') ? (
+              {(msg.text.startsWith('[SYS]') || msg.text.startsWith('⚡')) ? (
                 <SystemMessage text={msg.text} createdAt={msg.created_at} />
               ) : (
                 <MessageBubble message={msg} isOwnMessage={msg.is_admin} showAvatar={showAvatar} />

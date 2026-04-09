@@ -12,8 +12,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { Zap } from 'lucide-react'
 import { toast } from 'sonner'
+import { ChargeIcon } from '@/components/ui/charge-icon'
 
 interface RewardModalProps {
   open: boolean
@@ -53,7 +53,7 @@ export function RewardModal({ open, onOpenChange, onSubmit, userName }: RewardMo
       <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Zap className="w-4 h-4 text-primary" />
+            <ChargeIcon size="sm" />
             Начислить Кадры
           </DialogTitle>
         </DialogHeader>

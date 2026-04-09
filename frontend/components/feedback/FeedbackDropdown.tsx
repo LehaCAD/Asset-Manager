@@ -65,7 +65,7 @@ export function FeedbackDropdown() {
         {lastMessages.map((msg, index) => {
           const prevMsg = index > 0 ? lastMessages[index - 1] : null
           const showAvatar = !prevMsg || prevMsg.is_admin !== msg.is_admin
-          return msg.text.startsWith('⚡') ? (
+          return (msg.text.startsWith('[SYS]') || msg.text.startsWith('⚡')) ? (
             <SystemMessage key={msg.id} text={msg.text} createdAt={msg.created_at} />
           ) : (
             <MessageBubble key={msg.id} message={msg} isOwnMessage={!msg.is_admin} showAvatar={showAvatar} />

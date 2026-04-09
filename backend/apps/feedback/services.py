@@ -58,7 +58,7 @@ def grant_reward(
         conversation=conversation,
         sender=granted_by,
         is_admin=True,
-        text=f"⚡ {system_text}",
+        text=f"[SYS] {system_text}",
     )
 
     # WebSocket: reward_granted

@@ -13,7 +13,7 @@ export function AdminFeedbackInbox() {
   }, [disconnectWS])
 
   return (
-    <div className="flex h-[calc(100vh-64px)]">
+    <div className="flex flex-1 h-full min-h-0">
       <ConversationList />
       <AdminChatPanel />
     </div>
