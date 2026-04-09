@@ -3,6 +3,22 @@
 
 document.addEventListener('DOMContentLoaded', () => {
 
+  // Family field visibility toggle
+  const familySelect = document.getElementById('id_family');
+  const variantContainer = document.getElementById('variant-fields-container');
+
+  function syncFamilyFields() {
+      const hasFamily = familySelect && familySelect.value;
+      if (variantContainer) {
+          variantContainer.style.display = hasFamily ? '' : 'none';
+      }
+  }
+
+  if (familySelect) {
+      familySelect.addEventListener('change', syncFamilyFields);
+      syncFamilyFields();
+  }
+
   const mappingPayloadInput    = document.getElementById('id_mapping_payload');
   const form = mappingPayloadInput?.closest('form') || document.querySelector('form');
   const pricingDimensionsInput = document.getElementById('id_pricing_dimensions');
