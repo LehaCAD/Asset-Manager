@@ -39,6 +39,9 @@ class LLMProviderModelTests(TestCase):
 
 class AIServiceModelTests(TestCase):
     def setUp(self):
+        # Deactivate any seed services to avoid unique constraint conflicts
+        AIService.objects.filter(is_active=True).update(is_active=False)
+
         self.provider = LLMProvider.objects.create(
             name="Test Provider",
             provider_type="openai_compatible",

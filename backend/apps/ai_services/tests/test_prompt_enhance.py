@@ -40,6 +40,11 @@ class PromptEnhanceTestBase(TestCase):
         self.user.balance = Decimal("100.00")
         self.user.save(update_fields=["balance"])
 
+        # Deactivate any seed services to avoid unique constraint violation
+        AIService.objects.filter(
+            service_type=AIService.PROMPT_ENHANCE, is_active=True,
+        ).update(is_active=False)
+
         # LLM Provider
         self.provider = LLMProvider.objects.create(
             name="Test Provider",

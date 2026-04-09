@@ -20,6 +20,7 @@ class AIServicesAdminTests(TestCase):
         assert response.status_code == 200
 
     def test_create_provider_via_admin(self):
+        count_before = LLMProvider.objects.count()
         response = self.client.post("/admin/ai_services/llmprovider/add/", {
             "name": "OpenAI",
             "provider_type": "openai_compatible",
@@ -28,4 +29,4 @@ class AIServicesAdminTests(TestCase):
             "is_active": True,
         })
         assert response.status_code == 302
-        assert LLMProvider.objects.count() == 1
+        assert LLMProvider.objects.count() == count_before + 1
