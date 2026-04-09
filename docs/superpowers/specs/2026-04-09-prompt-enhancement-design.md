@@ -36,7 +36,7 @@ backend/apps/ai_services/
 | `name` | CharField | Отображаемое имя ("OpenAI", "Anthropic") |
 | `provider_type` | CharField choices | `openai_compatible` \| `anthropic` |
 | `api_base_url` | URLField | Базовый URL (`https://api.openai.com`, `https://api.anthropic.com`) |
-| `api_key` | CharField | API-ключ (шифрование через `django-fernet-fields` или хранение в env с ссылкой) |
+| `api_key` | CharField | API-ключ. Хранится plain text (видно только админу). Для прода: можно указать `ENV:OPENAI_API_KEY` — резолвится в `os.environ` при инициализации клиента |
 | `is_active` | BooleanField | Активен ли провайдер |
 | `created_at` | DateTimeField | auto_now_add |
 
@@ -54,7 +54,7 @@ backend/apps/ai_services/
 | `is_active` | BooleanField | Активен ли сервис |
 | `created_at` | DateTimeField | auto_now_add |
 
-**Constraint:** Максимум один активный сервис на каждый `service_type`. Админка показывает предупреждение при попытке активировать второй.
+**Constraint:** Максимум один активный сервис на каждый `service_type`. Enforced через `UniqueConstraint` с `condition=Q(is_active=True)` (partial unique index в PostgreSQL). Админка показывает ошибку при попытке активировать второй.
 
 ### LLM-клиенты
 
@@ -62,9 +62,13 @@ backend/apps/ai_services/
 
 ```python
 class BaseLLMClient(ABC):
+    DEFAULT_TIMEOUT = 15  # секунд — жёсткий лимит для синхронного вызова из view
+
     @abstractmethod
-    def chat(self, system_prompt: str, user_message: str, params: dict) -> LLMResponse:
-        """Синхронный вызов LLM. Возвращает текст ответа."""
+    def chat(self, system_prompt: str, user_message: str, params: dict,
+             timeout: int = DEFAULT_TIMEOUT) -> LLMResponse:
+        """Синхронный вызов LLM. Возвращает текст ответа.
+        Timeout: requests.post(..., timeout=timeout). При превышении — raise."""
         ...
 
 @dataclass
@@ -73,6 +77,8 @@ class LLMResponse:
     prompt_tokens: int
     completion_tokens: int
 ```
+
+**Таймаут:** 15 секунд по умолчанию. Переопределяется через `AIService.parameters.timeout`. Усиление выполняется синхронно внутри `create_generation()` — это Django view, пользователь ждёт ответа. При таймауте генерация продолжается с оригинальным промптом (graceful degradation).
 
 **OpenAICompatibleClient:**
 - POST `{base_url}/v1/chat/completions`
@@ -132,19 +138,32 @@ Your task:
 
 ```python
 # В create_generation(), после валидации, перед debit:
+#
+# 1. Извлечь и удалить флаг enhance_prompt из generation_config
+#    (чтобы он не попал в request_schema контекст провайдера)
+enhance_requested = generation_config.pop("enhance_prompt", False)
+
 enhanced_prompt = original_prompt
 enhance_cost = Decimal("0")
 was_enhanced = False
 
-if generation_config.pop("enhance_prompt", False):
+if enhance_requested:
     from apps.ai_services.services.prompt_enhance import enhance_prompt
     result = enhance_prompt(original_prompt, user)
     enhanced_prompt = result.prompt
     enhance_cost = result.cost
     was_enhanced = result.was_enhanced
 
-# Element создаётся с original_prompt в prompt_text
-# enhanced_prompt и enhance_cost сохраняются в generation_config
+# 2. Сохранить результат в generation_config с префиксом _
+#    (конвенция для системных метаданных: _debit_amount, _debit_transaction)
+if was_enhanced:
+    generation_config["_enhanced_prompt"] = enhanced_prompt
+    generation_config["_prompt_enhanced"] = True
+    generation_config["_enhance_cost"] = str(enhance_cost)
+
+# 3. Element создаётся с:
+#    - prompt_text = original_prompt (оригинал пользователя)
+#    - generation_config содержит _enhanced_prompt (если было усиление)
 ```
 
 ### Хранение в Element
@@ -154,21 +173,37 @@ Element:
     prompt_text = "хочу котика"  # Всегда оригинальный промпт пользователя
     generation_config = {
         # ... параметры модели ...
-        "enhanced_prompt": "A cute fluffy orange tabby kitten...",  # Если было усиление
-        "prompt_enhanced": True,                                      # Флаг
-        "enhance_cost": "1.00",                                       # Стоимость в кадрах
+        # Системные ключи с префиксом _ (не попадают в ConfigPanel, retryFromElement, provider context):
+        "_enhanced_prompt": "A cute fluffy orange tabby kitten...",  # Усиленный промпт
+        "_prompt_enhanced": True,                                      # Флаг — было ли усиление
+        "_enhance_cost": "1.00",                                       # Стоимость в кадрах
+        "_debit_amount": "12.50",                                      # Стоимость генерации (existing)
+        "_debit_transaction": 42,                                      # ID транзакции (existing)
     }
 ```
 
+Ключи с `_` автоматически скрыты: `HIDDEN_CONFIG_KEYS` в DetailPanel, `retryFromElement` в generation store, `build_generation_context` пропускает при подстановке.
+
 ### tasks.py — подстановка промпта
 
-В `start_generation()` при сборке контекста для request_schema:
+В `start_generation()`, перед вызовом `build_generation_context()`:
 
 ```python
-# Если есть enhanced_prompt — подставляем его вместо оригинального
-prompt_for_provider = generation_config.get("enhanced_prompt", element.prompt_text)
-# Подставляется в {{prompt}} плейсхолдер request_schema
+# Извлечь усиленный промпт, если был. Иначе — оригинальный.
+config = element.generation_config or {}
+prompt_for_provider = config.get("_enhanced_prompt", element.prompt_text) or ""
+
+# Передать как prompt= в build_generation_context:
+context = build_generation_context(
+    ai_model,
+    prompt=prompt_for_provider,       # ← усиленный или оригинальный
+    generation_config=config,
+    callback_url=callback_url,
+)
+# Дальше context подставляется в request_schema через {{prompt}} — без изменений
 ```
+
+**Важно:** `build_generation_context()` принимает `prompt=` как аргумент и кладёт в `context["prompt"]`, который подставляется в `{{prompt}}` плейсхолдер. Ключ `_enhanced_prompt` в generation_config НЕ матчит никакой плейсхолдер и безвредно игнорируется.
 
 ## Frontend
 
@@ -179,23 +214,46 @@ prompt_for_provider = generation_config.get("enhanced_prompt", element.prompt_te
 ```tsx
 {/* Pill-контейнер для фич (над PromptBar) */}
 <div className="flex items-center gap-2 px-1 mb-2">
-  <FeatureGate feature="ai_prompt" inline>
+  <PromptEnhanceToggle />
+</div>
+```
+
+**PromptEnhanceToggle** — отдельный компонент (`components/generation/PromptEnhanceToggle.tsx`):
+
+```tsx
+function PromptEnhanceToggle() {
+  const { enhancePrompt, setEnhancePrompt } = useGenerationStore();
+  const hasFeature = useSubscriptionStore((s) => s.hasFeature("ai_prompt"));
+  const [showUpgrade, setShowUpgrade] = useState(false);
+
+  if (!hasFeature) {
+    // Заблокировано: disabled чекбокс + PRO бейдж, клик → UpgradeModal
+    return (
+      <>
+        <label className="flex items-center gap-1.5 cursor-pointer opacity-50"
+               onClick={() => setShowUpgrade(true)}>
+          <Checkbox disabled checked={false} className="h-3.5 w-3.5" />
+          <span className="text-xs text-muted-foreground">Усилить промпт</span>
+          <ProBadge />
+        </label>
+        <UpgradeModal feature="ai_prompt" open={showUpgrade} onClose={() => setShowUpgrade(false)} />
+      </>
+    );
+  }
+
+  return (
     <label className="flex items-center gap-1.5 cursor-pointer">
-      <Checkbox
-        checked={enhancePrompt}
-        onCheckedChange={setEnhancePrompt}
-        className="h-3.5 w-3.5"
-      />
+      <Checkbox checked={enhancePrompt} onCheckedChange={setEnhancePrompt} className="h-3.5 w-3.5" />
       <span className="text-xs text-muted-foreground">Усилить промпт</span>
       <Tooltip content="Короткие промпты будут автоматически дополнены. Детальные останутся как есть.">
         <Info className="h-3.5 w-3.5 text-muted-foreground/50" />
       </Tooltip>
     </label>
-  </FeatureGate>
-</div>
+  );
+}
 ```
 
-**FeatureGate с `inline` prop:** Не оборачивает в overlay, а рендерит как disabled + PRO-бейдж рядом. Клик открывает UpgradeModal.
+Используются существующие `ProBadge` и `UpgradeModal` без модификации `FeatureGate`.
 
 **Состояние `enhancePrompt`:** Хранится в `useGenerationStore`. Передаётся в `generation_config` при вызове `generate()`:
 
@@ -215,14 +273,17 @@ const payload = {
 ### DetailPanel — отображение
 
 В секции «Информация»:
-- Если `generation_config.prompt_enhanced === true` — добавить строку «Усиление промпта: {enhance_cost} ₽» (форматируется через `formatCurrency` с иконкой кадра)
+- Если `generation_config._prompt_enhanced === true` — добавить строку «Усиление промпта: {_enhance_cost}» (форматируется через `formatCurrency` с иконкой кадра)
 
 В секции «Промпт»:
-- Если `prompt_enhanced === true` — показать бейдж «✦ Усилен» рядом с заголовком
-- Textarea показывает `enhanced_prompt` (то, что было отправлено провайдеру)
-- «Повторить запрос» → подставляет `enhanced_prompt` в PromptBar
+- Если `_prompt_enhanced === true` — показать бейдж «✦ Усилен» рядом с заголовком
+- Textarea показывает `_enhanced_prompt` (то, что было отправлено провайдеру)
 
-Ключ `enhance_cost` добавляется в `HIDDEN_CONFIG_KEYS` чтобы не дублировался в секции «Параметры». То же для `enhanced_prompt` и `prompt_enhanced`.
+**«Повторить запрос»:** Подставляет `element.prompt_text` (оригинальный промпт пользователя) в PromptBar. Это текущее поведение `retryFromElement` — не меняется. Если галочка «Усилить промпт» включена — промпт будет усилен заново. Это правильно: пользователь хочет повторить свой запрос, а не копировать предыдущий усиленный промпт (иначе будет рекурсивное усиление).
+
+Ключи `_enhanced_prompt`, `_prompt_enhanced`, `_enhance_cost`:
+- В `retryFromElement` — автоматически скрыты (существующая проверка `key.startsWith("_")`)
+- В `configParams` (секция «Параметры» DetailPanel) — **нужно добавить** в `HIDDEN_CONFIG_KEYS` set, либо добавить `key.startsWith("_")` guard в фильтр `configParams`. Текущий фильтр использует только `HIDDEN_CONFIG_KEYS.has(key)`, без `startsWith` проверки.
 
 ### Generation Store
 
@@ -235,15 +296,26 @@ interface GenerationState {
 }
 ```
 
-Значение по умолчанию: `false`. Персистится в `localStorage` чтобы пользователь не включал каждый раз.
+Значение по умолчанию: `false`. Персистится в `localStorage` через ручное чтение/запись:
+
+```typescript
+// В create():
+enhancePrompt: typeof window !== 'undefined'
+  ? localStorage.getItem('enhance_prompt') === 'true'
+  : false,
+setEnhancePrompt: (value) => {
+  set({ enhancePrompt: value });
+  localStorage.setItem('enhance_prompt', String(value));
+},
+```
 
 ## Подписки
 
 Используется существующая инфраструктура без изменений:
 - Feature code: `ai_prompt` (уже зарегистрирован)
 - План: `creator_pro` (уже привязан)
-- Backend: `feature_required('ai_prompt')` — не нужен отдельный эндпоинт, проверка в `enhance_prompt()`
-- Frontend: `<FeatureGate feature="ai_prompt">` — оборачивает галочку
+- Backend: проверка `has_feature(user, 'ai_prompt')` внутри `enhance_prompt()` — не нужен отдельный эндпоинт
+- Frontend: `PromptEnhanceToggle` использует `useSubscriptionStore().hasFeature("ai_prompt")` напрямую (без `FeatureGate`)
 
 ## Админка
 
@@ -263,11 +335,13 @@ Fieldsets:
 
 ## Стоимость
 
-- Списание в кадрах через существующий `CreditsService`
+- Списание в кадрах через `CreditsService`
+- **Новый метод:** `CreditsService.debit_flat(user, amount, reason, element=None)` — списание фиксированной суммы (не привязанной к AIModel pricing). Создаёт `CreditsTransaction` с `reason="prompt_enhancement"`. Новая константа `"prompt_enhancement"` добавляется в `REASON_CHOICES` модели `CreditsTransaction`.
 - `cost_per_call` задаётся в админке на AIService
 - Списание происходит в `enhance_prompt()` после успешного LLM-вызова
 - Отображается в DetailPanel как отдельная строка в метаданных
 - При ошибке LLM — стоимость не списывается, генерация продолжается с оригинальным промптом
+- **Два дебита не атомарны:** Усиление и генерация списываются отдельно. Если генерация падёт на этапе дебита (нехватка кадров) — усиление уже оплачено. Это корректно: LLM-вызов был выполнен, ресурс потрачен. Пользователь видит усиленный промпт в DetailPanel и может повторить генерацию
 
 ## Границы модуля
 
@@ -292,4 +366,6 @@ Fieldsets:
 - Кеширование усиленных промптов
 - Fallback между провайдерами при ошибке
 - A/B тестирование разных системных промптов
-- Фронтенд для просмотра оригинального промпта (только усиленный в DetailPanel)
+- Отдельное отображение оригинального промпта в DetailPanel (показывается только усиленный; оригинальный доступен через «Повторить запрос»)
+- Модификация `FeatureGate` компонента (используем отдельный `PromptEnhanceToggle`)
+- Новые типы в `types/index.ts` (ключи в `generation_config` — `Record<string, unknown>`, доступ через string keys)
