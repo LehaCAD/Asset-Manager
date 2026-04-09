@@ -729,3 +729,43 @@ export interface AdminConversation {
   unread_by_admin: number
   rewards_total: string
 }
+
+// Onboarding
+export interface OnboardingTaskEmptyState {
+  title: string;
+  description: string;
+  cta: string;
+  page: string;
+}
+
+export interface OnboardingTaskDTO {
+  code: string;
+  title: string;
+  description: string;
+  icon: string;
+  reward: number;
+  order: number;
+  completed: boolean;
+  completed_at: string | null;
+  empty_state: OnboardingTaskEmptyState | null;
+}
+
+export interface OnboardingStateResponse {
+  welcome_seen: boolean;
+  tasks: OnboardingTaskDTO[];
+  total_earned: number;
+  total_possible: number;
+  completed_count: number;
+  total_count: number;
+}
+
+// WebSocket event
+export interface WSOnboardingTaskCompletedEvent {
+  type: 'onboarding_task_completed';
+  task_code: string;
+  task_title: string;
+  reward: string;
+  new_balance: string;
+  completed_count: number;
+  total_count: number;
+}
