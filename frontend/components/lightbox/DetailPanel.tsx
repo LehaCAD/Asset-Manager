@@ -67,7 +67,16 @@ function InputImageThumbnail({ url, index }: { url: string; index: number }) {
 }
 
 export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelProps) {
-  const [promptText, setPromptText] = useState(element.prompt_text ?? "");
+  // Display enhanced prompt if available, otherwise original
+  const getDisplayPrompt = (el: Element) => {
+    const enhanced = el.generation_config?.["_prompt_enhanced"] === true;
+    if (enhanced) {
+      return (el.generation_config?.["_enhanced_prompt"] as string) ?? el.prompt_text ?? "";
+    }
+    return el.prompt_text ?? "";
+  };
+
+  const [promptText, setPromptText] = useState(getDisplayPrompt(element));
   const [isSaving, setIsSaving] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -78,7 +87,7 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
 
   // Sync prompt text when element changes
   useEffect(() => {
-    setPromptText(element.prompt_text ?? "");
+    setPromptText(getDisplayPrompt(element));
   }, [element.id, element.prompt_text]);
 
   // Fetch comments and reactions when element changes
@@ -96,7 +105,7 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
     return () => { cancelled = true; };
   }, [element.id]);
 
-  const hasPromptChanged = promptText !== (element.prompt_text ?? "");
+  const hasPromptChanged = promptText !== getDisplayPrompt(element);
   const isGenerated = element.source_type === "GENERATED";
 
   // Build label + value label maps from model's parameters_schema
@@ -126,7 +135,7 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
   const configParams = useMemo(() => {
     if (!element.generation_config || !isGenerated) return [];
     return Object.entries(element.generation_config)
-      .filter(([key]) => !HIDDEN_CONFIG_KEYS.has(key))
+      .filter(([key]) => !HIDDEN_CONFIG_KEYS.has(key) && !key.startsWith("_"))
       .filter(([, value]) => {
         if (typeof value === "string" && value.startsWith("http")) return false;
         if (Array.isArray(value)) return false;
@@ -144,9 +153,14 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
   const generationCost = element.generation_cost
     ?? (element.generation_config?.["_debit_amount"] as string | undefined);
 
+  // Prompt enhancement info
+  const enhanceCost = element.generation_config?.["_enhance_cost"] as string | undefined;
+  const wasEnhanced = element.generation_config?.["_prompt_enhanced"] === true;
+
   const metadata = [
     ...(element.ai_model_name ? [{ label: "Модель", value: element.ai_model_name }] : []),
     ...(generationCost ? [{ label: "Стоимость", value: formatCurrency(generationCost) }] : []),
+    ...(enhanceCost ? [{ label: "Усиление промпта", value: formatCurrency(enhanceCost) }] : []),
     ...(element.file_size ? [{ label: "Размер", value: formatStorage(element.file_size) }] : []),
     ...(element.seed ? [{ label: "Seed", value: String(element.seed) }] : []),
     { label: "Создан", value: formatDate(element.created_at) },
@@ -254,7 +268,14 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
 
       {/* Prompt Section */}
       <div>
-        <h3 className="text-sm font-medium text-muted-foreground mb-2">Промпт</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-medium text-muted-foreground mb-2">Промпт</h3>
+          {wasEnhanced && (
+            <span className="text-[11px] text-primary bg-primary/10 px-2 py-0.5 rounded mb-2">
+              ✦ Усилен
+            </span>
+          )}
+        </div>
         <Separator className="mb-3" />
         <div className="space-y-2">
           <Textarea
