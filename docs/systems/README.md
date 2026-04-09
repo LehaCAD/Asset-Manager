@@ -14,3 +14,4 @@
 | Файл | Подсистема |
 |------|------------|
 | [subscriptions.md](subscriptions.md) | Тарифы, подписки, ограничение фич |
+| [topup-payments.md](topup-payments.md) | Пополнение баланса через ЮKassa |
