@@ -49,6 +49,20 @@ def create_generation(project, scene, prompt, ai_model_id, generation_config, us
     input_urls = generation_config.get('input_urls')
     source_type = Element.SOURCE_GENERATED
 
+    # --- Prompt enhancement ---
+    enhance_requested = generation_config.pop("enhance_prompt", False)
+    if enhance_requested:
+        try:
+            from apps.ai_services.services.prompt_enhance import enhance_prompt as _enhance
+            result = _enhance(prompt, user)
+            if result.was_enhanced:
+                generation_config["_enhanced_prompt"] = result.prompt
+                generation_config["_prompt_enhanced"] = True
+                generation_config["_enhance_cost"] = str(result.cost)
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception("Prompt enhancement failed, using original")
+
     try:
         operation_key = uuid4().hex
         element = None

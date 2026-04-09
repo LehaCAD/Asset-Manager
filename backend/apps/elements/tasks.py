@@ -81,11 +81,15 @@ def start_generation(self, element_id: int) -> dict:
             if settings.KIE_CALLBACK_TOKEN:
                 callback_url = f"{callback_url}?token={settings.KIE_CALLBACK_TOKEN}"
         
+        # Use enhanced prompt if available, otherwise original
+        config = element.generation_config or {}
+        prompt_for_provider = config.get("_enhanced_prompt", element.prompt_text) or ""
+
         # Добавляем параметры из generation_config (единственный источник input_urls и др.)
         validate_model_admin_config(ai_model)
         context = build_generation_context(
             ai_model,
-            prompt=element.prompt_text or '',
+            prompt=prompt_for_provider,
             generation_config=element.generation_config,
             callback_url=callback_url,
         )
