@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     'apps.notifications',
     'apps.cabinet',
     'apps.subscriptions',
+    'apps.feedback',
 ]
 
 MIDDLEWARE = [
