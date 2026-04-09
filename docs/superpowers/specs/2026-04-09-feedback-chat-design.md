@@ -86,13 +86,12 @@ class Message(models.Model):
 
 
 class Attachment(models.Model):
-    """Вложение к сообщению."""
+    """Вложение к сообщению. Изображения хранятся в 800px, без оригиналов."""
     message = ForeignKey(Message, on_delete=CASCADE, related_name='attachments')
-    file_key = CharField(max_length=500)          # S3 key
+    file_key = CharField(max_length=500)          # S3 key (final, после resize)
     file_name = CharField(max_length=255)          # оригинальное имя
-    file_size = PositiveIntegerField()             # байты
+    file_size = PositiveIntegerField()             # байты (после resize)
     content_type = CharField(max_length=100)       # MIME
-    thumbnail_key = CharField(max_length=500, blank=True)  # S3 key миниатюры (для изображений)
     created_at = DateTimeField(auto_now_add=True)
 
 
@@ -129,7 +128,8 @@ GET  /api/feedback/conversation/          → Получить свой диал
 POST /api/feedback/conversation/          → Создать диалог (если нет)
 GET  /api/feedback/messages/              → Список сообщений (pagination, cursor-based)
 POST /api/feedback/messages/              → Отправить сообщение
-POST /api/feedback/messages/{id}/attach/  → Загрузить вложение (multipart, staging)
+POST /api/feedback/messages/{id}/presign/  → Получить presigned PUT URL для загрузки в S3
+POST /api/feedback/messages/{id}/confirm-attach/ → Подтвердить загрузку, запустить resize
 POST /api/feedback/conversation/read/     → Обновить user_last_read_at (вызывается при открытии чата)
 ```
 
@@ -215,46 +215,66 @@ class FeedbackChatConsumer(AsyncJsonWebsocketConsumer):
 
 ## 4. Загрузка файлов
 
-### Flow (двухшаговый)
+### Flow: presigned upload → resize (без staging на сервере)
 
 ```
 Шаг 1: POST /api/feedback/messages/ {text: "описание бага"}
   → Создаётся Message, возвращается message.id
   → WebSocket: new_message (текст, пока без вложений)
 
-Шаг 2 (опционально, 0-5 раз): POST /api/feedback/messages/{id}/attach/ (multipart)
-  → Django view: validate MIME (magic bytes) + size
-  → save_to_staging(/app/tmp_uploads/feedback/{uuid}{ext})
-  → HTTP 202 Accepted (attachment processing started)
+Шаг 2: POST /api/feedback/messages/{id}/presign/ {file_name, content_type}
+  → Backend: валидация MIME (whitelist), генерация presigned PUT URL
+  → Возвращает: {upload_url, file_key} (S3 prefix: feedback/tmp/{uuid}{ext})
+
+Шаг 3: Frontend: PUT файл напрямую в S3 по presigned URL
+  → Трафик идёт: браузер → S3. Сервер не участвует.
+
+Шаг 4: POST /api/feedback/messages/{id}/confirm-attach/ {file_key, file_name, file_size}
+  → Backend: проверяет что файл существует в S3 tmp
   → Celery task: process_feedback_attachment
-    → re-encode images (Pillow: strip EXIF, convert RGB, save)
-    → generate thumbnail (для изображений)
-    → upload to S3: feedback/{conversation_id}/{uuid}{ext}
-    → create Attachment record
-    → WebSocket: attachment_ready → frontend обновляет превью
+    → Download из S3 tmp (в память, файл маленький)
+    → Resize до 800px longest side (Pillow, quality=85, strip EXIF)
+    → Upload в S3 final: feedback/{conversation_id}/{uuid}.jpg
+    → Delete S3 tmp файл
+    → Create Attachment record (с file_size после resize)
+    → WebSocket: attachment_ready
 ```
 
-**Обработка ошибок:** Если upload Celery task падает — Attachment не создаётся, юзер видит ошибку в UI. Сообщение остаётся (текст отправлен). Frontend показывает retry-кнопку для вложения.
+**Ключевое:** сервер и Celery НЕ качают оригинал от юзера. Юзер грузит в S3 напрямую. Celery только ресайзит (скачать ~2МБ из S3, обработать, залить ~200КБ обратно — секунды).
+
+**Обработка ошибок:** Если resize падает — tmp-файл остаётся в S3. Periodic task `cleanup_feedback_tmp` (раз в час) удаляет файлы в `feedback/tmp/` старше 1 часа. Юзер видит ошибку, может retry.
+
+**PDF:** не ресайзится, копируется из tmp в final as-is (лимит 10 МБ на файл).
 
 ### Rate limiting
 
-- Сообщения: max 10 в минуту на юзера (DRF throttle)
-- Вложения: max 20 в час на юзера
-- Реализация: `UserRateThrottle` с кастомными scope'ами в DRF settings
+Отложено. В MVP единственный админ видит спам сразу, есть «заблокировать» в модерации. При росте — `UserRateThrottle`.
+
+### Хранилище
+
+- **Оригиналы не хранятся** — только 800px resize (~200-300 КБ на файл)
+- Per-file upload limit: 10 МБ (до resize, проверяется на фронте + presigned URL с Content-Length condition)
+- **Без per-conversation лимита** — при 800px resize объёмы мизерные
+- **Автоочистка**: Celery periodic task раз в сутки удаляет вложения старше 90 дней. Attachment запись остаётся с флагом `is_expired=True`, юзер видит плейсхолдер «Вложение удалено (срок хранения истёк)». Сообщения и текст — бессрочно
+- **Админ может удалить** любое вложение вручную из интерфейса
+- Feedback-вложения НЕ считаются в квоту хранилища юзера (отдельный S3 prefix `feedback/`)
+- Staging (S3 `feedback/tmp/`) — cleanup каждый час для файлов старше 1 часа
 
 ### Безопасность
 
 | Правило | Значение |
 |---------|----------|
 | Допустимые MIME | image/jpeg, image/png, image/webp, application/pdf |
-| Валидация | python-magic (magic bytes), не расширение |
-| Max размер файла | 10 МБ |
+| Валидация при presign | Whitelist content_type на бэкенде (перед выдачей presigned URL) |
+| Валидация при confirm | python-magic (magic bytes) на скачанном из S3 tmp файле |
+| Max размер upload | 10 МБ (Content-Length condition в presigned URL) |
 | Max вложений на сообщение | 5 |
-| Изображения | Re-encode через Pillow (strip EXIF, нейтрализация эксплойтов) |
-| PDF | Без обработки, только проверка magic bytes |
-| S3 path | `feedback/{conversation_id}/{uuid}{ext}` — изолированно от контента проектов |
+| Изображения | Resize 800px + re-encode (Pillow: strip EXIF, convert RGB, quality=85). Оригинал удаляется |
+| PDF | Копируется as-is из tmp в final (лимит 10 МБ) |
+| S3 tmp path | `feedback/tmp/{uuid}{ext}` — транзитная зона, cleanup каждый час |
+| S3 final path | `feedback/{conversation_id}/{uuid}{ext}` — изолировано от проектов |
 | Подача | Presigned GET URL, TTL 1 час |
-| ClamAV | Не нужен в MVP (whitelist MIME + re-encode достаточно) |
+| ClamAV | Не нужен (whitelist MIME + re-encode + автоочистка) |
 | python-magic | Новая зависимость: добавить в requirements.txt + libmagic1 в Dockerfile |
 
 ---
@@ -311,6 +331,9 @@ Popover (как NotificationDropdown):
 
 Если диалога ещё нет — показывает приветственный текст:
 > «Нашли баг? Есть идея? Напишите — мы читаем каждое сообщение.»
+
+Под полем ввода — мелкий текст (muted, 10px):
+> «Вложения хранятся 90 дней»
 
 ### 6.3. Страница /cabinet/feedback
 
@@ -456,7 +479,7 @@ backend/apps/feedback/
 ├── urls.py            → /api/feedback/...
 ├── consumers.py       → FeedbackChatConsumer
 ├── routing.py         → ws/feedback/{conversation_id}/
-├── tasks.py           → process_feedback_attachment (Celery)
+├── tasks.py           → process_feedback_attachment, cleanup_feedback_tmp, cleanup_old_attachments (Celery)
 ├── services.py        → grant_reward(), process_attachment()
 ├── admin.py           → ConversationAdmin, MessageInline
 └── apps.py
