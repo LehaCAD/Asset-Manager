@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import AIModel, AIProvider
+from .models import AIModel, AIProvider, ModelFamily
 
 
 class AIProviderSerializer(serializers.ModelSerializer):
@@ -8,6 +8,13 @@ class AIProviderSerializer(serializers.ModelSerializer):
     class Meta:
         model = AIProvider
         fields = ('id', 'name', 'is_active')
+        read_only_fields = fields
+
+
+class ModelFamilyBriefSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ModelFamily
+        fields = ('id', 'name', 'preview_url', 'description', 'tags', 'variant_ui_control')
         read_only_fields = fields
 
 
@@ -20,6 +27,7 @@ class AIModelSerializer(serializers.ModelSerializer):
     """
     provider_name = serializers.CharField(source='provider.name', read_only=True)
     parameters_schema = serializers.SerializerMethodField()
+    family = ModelFamilyBriefSerializer(read_only=True)
 
     def get_parameters_schema(self, obj):
         return obj.get_runtime_parameters_schema()
@@ -37,5 +45,9 @@ class AIModelSerializer(serializers.ModelSerializer):
             'tags',
             'image_inputs_schema',
             'is_active',
+            'family',
+            'variant_label',
+            'is_default_variant',
+            'variant_sort_order',
         )
         read_only_fields = fields

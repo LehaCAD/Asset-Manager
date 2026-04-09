@@ -23,7 +23,9 @@ class AIModelViewSet(viewsets.ReadOnlyModelViewSet):
         queryset = AIModel.objects.filter(
             is_active=True,
             provider__is_active=True,
-        ).select_related('provider')
+        ).select_related('provider', 'family').exclude(
+            family__is_active=False
+        )
 
         # Фильтр по типу модели
         model_type = self.request.query_params.get('type')
