@@ -114,8 +114,17 @@ class BackfillTest(TestCase):
         """User with existing project gets create_project task completed without reward."""
         from apps.onboarding.services import OnboardingService
         from apps.projects.models import Project
+        from apps.onboarding import signals as onboarding_signals
+        from django.db.models.signals import post_save
         user = _make_user()
-        Project.objects.create(user=user, name='My Project')
+
+        # Disconnect signal so creating a project doesn't auto-complete the task
+        post_save.disconnect(onboarding_signals.on_project_created, sender=Project)
+        try:
+            Project.objects.create(user=user, name='My Project')
+        finally:
+            post_save.connect(onboarding_signals.on_project_created, sender=Project)
+
         task = OnboardingTask.objects.get(code='create_project')
 
         svc = OnboardingService()

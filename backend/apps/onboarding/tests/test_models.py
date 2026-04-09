@@ -36,10 +36,10 @@ class OnboardingTaskModelTest(TestCase):
             _make_task(code='unique')
 
     def test_ordering(self):
-        _make_task(code='b', order=2)
-        _make_task(code='a', order=1)
-        tasks = list(OnboardingTask.objects.values_list('code', flat=True))
-        self.assertEqual(tasks, ['a', 'b'])
+        _make_task(code='task_b', order=200)
+        _make_task(code='task_a', order=100)
+        codes = list(OnboardingTask.objects.filter(code__in=['task_a', 'task_b']).values_list('code', flat=True))
+        self.assertEqual(codes, ['task_a', 'task_b'])
 
 
 class UserOnboardingStateTest(TestCase):
