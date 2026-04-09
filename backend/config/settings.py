@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     'apps.subscriptions',
     'apps.ai_services',
     'apps.feedback',
+    'apps.onboarding',
 ]
 
 MIDDLEWARE = [
