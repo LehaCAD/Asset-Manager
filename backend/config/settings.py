@@ -236,6 +236,14 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'reconcile_pending_payments',
         'schedule': 900.0,  # every 15 minutes
     },
+    'cleanup-feedback-tmp': {
+        'task': 'apps.feedback.tasks.cleanup_feedback_tmp',
+        'schedule': 3600.0,  # every hour
+    },
+    'cleanup-old-feedback-attachments': {
+        'task': 'apps.feedback.tasks.cleanup_old_attachments',
+        'schedule': 86400.0,  # every 24 hours
+    },
 }
 
 # AWS S3 Configuration
