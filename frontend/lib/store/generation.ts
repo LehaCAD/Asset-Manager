@@ -63,6 +63,8 @@ interface GenerationState {
   clearSubmitResult: () => void;
   retryFromElement: (element: Element) => void;
 
+  familyVariants: () => AIModel[];
+
   // Internal
   _requestEstimate: () => void;
 
@@ -444,6 +446,14 @@ export const useGenerationStore = create<GenerationState>()((set, get) => ({
     return true;
   },
   
+  familyVariants: (): AIModel[] => {
+    const { selectedModel, availableModels } = get();
+    if (!selectedModel?.family) return [];
+    return availableModels
+      .filter(m => m.family?.id === selectedModel.family!.id)
+      .sort((a, b) => a.variant_sort_order - b.variant_sort_order);
+  },
+
   _requestEstimate: () => {
     const { selectedModel, parameters, imageInputs } = get();
     if (!selectedModel) return;

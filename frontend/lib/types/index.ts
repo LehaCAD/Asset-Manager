@@ -36,7 +36,6 @@ export interface PlanInfo {
   credits_per_month: number;
   max_projects: number;
   max_scenes_per_project: number;
-  max_elements_per_scene: number;
   storage_limit_gb: number;
   features: { code: string; title: string; description: string; icon: string }[];
   is_recommended: boolean;
@@ -48,8 +47,6 @@ export interface UserQuota {
   used_projects: number;
   max_scenes_per_project: number;
   max_scenes_used: number;
-  max_elements_per_scene: number;
-  max_elements_used: number;
   storage_limit_bytes: number;
   storage_used_bytes: number;
 }
@@ -349,6 +346,15 @@ export function isGroupsSchema(schema: ImageInputsSchema): schema is ImageInputG
   return !Array.isArray(schema) && typeof schema === 'object' && schema?.mode === 'groups';
 }
 
+export interface ModelFamilyBrief {
+  id: number;
+  name: string;
+  preview_url: string;
+  description: string;
+  tags: string[];
+  variant_ui_control: 'pills' | 'select';
+}
+
 export interface AIModel {
   id: number;
   name: string;
@@ -360,6 +366,10 @@ export interface AIModel {
   tags: string[];
   image_inputs_schema: ImageInputsSchema;
   is_active: boolean;
+  family: ModelFamilyBrief | null;
+  variant_label: string;
+  is_default_variant: boolean;
+  variant_sort_order: number;
 }
 
 /* ── Sharing ──────────────────────────────────────────────── */
