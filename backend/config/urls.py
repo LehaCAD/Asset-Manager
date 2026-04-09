@@ -19,8 +19,11 @@ from django.urls import path, include
 from apps.elements.views_webhook import generation_callback_view
 from apps.common.views import health_check
 
+from apps.feedback.admin import inbox_view as feedback_inbox_view
+
 urlpatterns = [
     path('api/health/', health_check, name='health_check'),
+    path('admin/feedback/inbox/', admin.site.admin_view(feedback_inbox_view), name='feedback_inbox'),
     path('admin/', admin.site.urls),
     path('api/auth/', include('apps.users.urls')),
     path('api/projects/', include('apps.projects.urls')),
