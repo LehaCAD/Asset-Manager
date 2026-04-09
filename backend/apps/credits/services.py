@@ -114,6 +114,32 @@ class CreditsService:
         return BalanceMutationResult(balance_after=user.balance)
 
     @transaction.atomic
+    def debit_flat(self, user, amount, reason, element=None, metadata=None):
+        """Debit a fixed amount (not tied to AIModel pricing)."""
+        if amount <= 0:
+            return DebitResult(ok=True, cost=Decimal("0"), balance_after=user.balance, error=None)
+
+        locked_user = type(user).objects.select_for_update().get(pk=user.pk)
+        if locked_user.balance < amount:
+            return DebitResult(
+                ok=False, cost=Decimal("0"), balance_after=locked_user.balance,
+                error="Недостаточно кадров",
+            )
+        locked_user.balance -= amount
+        locked_user.save(update_fields=["balance"])
+
+        CreditsTransaction.objects.create(
+            user=locked_user,
+            amount=-amount,
+            balance_after=locked_user.balance,
+            reason=reason,
+            element=element,
+            metadata=metadata or {},
+        )
+
+        return DebitResult(ok=True, cost=amount, balance_after=locked_user.balance, error=None)
+
+    @transaction.atomic
     def debit_for_generation(
         self,
         user: User,

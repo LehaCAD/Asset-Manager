@@ -16,6 +16,7 @@ class CreditsTransaction(models.Model):
     REASON_PAYMENT_TOPUP = "payment_topup"
     REASON_TRIAL_BONUS = "trial_bonus"
     REASON_FEEDBACK_REWARD = "feedback_reward"
+    REASON_PROMPT_ENHANCEMENT = "prompt_enhancement"
 
     REASON_CHOICES = [
         (REASON_ADMIN_TOPUP, "Пополнение администратором"),
@@ -27,6 +28,7 @@ class CreditsTransaction(models.Model):
         (REASON_PAYMENT_TOPUP, "Пополнение (онлайн-оплата)"),
         (REASON_TRIAL_BONUS, "Бонус за триал"),
         (REASON_FEEDBACK_REWARD, "Награда за обратную связь"),
+        (REASON_PROMPT_ENHANCEMENT, "Усиление промпта"),
     ]
     
     user = models.ForeignKey(

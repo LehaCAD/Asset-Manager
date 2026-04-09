@@ -585,6 +585,50 @@ class TestReconciliation(TestCase):
 # Existing serializer + service tests (preserved from original)
 # ============================================================================
 
+class CreditsServiceDebitFlatTests(TestCase):
+    def setUp(self):
+        self.user = _make_user("flat_user", balance=Decimal("100.00"))
+
+    def test_debit_flat_success(self):
+        result = CreditsService().debit_flat(
+            user=self.user, amount=Decimal("5.00"),
+            reason=CreditsTransaction.REASON_PROMPT_ENHANCEMENT,
+        )
+        assert result.ok is True
+        assert result.cost == Decimal("5.00")
+        self.user.refresh_from_db()
+        assert self.user.balance == Decimal("95.00")
+
+    def test_debit_flat_creates_transaction(self):
+        CreditsService().debit_flat(
+            user=self.user, amount=Decimal("3.00"),
+            reason=CreditsTransaction.REASON_PROMPT_ENHANCEMENT,
+        )
+        tx = CreditsTransaction.objects.filter(
+            user=self.user,
+            reason=CreditsTransaction.REASON_PROMPT_ENHANCEMENT,
+        ).last()
+        assert tx is not None
+        assert tx.amount == Decimal("-3.00")
+
+    def test_debit_flat_insufficient_funds(self):
+        result = CreditsService().debit_flat(
+            user=self.user, amount=Decimal("999.00"),
+            reason=CreditsTransaction.REASON_PROMPT_ENHANCEMENT,
+        )
+        assert result.ok is False
+        self.user.refresh_from_db()
+        assert self.user.balance == Decimal("100.00")
+
+    def test_debit_flat_zero_amount(self):
+        result = CreditsService().debit_flat(
+            user=self.user, amount=Decimal("0.00"),
+            reason=CreditsTransaction.REASON_PROMPT_ENHANCEMENT,
+        )
+        assert result.ok is True
+        assert result.cost == Decimal("0.00")
+
+
 class CreditsEstimateRequestSerializerTests(SimpleTestCase):
     def test_accepts_numeric_generation_values(self):
         serializer = CreditsEstimateRequestSerializer(
