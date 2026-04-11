@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { Check, Tag, ExternalLink, RotateCcw } from 'lucide-react'
 import { useFeedbackAdminStore } from '@/lib/store/feedback-admin'
 import { ChatMessageList } from './ChatMessageList'
@@ -24,8 +24,39 @@ const TAG_OPTIONS = [
 ]
 
 export function AdminChatPanel() {
-  const { activeConversation, messages, sendReply, updateConversation, grantReward, uploadAttachment } = useFeedbackAdminStore()
+  const { activeConversation, messages, sendReply, updateConversation, grantReward, uploadAttachment, loadOlderMessages, sendTyping } = useFeedbackAdminStore()
   const [rewardOpen, setRewardOpen] = useState(false)
+  const lastTypingSent = useRef(0)
+  const prevConvIdRef = useRef<number | null>(null)
+  const [hasMore, setHasMore] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+
+  // Reset hasMore when switching conversations
+  const convId = activeConversation?.id ?? null
+  if (convId !== prevConvIdRef.current) {
+    prevConvIdRef.current = convId
+    setHasMore(true)
+    setIsLoadingMore(false)
+  }
+
+  const loadOlder = useCallback(async () => {
+    if (isLoadingMore || !messages.length) return
+    setIsLoadingMore(true)
+    try {
+      const loaded = await loadOlderMessages()
+      if (loaded.length < 30) setHasMore(false)
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }, [isLoadingMore, messages, loadOlderMessages])
+
+  const handleTyping = useCallback(() => {
+    const now = Date.now()
+    if (now - lastTypingSent.current > 5000) {
+      sendTyping()
+      lastTypingSent.current = now
+    }
+  }, [sendTyping])
 
   if (!activeConversation) {
     return (
@@ -132,14 +163,18 @@ export function AdminChatPanel() {
         </div>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-3">
-        <ChatMessageList messages={messages} isOwnMessage={(m) => m.is_admin} />
-      </div>
+      {/* Messages — ChatMessageList owns its own scroll container */}
+      <ChatMessageList
+        messages={messages}
+        isOwnMessage={(m) => m.is_admin}
+        onLoadMore={loadOlder}
+        hasMore={hasMore}
+        isLoadingMore={isLoadingMore}
+      />
 
       {/* Input */}
       <div className="border-t border-border/50 px-4 py-3">
-        <ChatInput onSend={handleSend} onAttachment={handleAttachment} placeholder="Ответить..." />
+        <ChatInput onSend={handleSend} onAttachment={handleAttachment} onTyping={handleTyping} placeholder="Ответить..." />
       </div>
 
       <RewardModal

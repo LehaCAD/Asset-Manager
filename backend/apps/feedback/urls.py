@@ -17,5 +17,5 @@ urlpatterns = [
     path("admin/conversations/<int:conversation_id>/messages/", views.admin_conversation_messages),
     path("admin/conversations/<int:conversation_id>/reward/", views.admin_reward_view),
     path("admin/conversations/<int:conversation_id>/read/", views.admin_mark_read_view),
-    path("admin/messages/<int:message_id>/", views.admin_delete_message),
+    path("admin/messages/<int:message_id>/", views.admin_message_actions),
 ]

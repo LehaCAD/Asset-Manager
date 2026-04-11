@@ -1,10 +1,12 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { useFeedbackStore } from '@/lib/store/feedback'
 import { ChatMessageList } from './ChatMessageList'
 import { ChatInput } from './ChatInput'
+
+const PAGE_SIZE = 30
 
 export function FeedbackDropdown() {
   const {
@@ -13,16 +15,31 @@ export function FeedbackDropdown() {
     connectWS, disconnectWS, markAsRead,
   } = useFeedbackStore()
 
+  const [hasMore, setHasMore] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+
   useEffect(() => {
     const init = async () => {
       await loadConversation()
-      await loadMessages()
+      const loaded = await loadMessages()
+      if (loaded.length < PAGE_SIZE) setHasMore(false)
       connectWS()
       markAsRead()
     }
     init()
     return () => disconnectWS()
   }, [])
+
+  const loadOlder = useCallback(async () => {
+    if (isLoadingMore || !messages.length) return
+    setIsLoadingMore(true)
+    try {
+      const loaded = await loadMessages(messages[0].id)
+      if (loaded.length < PAGE_SIZE) setHasMore(false)
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }, [isLoadingMore, messages, loadMessages])
 
   const handleSend = async (text: string) => {
     await sendMessage(text)
@@ -45,15 +62,23 @@ export function FeedbackDropdown() {
         <h3 className="text-sm font-semibold">Чат поддержки</h3>
       </div>
 
-      {/* Messages — increased height */}
-      <div className="max-h-[400px] overflow-y-auto px-3 py-2">
-        {messages.length === 0 && !isLoading && (
+      {/* Messages — ChatMessageList owns scroll, max-h applied via className */}
+      {messages.length === 0 && !isLoading ? (
+        <div className="px-3 py-2">
           <p className="text-sm text-muted-foreground text-center py-4">
             Нашли баг? Есть идея? Напишите — мы читаем каждое сообщение.
           </p>
-        )}
-        <ChatMessageList messages={messages} isOwnMessage={(m) => !m.is_admin} />
-      </div>
+        </div>
+      ) : (
+        <ChatMessageList
+          messages={messages}
+          isOwnMessage={(m) => !m.is_admin}
+          onLoadMore={loadOlder}
+          hasMore={hasMore}
+          isLoadingMore={isLoadingMore}
+          className="max-h-[400px]"
+        />
+      )}
 
       {/* Input — now with attachments */}
       <div className="border-t px-3 py-2">

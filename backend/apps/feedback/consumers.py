@@ -50,6 +50,33 @@ class FeedbackChatConsumer(AsyncJsonWebsocketConsumer):
         """Handle reward granted event."""
         await self.send_json(event)
 
+    async def message_edited(self, event):
+        """Handle message edited event."""
+        await self.send_json(event)
+
+    async def message_deleted(self, event):
+        """Handle message deleted event."""
+        await self.send_json(event)
+
+    async def typing(self, event):
+        """Handle typing indicator event."""
+        await self.send_json(event)
+
+    async def receive_json(self, content):
+        """Handle incoming messages from WebSocket clients (e.g. typing)."""
+        if content.get("type") == "typing":
+            user = self.scope.get("user")
+            sender_name = getattr(user, "username", "Admin") if user else "Admin"
+            is_admin = getattr(user, "is_staff", False) if user else False
+            await self.channel_layer.group_send(
+                self.group_name,
+                {
+                    "type": "typing",
+                    "sender_name": sender_name,
+                    "is_admin": is_admin,
+                },
+            )
+
     @database_sync_to_async
     def _check_access(self, user):
         """Check if user has access to conversation."""

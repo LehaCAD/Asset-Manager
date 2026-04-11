@@ -1,10 +1,12 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useFeedbackStore } from '@/lib/store/feedback'
 import { ChatMessageList } from './ChatMessageList'
 import { ChatInput } from './ChatInput'
 import { Badge } from '@/components/ui/badge'
+
+const PAGE_SIZE = 30
 
 export function FeedbackChat() {
   const {
@@ -12,17 +14,33 @@ export function FeedbackChat() {
     loadConversation, loadMessages, sendMessage, uploadAttachment,
     connectWS, disconnectWS, markAsRead,
   } = useFeedbackStore()
+  const typingIndicator = useFeedbackStore((s) => s.typingIndicator)
+
+  const [hasMore, setHasMore] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
 
   useEffect(() => {
     const init = async () => {
       await loadConversation()
-      await loadMessages()
+      const loaded = await loadMessages()
+      if (loaded.length < PAGE_SIZE) setHasMore(false)
       connectWS()
       markAsRead()
     }
     init()
     return () => disconnectWS()
   }, [])
+
+  const loadOlder = useCallback(async () => {
+    if (isLoadingMore || !messages.length) return
+    setIsLoadingMore(true)
+    try {
+      const loaded = await loadMessages(messages[0].id)
+      if (loaded.length < PAGE_SIZE) setHasMore(false)
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }, [isLoadingMore, messages, loadMessages])
 
   const handleSend = async (text: string) => {
     await sendMessage(text)
@@ -52,17 +70,32 @@ export function FeedbackChat() {
         </div>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-6 py-4">
-        {!conversation && !isLoading && (
-          <div className="flex flex-col items-center justify-center h-full text-center">
-            <p className="text-muted-foreground">
-              Нашли баг? Есть идея? Напишите — мы читаем каждое сообщение.
-            </p>
-          </div>
-        )}
-        <ChatMessageList messages={messages} isOwnMessage={(m) => !m.is_admin} />
-      </div>
+      {/* Messages — ChatMessageList owns its own scroll container */}
+      {!conversation && !isLoading ? (
+        <div className="flex-1 flex items-center justify-center text-center px-6">
+          <p className="text-muted-foreground">
+            Нашли баг? Есть идея? Напишите — мы читаем каждое сообщение.
+          </p>
+        </div>
+      ) : (
+        <ChatMessageList
+          messages={messages}
+          isOwnMessage={(m) => !m.is_admin}
+          onLoadMore={loadOlder}
+          hasMore={hasMore}
+          isLoadingMore={isLoadingMore}
+          lastReadAt={null}
+        />
+      )}
+
+      {/* Typing indicator */}
+      {typingIndicator && (
+        <div className="px-6 pb-1">
+          <span className="text-xs text-muted-foreground animate-pulse">
+            Поддержка печатает...
+          </span>
+        </div>
+      )}
 
       {/* Input */}
       <div className="border-t border-border/50 px-4 py-3">

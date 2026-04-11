@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
-import { ChargeIcon } from '@/components/ui/charge-icon'
+import { KadrIcon } from '@/components/ui/kadr-icon'
 
 interface RewardModalProps {
   open: boolean
@@ -26,6 +26,13 @@ export function RewardModal({ open, onOpenChange, onSubmit, userName }: RewardMo
   const [amount, setAmount] = useState('')
   const [comment, setComment] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (open) {
+      setAmount('')
+      setComment('')
+    }
+  }, [open])
 
   const handleSubmit = async () => {
     const numAmount = Number(amount)
@@ -53,7 +60,7 @@ export function RewardModal({ open, onOpenChange, onSubmit, userName }: RewardMo
       <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <ChargeIcon size="sm" />
+            <KadrIcon size="sm" />
             Начислить Кадры
           </DialogTitle>
         </DialogHeader>

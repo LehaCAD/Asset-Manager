@@ -11,6 +11,7 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
 interface ChatInputProps {
   onSend: (text: string) => Promise<void>
   onAttachment?: (file: File) => Promise<void>
+  onTyping?: () => void
   placeholder?: string
   showAttachButton?: boolean
 }
@@ -18,6 +19,7 @@ interface ChatInputProps {
 export function ChatInput({
   onSend,
   onAttachment,
+  onTyping,
   placeholder = 'Сообщение...',
   showAttachButton = true,
 }: ChatInputProps) {
@@ -139,7 +141,7 @@ export function ChatInput({
       <textarea
         ref={textareaRef}
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => { setText(e.target.value); onTyping?.() }}
         onInput={handleInput}
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}

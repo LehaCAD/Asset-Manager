@@ -97,6 +97,9 @@ export function MessageBubble({ message, isOwn, position }: MessageBubbleProps) 
         )}
 
         <p className={cn('text-[10px] text-right mt-0.5', timeColor)}>
+          {message.edited_at && (
+            <span className="mr-1 opacity-60">изм.</span>
+          )}
           {new Date(message.created_at).toLocaleTimeString('ru-RU', {
             hour: '2-digit',
             minute: '2-digit',

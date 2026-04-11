@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { ChevronDown, Loader2 } from 'lucide-react'
 import type { FeedbackMessage } from '@/lib/types'
 import { MessageBubble, type BubblePosition } from './MessageBubble'
 import { SystemMessage } from './SystemMessage'
@@ -10,6 +11,11 @@ import { SystemMessage } from './SystemMessage'
 interface ChatMessageListProps {
   messages: FeedbackMessage[]
   isOwnMessage: (msg: FeedbackMessage) => boolean
+  onLoadMore?: () => void
+  hasMore?: boolean
+  isLoadingMore?: boolean
+  lastReadAt?: string | null
+  className?: string
 }
 
 /* ── Helpers ───────────────────────────────────────────────── */
@@ -20,6 +26,7 @@ const MONTHS_GENITIVE = [
 ]
 
 const GROUP_WINDOW_MS = 5 * 60 * 1000 // 5 minutes
+const NEAR_BOTTOM_THRESHOLD = 150
 
 function isSystemMsg(msg: FeedbackMessage): boolean {
   return msg.text.startsWith('[SYS]') || msg.text.startsWith('\u26A1')
@@ -142,39 +149,195 @@ function buildGroupedMessages(
 
 /* ── Component ─────────────────────────────────────────────── */
 
-export function ChatMessageList({ messages, isOwnMessage }: ChatMessageListProps) {
+export function ChatMessageList({
+  messages,
+  isOwnMessage,
+  onLoadMore,
+  hasMore = false,
+  isLoadingMore = false,
+  lastReadAt,
+  className,
+}: ChatMessageListProps) {
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  const unreadSepRef = useRef<HTMLDivElement>(null)
+
+  const [isNearBottom, setIsNearBottom] = useState(true)
+  const [newMsgCount, setNewMsgCount] = useState(0)
+
+  const prevMessagesLenRef = useRef(0)
+  const prevScrollHeightRef = useRef(0)
+  const didInitialScrollRef = useRef(false)
+
+  /* ── Track scroll position ─────────────────────────────── */
+
+  const handleScroll = useCallback(() => {
+    const el = scrollContainerRef.current
+    if (!el) return
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    const nearBottom = distanceFromBottom < NEAR_BOTTOM_THRESHOLD
+    setIsNearBottom(nearBottom)
+    if (nearBottom) setNewMsgCount(0)
+  }, [])
+
+  /* ── Smart auto-scroll ─────────────────────────────────── */
 
   useEffect(() => {
+    const isNewMessage = messages.length > prevMessagesLenRef.current
+    const isInitialLoad = !didInitialScrollRef.current && messages.length > 0
+    const wasPrepend = prevScrollHeightRef.current > 0
+
+    prevMessagesLenRef.current = messages.length
+
+    if (isInitialLoad) {
+      didInitialScrollRef.current = true
+      // First load — scroll to unread separator or bottom
+      requestAnimationFrame(() => {
+        if (unreadSepRef.current) {
+          unreadSepRef.current.scrollIntoView({ block: 'center' })
+        } else {
+          bottomRef.current?.scrollIntoView()
+        }
+      })
+      return
+    }
+
+    // Preserve scroll position after prepending older messages
+    if (wasPrepend) {
+      const el = scrollContainerRef.current
+      if (el) {
+        const addedHeight = el.scrollHeight - prevScrollHeightRef.current
+        el.scrollTop += addedHeight
+      }
+      prevScrollHeightRef.current = 0
+      return
+    }
+
+    if (isNewMessage && isNearBottom) {
+      requestAnimationFrame(() => {
+        bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+      })
+    } else if (isNewMessage && !isNearBottom) {
+      setNewMsgCount((c) => c + 1)
+    }
+  }, [messages, isNearBottom])
+
+  /* ── Infinite scroll — IntersectionObserver at top ──────── */
+
+  useEffect(() => {
+    if (!onLoadMore || !hasMore) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !isLoadingMore) {
+          // Save scroll height before loading more
+          const el = scrollContainerRef.current
+          if (el) prevScrollHeightRef.current = el.scrollHeight
+          onLoadMore()
+        }
+      },
+      { root: scrollContainerRef.current, threshold: 0.1 },
+    )
+    if (sentinelRef.current) observer.observe(sentinelRef.current)
+    return () => observer.disconnect()
+  }, [onLoadMore, hasMore, isLoadingMore])
+
+  /* ── Jump to bottom ────────────────────────────────────── */
+
+  const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    setNewMsgCount(0)
+  }, [])
+
+  /* ── Build items ───────────────────────────────────────── */
 
   const items = buildGroupedMessages(messages)
 
-  return (
-    <>
-      {items.map(({ msg, position, isSystem, showDatePill, dateLabel, gapClass }) => (
-        <div key={msg.id} className={gapClass}>
-          {showDatePill && (
-            <div className="flex justify-center py-1.5">
-              <span className="bg-[#213040]/80 text-white/80 text-[11px] font-medium rounded-full px-3 py-0.5">
-                {dateLabel}
-              </span>
-            </div>
-          )}
+  // Pre-compute unread separator position
+  const lastReadDate = lastReadAt ? new Date(lastReadAt) : null
+  let unreadSepIdx = -1
+  if (lastReadDate) {
+    for (let i = 0; i < items.length; i++) {
+      const msgDate = new Date(items[i].msg.created_at)
+      if (msgDate > lastReadDate) {
+        // Only show separator if the previous message was at or before lastReadAt
+        const prevMsgDate = i > 0 ? new Date(items[i - 1].msg.created_at) : null
+        if (!prevMsgDate || prevMsgDate <= lastReadDate) {
+          unreadSepIdx = i
+        }
+        break
+      }
+    }
+  }
 
-          {isSystem ? (
-            <SystemMessage text={msg.text} createdAt={msg.created_at} />
-          ) : (
-            <MessageBubble
-              message={msg}
-              isOwn={isOwnMessage(msg)}
-              position={position}
-            />
+  /* ── Render ────────────────────────────────────────────── */
+
+  return (
+    <div
+      ref={scrollContainerRef}
+      onScroll={handleScroll}
+      className={`relative flex-1 overflow-y-auto ${className ?? ''}`}
+    >
+      <div className="px-4 py-3">
+        {/* Sentinel for infinite scroll — sits at top */}
+        {hasMore && <div ref={sentinelRef} className="h-1" />}
+        {isLoadingMore && (
+          <div className="flex justify-center py-2">
+            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+          </div>
+        )}
+
+        {/* Messages */}
+        {items.map(({ msg, position, isSystem, showDatePill, dateLabel, gapClass }, idx) => (
+          <div key={msg.id} className={gapClass}>
+            {/* Unread separator */}
+            {idx === unreadSepIdx && (
+              <div ref={unreadSepRef} className="flex items-center gap-3 py-2">
+                <div className="flex-1 h-px bg-primary/30" />
+                <span className="text-[11px] text-primary font-medium px-2">
+                  Новые сообщения
+                </span>
+                <div className="flex-1 h-px bg-primary/30" />
+              </div>
+            )}
+
+            {showDatePill && (
+              <div className="flex justify-center py-1.5">
+                <span className="bg-[#213040]/80 text-white/80 text-[11px] font-medium rounded-full px-3 py-0.5">
+                  {dateLabel}
+                </span>
+              </div>
+            )}
+
+            {isSystem ? (
+              <SystemMessage text={msg.text} createdAt={msg.created_at} />
+            ) : (
+              <MessageBubble
+                message={msg}
+                isOwn={isOwnMessage(msg)}
+                position={position}
+              />
+            )}
+          </div>
+        ))}
+
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Jump to bottom button */}
+      {!isNearBottom && (
+        <button
+          onClick={scrollToBottom}
+          className="absolute bottom-4 right-4 w-10 h-10 rounded-full bg-muted/90 border border-border/50 flex items-center justify-center shadow-lg hover:bg-muted transition-colors z-10"
+        >
+          <ChevronDown className="w-5 h-5 text-foreground" />
+          {newMsgCount > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] rounded-full bg-primary text-primary-foreground text-[10px] font-medium flex items-center justify-center px-1">
+              {newMsgCount}
+            </span>
           )}
-        </div>
-      ))}
-      <div ref={bottomRef} />
-    </>
+        </button>
+      )}
+    </div>
   )
 }

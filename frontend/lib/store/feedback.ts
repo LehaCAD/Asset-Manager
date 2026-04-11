@@ -10,9 +10,11 @@ interface FeedbackState {
   hasUnreadReply: boolean
   isLoading: boolean
   wsConnected: boolean
+  typingIndicator: boolean
+  _typingTimeout: ReturnType<typeof setTimeout> | null
 
   loadConversation: () => Promise<void>
-  loadMessages: (cursor?: number) => Promise<void>
+  loadMessages: (cursor?: number) => Promise<FeedbackMessage[]>
   sendMessage: (text: string) => Promise<FeedbackMessage | null>
   uploadAttachment: (messageId: number, file: File) => Promise<void>
   markAsRead: () => Promise<void>
@@ -30,6 +32,8 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => {
     hasUnreadReply: false,
     isLoading: false,
     wsConnected: false,
+    typingIndicator: false,
+    _typingTimeout: null,
 
     loadConversation: async () => {
       try {
@@ -42,13 +46,16 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => {
 
     loadMessages: async (cursor) => {
       const conv = get().conversation
-      if (!conv) return
+      if (!conv) return []
       set({ isLoading: true })
       try {
         const msgs = await feedbackApi.getMessages(cursor)
         set((s) => ({
           messages: cursor ? [...msgs, ...s.messages] : msgs,
         }))
+        return msgs
+      } catch {
+        return []
       } finally {
         set({ isLoading: false })
       }
@@ -115,6 +122,10 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => {
             // Auto mark-as-read since chat is open (WS connected = chat visible)
             if (msg.is_admin) {
               get().markAsRead()
+              // Clear typing indicator — admin finished typing
+              const prev = get()._typingTimeout
+              if (prev) clearTimeout(prev)
+              set({ typingIndicator: false, _typingTimeout: null })
             }
           }
         }
@@ -138,6 +149,26 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => {
               : null,
           }))
         }
+        if (event.type === 'message_edited') {
+          set((s) => ({
+            messages: s.messages.map((m) =>
+              m.id === event.message.id ? event.message : m
+            ),
+          }))
+        }
+        if (event.type === 'message_deleted') {
+          set((s) => ({
+            messages: s.messages.filter((m) => m.id !== event.message_id),
+          }))
+        }
+        if (event.type === 'typing') {
+          if (event.is_admin) {
+            const prev = get()._typingTimeout
+            if (prev) clearTimeout(prev)
+            const timeout = setTimeout(() => set({ typingIndicator: false }), 10_000)
+            set({ typingIndicator: true, _typingTimeout: timeout })
+          }
+        }
       })
       set({ wsConnected: true })
     },
@@ -145,7 +176,9 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => {
     disconnectWS: () => {
       wsUnsub?.()
       feedbackWS.disconnect()
-      set({ wsConnected: false })
+      const timeout = get()._typingTimeout
+      if (timeout) clearTimeout(timeout)
+      set({ wsConnected: false, typingIndicator: false, _typingTimeout: null })
     },
 
     checkUnread: async () => {

@@ -7,6 +7,9 @@ type FeedbackWSEvent =
   | { type: 'attachment_ready'; message_id: number; attachment: FeedbackAttachment }
   | { type: 'conversation_updated'; status: string; tag: string }
   | { type: 'reward_granted'; amount: string; comment: string; message: FeedbackMessage }
+  | { type: 'message_edited'; message: FeedbackMessage }
+  | { type: 'message_deleted'; message_id: number }
+  | { type: 'typing'; sender_name: string; is_admin: boolean }
 
 type Handler = (event: FeedbackWSEvent) => void
 
@@ -44,6 +47,12 @@ export class FeedbackWSManager {
   on(handler: Handler): () => void {
     this.handlers.add(handler)
     return () => this.handlers.delete(handler)
+  }
+
+  send(data: Record<string, unknown>): void {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(data))
+    }
   }
 
   get isConnected(): boolean {

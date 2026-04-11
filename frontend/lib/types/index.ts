@@ -708,6 +708,7 @@ export interface FeedbackMessage {
   text: string
   attachments: FeedbackAttachment[]
   created_at: string
+  edited_at: string | null
 }
 
 export interface FeedbackConversation {

@@ -51,6 +51,8 @@ class Message(models.Model):
     )
     is_admin = models.BooleanField(default=False)
     text = models.TextField(max_length=5000, blank=True)
+    edited_at = models.DateTimeField(null=True, blank=True)
+    is_deleted = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
