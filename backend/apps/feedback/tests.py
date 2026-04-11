@@ -151,7 +151,7 @@ class TestAdminAPI(TestCase):
         self.conv.refresh_from_db()
         self.assertEqual(self.conv.tag, Conversation.TAG_BUG)
 
-    @patch("apps.feedback.services.CreditsService")
+    @patch("apps.credits.services.CreditsService")
     @patch("apps.feedback.services.create_notification")
     @patch("apps.feedback.services.get_channel_layer")
     def test_grant_reward(self, mock_channel, mock_notify, mock_cs_class):
@@ -198,7 +198,7 @@ class TestAdminAPI(TestCase):
         )
         msg_id = resp.data["id"]
         # Admin can presign for their own message
-        with patch("apps.feedback.views.boto3.client") as mock_boto:
+        with patch("apps.common.s3.get_s3_client") as mock_boto:
             mock_s3 = MagicMock()
             mock_s3.generate_presigned_url.return_value = "https://s3.example.com/presigned"
             mock_boto.return_value = mock_s3
@@ -472,3 +472,129 @@ class TestAdvancedFeatures(TestCase):
         )
         self.assertEqual(resp.status_code, 201)
         self.assertIsNone(resp.data["edited_at"])
+
+    @patch("apps.feedback.services.get_channel_layer")
+    @patch("apps.feedback.services.create_notification")
+    def test_soft_delete_clears_attachments(self, mock_notify, mock_channel):
+        """Soft delete clears attachment file_key and marks expired."""
+        mock_channel.return_value = MagicMock()
+        # Create message and attachment
+        msg = _make_message(self.conv, self.user, text="with file")
+        att = Attachment.objects.create(
+            message=msg, file_key="feedback/1/test.jpg",
+            file_name="test.jpg", file_size=1000, content_type="image/jpeg",
+        )
+
+        with patch("apps.common.s3.get_s3_client") as mock_s3:
+            mock_client = MagicMock()
+            mock_s3.return_value = mock_client
+            resp = self.client.delete(f"/api/feedback/admin/messages/{msg.id}/")
+
+        self.assertEqual(resp.status_code, 204)
+        att.refresh_from_db()
+        self.assertEqual(att.file_key, "")
+        self.assertTrue(att.is_expired)
+
+
+class TestAdapterAndIntegration(TestCase):
+    """Tests for CreditsAdapter, S3 client, and integration points."""
+
+    def setUp(self):
+        self.admin = _make_user("admin", is_staff=True)
+        self.user = _make_user("user1")
+        self.conv = _make_conversation(self.user)
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.admin)
+
+    @patch("apps.credits.services.CreditsService")
+    @patch("apps.feedback.services.create_notification")
+    @patch("apps.feedback.services.get_channel_layer")
+    def test_credits_adapter_called_on_reward(self, mock_channel, mock_notify, mock_cs_class):
+        """CreditsAdapter correctly calls CreditsService.topup."""
+        mock_channel.return_value = MagicMock()
+        mock_cs = MagicMock()
+        mock_cs.topup.return_value = MagicMock(balance_after=Decimal("100"))
+        mock_cs_class.return_value = mock_cs
+
+        resp = self.client.post(
+            f"/api/feedback/admin/conversations/{self.conv.id}/reward/",
+            {"amount": "25", "comment": "Test reward"},
+        )
+        self.assertEqual(resp.status_code, 201)
+        mock_cs.topup.assert_called_once()
+        # Verify topup was called with correct reason
+        call_kwargs = mock_cs.topup.call_args
+        self.assertEqual(call_kwargs.kwargs.get('reason') or call_kwargs[1].get('reason'), 'feedback_reward')
+
+    def test_s3_client_import(self):
+        """Shared S3 client is importable and returns correct type."""
+        from apps.common.s3 import get_s3_client, get_bucket_name
+        # Just verify imports work — don't actually connect to S3
+        self.assertTrue(callable(get_s3_client))
+        self.assertTrue(callable(get_bucket_name))
+        bucket = get_bucket_name()
+        self.assertIsInstance(bucket, str)
+        self.assertTrue(len(bucket) > 0)
+
+    def test_feedback_utils_re_exports_s3(self):
+        """Feedback utils re-exports from common.s3."""
+        from apps.feedback.utils import get_s3_client
+        from apps.common.s3 import get_s3_client as common_s3
+        self.assertIs(get_s3_client, common_s3)
+
+    def test_user_last_read_at_in_conversation_serializer(self):
+        """ConversationSerializer includes user_last_read_at for unread separator."""
+        _make_message(self.conv, self.user, text="Hello")
+        user_client = APIClient()
+        user_client.force_authenticate(user=self.user)
+        resp = user_client.get("/api/feedback/conversation/")
+        self.assertIn("user_last_read_at", resp.data)
+
+    @patch("apps.feedback.services.get_channel_layer")
+    @patch("apps.feedback.services.create_notification")
+    def test_messages_page_size_30(self, mock_notify, mock_channel):
+        """Verify page size is 30, not 50."""
+        mock_channel.return_value = MagicMock()
+        for i in range(35):
+            _make_message(self.conv, self.user, text=f"msg {i}")
+
+        resp = self.client.get(f"/api/feedback/admin/conversations/{self.conv.id}/messages/")
+        self.assertEqual(len(resp.data), 30)
+
+    def test_unread_total_endpoint(self):
+        """Unread total returns correct count."""
+        _make_message(self.conv, self.user, text="unread msg")
+        resp = self.client.get("/api/feedback/admin/unread-total/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertGreater(resp.data["unread_total"], 0)
+
+    def test_unread_total_after_mark_read(self):
+        """Unread total returns 0 after marking conversation as read."""
+        _make_message(self.conv, self.user, text="msg")
+        self.client.post(f"/api/feedback/admin/conversations/{self.conv.id}/read/")
+        resp = self.client.get("/api/feedback/admin/unread-total/")
+        self.assertEqual(resp.data["unread_total"], 0)
+
+    @patch("apps.feedback.views.get_s3_client")
+    @patch("apps.feedback.services.get_channel_layer")
+    @patch("apps.feedback.services.create_notification")
+    def test_presign_uses_common_s3_client(self, mock_notify, mock_channel, mock_s3):
+        """Presign view uses the shared S3 client from apps.common."""
+        mock_channel.return_value = MagicMock()
+        mock_client = MagicMock()
+        mock_client.generate_presigned_url.return_value = "https://s3.example.com/presigned"
+        mock_s3.return_value = mock_client
+
+        # Admin sends message first
+        resp = self.client.post(
+            f"/api/feedback/admin/conversations/{self.conv.id}/messages/",
+            {"text": "check this"},
+        )
+        msg_id = resp.data["id"]
+
+        resp = self.client.post(
+            f"/api/feedback/messages/{msg_id}/presign/",
+            {"file_name": "test.png", "content_type": "image/png"},
+        )
+        self.assertEqual(resp.status_code, 200)
+        mock_s3.assert_called()  # Verify shared client was used
