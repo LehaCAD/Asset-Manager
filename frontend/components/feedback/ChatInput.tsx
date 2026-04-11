@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback } from 'react'
-import { Send, Paperclip } from 'lucide-react'
+import { ArrowUp, Paperclip } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 
@@ -31,13 +31,17 @@ export function ChatInput({
     if (el) {
       el.style.height = 'auto'
       el.style.height = '36px'
+      el.style.overflow = 'hidden'
     }
   }, [])
 
   const handleInput = useCallback((e: React.FormEvent<HTMLTextAreaElement>) => {
     const el = e.currentTarget
     el.style.height = 'auto'
-    el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+    const newHeight = Math.min(el.scrollHeight, 120)
+    el.style.height = newHeight + 'px'
+    // Only allow scrolling when at max height, keep scrollbar invisible
+    el.style.overflow = el.scrollHeight > 120 ? 'auto' : 'hidden'
   }, [])
 
   const handleSend = useCallback(async () => {
@@ -141,16 +145,17 @@ export function ChatInput({
         onPaste={handlePaste}
         placeholder={placeholder}
         rows={1}
-        className="flex-1 resize-none bg-muted/30 text-foreground rounded-lg text-sm border border-border/50 outline-none focus:border-primary/50 placeholder:text-muted-foreground min-h-9 max-h-[120px] px-3 py-2 transition-colors overflow-y-auto"
+        style={{ overflow: 'hidden' }}
+        className="flex-1 resize-none bg-muted/30 text-foreground rounded-lg text-sm border border-border/50 outline-none focus:border-primary/50 placeholder:text-muted-foreground min-h-9 max-h-[120px] px-3 py-2 transition-colors [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       />
 
       <Button
         size="icon"
         onClick={handleSend}
         disabled={!text.trim() || isSending}
-        className="h-9 w-9 shrink-0 rounded-lg bg-primary hover:bg-primary/90"
+        className="h-9 w-9 shrink-0 rounded-full bg-primary hover:bg-primary/90"
       >
-        <Send className="w-4 h-4" />
+        <ArrowUp className="w-4 h-4" />
       </Button>
     </div>
   )
