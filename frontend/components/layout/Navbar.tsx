@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LogOut, User, Clapperboard, HardDrive, LayoutDashboard, Bell, Inbox } from "lucide-react";
+import { LogOut, User, Clapperboard, HardDrive, LayoutDashboard, Bell } from "lucide-react";
 import { KadrIcon } from "@/components/ui/kadr-icon";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,7 +25,6 @@ import { formatCurrency, formatStorage } from "@/lib/utils/format";
 import { TrialBanner } from "@/components/subscription/TrialBanner";
 import { FeedbackButton } from "@/components/feedback/FeedbackButton";
 import { OnboardingProgress } from "@/components/onboarding/OnboardingProgress";
-import { useFeedbackAdminStore } from "@/lib/store/feedback-admin";
 
 export function Navbar() {
   const user = useAuthStore((s) => s.user);
@@ -36,7 +35,6 @@ export function Navbar() {
   const balance = useCreditsStore((s) => s.balance);
   const loadBalance = useCreditsStore((s) => s.loadBalance);
 
-  const totalUnread = useFeedbackAdminStore((s) => s.totalUnread);
   const unreadCount = useNotificationStore((s) => s.unreadCount);
   const fetchUnreadCount = useNotificationStore((s) => s.fetchUnreadCount);
   const addNotification = useNotificationStore((s) => s.addNotification);
@@ -132,22 +130,6 @@ export function Navbar() {
 
           {/* Обратная связь */}
           {user && <FeedbackButton />}
-
-          {/* Входящие — только для админа */}
-          {user?.is_staff && (
-            <Link
-              href="/cabinet/inbox"
-              className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-muted/50 border border-border/50 text-foreground hover:bg-muted transition-colors"
-            >
-              <Inbox className="w-4 h-4" />
-              <span className="hidden sm:inline">Входящие</span>
-              {totalUnread > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-primary text-primary-foreground text-[10px] font-medium flex items-center justify-center px-1">
-                  {totalUnread > 99 ? '99+' : totalUnread}
-                </span>
-              )}
-            </Link>
-          )}
 
           {/* Колокольчик уведомлений */}
           {user && (
