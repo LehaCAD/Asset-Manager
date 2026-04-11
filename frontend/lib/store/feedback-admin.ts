@@ -46,10 +46,6 @@ export const useFeedbackAdminStore = create<FeedbackAdminState>((set, get) => {
         const convs = await feedbackApi.getConversations(get().filters)
         const totalUnread = convs.reduce((sum, c) => sum + c.unread_by_admin, 0)
         set({ conversations: convs, totalUnread })
-        // Auto-select first conversation if none active
-        if (convs.length > 0 && !get().activeConversation) {
-          await get().selectConversation(convs[0].id)
-        }
       } finally {
         set({ isLoading: false })
       }

@@ -3,8 +3,8 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LogOut, User, Clapperboard, HardDrive, LayoutDashboard, Bell } from "lucide-react";
-import { ChargeIcon } from "@/components/ui/charge-icon";
+import { LogOut, User, Clapperboard, HardDrive, LayoutDashboard, Bell, Inbox } from "lucide-react";
+import { KadrIcon } from "@/components/ui/kadr-icon";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -25,6 +25,7 @@ import { formatCurrency, formatStorage } from "@/lib/utils/format";
 import { TrialBanner } from "@/components/subscription/TrialBanner";
 import { FeedbackButton } from "@/components/feedback/FeedbackButton";
 import { OnboardingProgress } from "@/components/onboarding/OnboardingProgress";
+import { useFeedbackAdminStore } from "@/lib/store/feedback-admin";
 
 export function Navbar() {
   const user = useAuthStore((s) => s.user);
@@ -35,6 +36,7 @@ export function Navbar() {
   const balance = useCreditsStore((s) => s.balance);
   const loadBalance = useCreditsStore((s) => s.loadBalance);
 
+  const totalUnread = useFeedbackAdminStore((s) => s.totalUnread);
   const unreadCount = useNotificationStore((s) => s.unreadCount);
   const fetchUnreadCount = useNotificationStore((s) => s.fetchUnreadCount);
   const addNotification = useNotificationStore((s) => s.addNotification);
@@ -120,7 +122,7 @@ export function Navbar() {
           {/* Баланс */}
           {user && (
             <div className="flex items-center gap-1.5 h-7 px-3 rounded bg-success/10 border border-success/20">
-              <ChargeIcon size="sm" />
+              <KadrIcon size="sm" />
               <span className="text-xs font-medium text-foreground">{formatCurrency(balance)}</span>
             </div>
           )}
@@ -130,6 +132,22 @@ export function Navbar() {
 
           {/* Обратная связь */}
           {user && <FeedbackButton />}
+
+          {/* Входящие — только для админа */}
+          {user?.is_staff && (
+            <Link
+              href="/cabinet/inbox"
+              className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-muted/50 border border-border/50 text-foreground hover:bg-muted transition-colors"
+            >
+              <Inbox className="w-4 h-4" />
+              <span className="hidden sm:inline">Входящие</span>
+              {totalUnread > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-primary text-primary-foreground text-[10px] font-medium flex items-center justify-center px-1">
+                  {totalUnread > 99 ? '99+' : totalUnread}
+                </span>
+              )}
+            </Link>
+          )}
 
           {/* Колокольчик уведомлений */}
           {user && (
@@ -187,18 +205,27 @@ export function Navbar() {
                     <div className="flex items-start gap-3 text-xs text-muted-foreground">
                       <HardDrive className="h-3.5 w-3.5 shrink-0 mt-0.5" strokeWidth={1.75} />
                       <div className="flex-1 min-w-0 flex flex-col gap-2">
-                        <div className="text-foreground text-xs whitespace-nowrap">
-                          {formatStorage(user.quota.storage_used_bytes ?? 0)}{" "}
-                          <span className="text-muted-foreground">/ {formatStorage(user.quota.storage_limit_bytes ?? 0)}</span>
-                        </div>
-                        <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all bg-primary"
-                            style={{
-                              width: `${Math.max(Math.min(Math.round(((user.quota.storage_used_bytes ?? 0) / (user.quota.storage_limit_bytes || 1)) * 100), 100), (user.quota.storage_used_bytes ?? 0) > 0 ? 4 : 0)}%`,
-                            }}
-                          />
-                        </div>
+                        {user.quota.storage_limit_bytes === 0 ? (
+                          <div className="text-foreground text-xs whitespace-nowrap">
+                            Хранилище:{" "}
+                            <span className="text-muted-foreground">безлимит</span>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="text-foreground text-xs whitespace-nowrap">
+                              {formatStorage(user.quota.storage_used_bytes ?? 0)}{" "}
+                              <span className="text-muted-foreground">/ {formatStorage(user.quota.storage_limit_bytes ?? 0)}</span>
+                            </div>
+                            <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all bg-primary"
+                                style={{
+                                  width: `${Math.max(Math.min(Math.round(((user.quota.storage_used_bytes ?? 0) / (user.quota.storage_limit_bytes || 1)) * 100), 100), (user.quota.storage_used_bytes ?? 0) > 0 ? 4 : 0)}%`,
+                                }}
+                              />
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
                   </DropdownMenuLabel>
