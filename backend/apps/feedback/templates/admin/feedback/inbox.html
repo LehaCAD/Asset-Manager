@@ -607,9 +607,12 @@ function handleKey(e) {
 }
 
 function autoGrow(el) {
-  el.style.height = 'auto';
-  const newH = Math.min(el.scrollHeight, 120);
-  el.style.height = newH + 'px';
+  // Reset to min-height first to allow shrinking
+  el.style.height = '38px';
+  // Only grow if content actually overflows
+  if (el.scrollHeight > el.clientHeight) {
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  }
   el.style.overflow = el.scrollHeight > 120 ? 'auto' : 'hidden';
 }
 

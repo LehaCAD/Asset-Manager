@@ -28,24 +28,22 @@ def get_user_from_session(scope):
     """Получить пользователя из Django session (для admin WebSocket)."""
     try:
         from django.contrib.sessions.models import Session
-        from django.contrib.auth import get_user_model
-        User = get_user_model()
-        cookies = dict(
-            item.split('=', 1) for item in
-            scope.get('headers', {}).get(b'cookie', b'').decode().split('; ')
-            if '=' in item
-        ) if isinstance(scope.get('headers'), dict) else {}
-        # Parse cookies from headers list
-        if not cookies:
-            for header_name, header_value in scope.get('headers', []):
-                if header_name == b'cookie':
-                    cookies = dict(
-                        item.strip().split('=', 1) for item in
-                        header_value.decode().split(';')
-                        if '=' in item
-                    )
-                    break
-        session_key = cookies.get('sessionid', '').strip()
+        # ASGI headers: list of (name: bytes, value: bytes) tuples
+        cookie_header = b''
+        for header_name, header_value in scope.get('headers', []):
+            if header_name == b'cookie':
+                cookie_header = header_value
+                break
+        if not cookie_header:
+            return AnonymousUser()
+        # Parse "sessionid=abc123; csrftoken=xyz; ..."
+        cookies = {}
+        for part in cookie_header.decode().split(';'):
+            part = part.strip()
+            if '=' in part:
+                k, v = part.split('=', 1)
+                cookies[k.strip()] = v.strip()
+        session_key = cookies.get('sessionid', '')
         if not session_key:
             return AnonymousUser()
         session = Session.objects.get(session_key=session_key)
