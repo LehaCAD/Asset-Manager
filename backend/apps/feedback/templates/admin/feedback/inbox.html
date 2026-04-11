@@ -104,7 +104,7 @@
   }
 
   /* ─── Chat panel ─── */
-  #chat-panel { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--chat-bg); }
+  #chat-panel { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--chat-bg); position: relative; }
   #chat-empty { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 14px; }
 
   #chat-header {
@@ -230,6 +230,36 @@
   .modal-actions .chat-btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
   .modal-actions .chat-btn-primary:hover { background: #4A8BC4; }
 
+  /* ─── Jump-to-bottom button ─── */
+  .jump-to-bottom {
+    position: absolute; bottom: 80px; right: 24px;
+    width: 40px; height: 40px; border-radius: 50%;
+    background: var(--sidebar-bg); border: 1px solid var(--border);
+    color: var(--text-secondary); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    transition: all 0.15s; z-index: 5;
+  }
+  .jump-to-bottom:hover { background: var(--sidebar-hover); color: var(--text-primary); }
+  .jump-badge {
+    position: absolute; top: -4px; right: -4px;
+    min-width: 18px; height: 18px; border-radius: 9px;
+    background: var(--badge-bg); color: #fff; font-size: 10px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 4px; font-weight: 600;
+  }
+
+  /* ─── Message edit button ─── */
+  .msg-edit-btn {
+    position: absolute; top: 2px; right: -28px;
+    width: 24px; height: 24px; border-radius: 50%;
+    background: var(--sidebar-bg); border: 1px solid var(--border);
+    color: var(--text-muted); cursor: pointer; font-size: 12px;
+    display: none; align-items: center; justify-content: center;
+  }
+  .msg-bubble.admin:hover .msg-edit-btn { display: flex; }
+  .msg-edit-btn:hover { color: var(--text-primary); background: var(--sidebar-hover); }
+
   /* ─── Responsive: admin messages right-aligned on narrow screens ─── */
   @media (max-width: 768px) {
     .msg-group.admin-msg { flex-direction: row-reverse; }
@@ -278,6 +308,10 @@ let messages = [];
 let pollTimer = null;
 let statusFilter = '';
 let searchQuery = '';
+let hasMore = true;
+let loadingMore = false;
+let isNearBottom = true;
+let newMsgCount = 0;
 
 // ─── API helpers ─────────────────────────────────────
 async function api(path, opts = {}) {
@@ -343,6 +377,9 @@ function renderConversations() {
 // ─── Select conversation ─────────────────────────────
 async function selectConv(id) {
   activeId = id;
+  hasMore = true;
+  isNearBottom = true;
+  newMsgCount = 0;
   renderConversations();
   const conv = conversations.find(c => c.id === id);
   if (!conv) return;
@@ -392,6 +429,32 @@ function renderChat(conv) {
     </div>`;
   renderMessages();
   scrollToBottom();
+
+  // Jump-to-bottom button
+  const jumpBtn = document.createElement('button');
+  jumpBtn.className = 'jump-to-bottom';
+  jumpBtn.style.display = 'none';
+  jumpBtn.innerHTML = '\u2193';
+  jumpBtn.onclick = () => {
+    scrollToBottom();
+    newMsgCount = 0;
+    jumpBtn.style.display = 'none';
+  };
+  document.getElementById('chat-panel').appendChild(jumpBtn);
+
+  // Scroll listener for infinite scroll + smart auto-scroll
+  const chatMsgs = document.getElementById('chat-messages');
+  if (chatMsgs) {
+    chatMsgs.addEventListener('scroll', () => {
+      const dist = chatMsgs.scrollHeight - chatMsgs.scrollTop - chatMsgs.clientHeight;
+      isNearBottom = dist < 150;
+      if (isNearBottom) {
+        newMsgCount = 0;
+        jumpBtn.style.display = 'none';
+      }
+      if (chatMsgs.scrollTop < 50) loadOlderMessages();
+    });
+  }
 }
 
 // ─── Telegram-style message rendering with grouping ──
@@ -450,12 +513,13 @@ function renderMessages() {
 
     html += `<div class="msg-content">`;
 
-    html += `<div class="msg-bubble ${bubbleClass} ${cornerClass}">${escHtml(m.text)}${attachments}<div class="msg-time">${formatHHMM(m.created_at)}</div></div>`;
+    const editBtn = m.is_admin ? `<button class="msg-edit-btn" onclick="editMessage(${m.id}, this)" title="Редактировать">✎</button>` : '';
+    const editedLabel = m.edited_at ? '<span style="opacity:0.6;margin-right:3px">изм.</span>' : '';
+    html += `<div class="msg-bubble ${bubbleClass} ${cornerClass}">${escHtml(m.text)}${attachments}${editBtn}<div class="msg-time">${editedLabel}${formatHHMM(m.created_at)}</div></div>`;
     html += `</div></div>`;
   }
 
   el.innerHTML = html;
-  scrollToBottom();
 }
 
 // ─── Actions ─────────────────────────────────────────
@@ -473,6 +537,7 @@ async function sendReply() {
   if (msg) {
     messages.push(msg);
     renderMessages();
+    scrollToBottom();
   }
 }
 
@@ -564,6 +629,7 @@ async function submitReward(convId) {
   closeRewardModal();
   messages = await api(`${API}/conversations/${convId}/messages/`) || [];
   renderMessages();
+  scrollToBottom();
   loadConversations();
 }
 
@@ -577,12 +643,26 @@ function startPolling(convId) {
       const lastOld = messages.length ? messages[messages.length - 1].id : null;
       const lastNew = fresh.length ? fresh[fresh.length - 1].id : null;
       if (lastNew !== lastOld || fresh.length !== messages.length) {
+        const prevLen = messages.length;
         messages = fresh;
         renderMessages();
+        if (!isNearBottom) {
+          const added = fresh.length - prevLen;
+          if (added > 0) newMsgCount += added;
+          const btn = document.querySelector('.jump-to-bottom');
+          if (btn) {
+            btn.style.display = 'flex';
+            btn.innerHTML = newMsgCount > 0
+              ? `\u2193<span class="jump-badge">${newMsgCount}</span>`
+              : '\u2193';
+          }
+        } else {
+          scrollToBottom();
+        }
       }
     }
     loadConversations();
-  }, 5000);
+  }, 30000);
 }
 
 // ─── Filters ─────────────────────────────────────────
@@ -603,6 +683,83 @@ document.getElementById('search-input').addEventListener('input', (e) => {
     loadConversations();
   }, 300);
 });
+
+// ─── Infinite scroll — load older messages ──────────
+async function loadOlderMessages() {
+  if (!activeId || !messages.length || loadingMore || !hasMore) return;
+  loadingMore = true;
+  const oldest = messages[0];
+  const el = document.getElementById('chat-messages');
+  const prevHeight = el ? el.scrollHeight : 0;
+
+  const older = await api(`${API}/conversations/${activeId}/messages/?cursor=${oldest.id}`);
+  if (!older || older.length === 0) {
+    hasMore = false;
+    loadingMore = false;
+    return;
+  }
+  if (older.length < 30) hasMore = false;
+  messages = [...older, ...messages];
+  renderMessages();
+
+  // Preserve scroll position
+  if (el) {
+    const addedHeight = el.scrollHeight - prevHeight;
+    el.scrollTop += addedHeight;
+  }
+  loadingMore = false;
+}
+
+// ─── Message editing ────────────────────────────────
+async function editMessage(msgId, btn) {
+  const msg = messages.find(m => m.id === msgId);
+  if (!msg) return;
+
+  const bubble = btn.closest('.msg-bubble');
+  const originalText = msg.text;
+  bubble.innerHTML = `
+    <textarea class="edit-textarea" style="width:100%;min-height:40px;max-height:120px;resize:none;background:transparent;color:var(--text-primary);border:1px solid var(--accent);border-radius:6px;padding:6px 8px;font-size:13px;font-family:inherit;outline:none;overflow:hidden;scrollbar-width:none;">${escHtml(originalText)}</textarea>
+    <div style="display:flex;gap:4px;margin-top:4px;justify-content:flex-end;">
+      <button class="chat-btn" onclick="cancelEdit(${msgId})" style="padding:2px 10px;font-size:11px;">Отмена</button>
+      <button class="chat-btn" onclick="saveEdit(${msgId})" style="padding:2px 10px;font-size:11px;background:var(--accent);color:#fff;border-color:var(--accent);">Сохранить</button>
+    </div>
+  `;
+
+  const textarea = bubble.querySelector('.edit-textarea');
+  textarea.focus();
+  textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+  textarea.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+  });
+  textarea.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEdit(msgId); }
+    if (e.key === 'Escape') cancelEdit(msgId);
+  });
+}
+
+async function saveEdit(msgId) {
+  const textarea = document.querySelector('.edit-textarea');
+  if (!textarea) return;
+  const text = textarea.value.trim();
+  if (!text) return;
+
+  const updated = await api(`${API}/messages/${msgId}/`, {
+    method: 'PATCH',
+    body: JSON.stringify({ text }),
+  });
+  if (updated) {
+    const idx = messages.findIndex(m => m.id === msgId);
+    if (idx >= 0) messages[idx] = updated;
+    renderMessages();
+    if (isNearBottom) scrollToBottom();
+  }
+}
+
+function cancelEdit(msgId) {
+  renderMessages();
+  if (isNearBottom) scrollToBottom();
+}
 
 // ─── Helpers ─────────────────────────────────────────
 function formatTime(iso) {

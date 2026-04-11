@@ -17,6 +17,7 @@ export function AdminFeedbackInbox() {
       disconnectWS()
     }
   }, [startPolling, stopPolling, disconnectWS])
+  // Polling interval is 60s (defined in store) — just for new conversations
 
   return (
     <div className="flex flex-1 h-full min-h-0">

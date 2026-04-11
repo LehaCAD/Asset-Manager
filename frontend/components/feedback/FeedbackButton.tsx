@@ -10,10 +10,10 @@ export function FeedbackButton() {
   const hasUnreadReply = useFeedbackStore((s) => s.hasUnreadReply)
   const checkUnread = useFeedbackStore((s) => s.checkUnread)
 
+  // Check once on mount — no polling.
+  // WS connection (via Navbar) updates hasUnreadReply reactively.
   useEffect(() => {
     checkUnread()
-    const interval = setInterval(checkUnread, 30000)
-    return () => clearInterval(interval)
   }, [checkUnread])
 
   return (

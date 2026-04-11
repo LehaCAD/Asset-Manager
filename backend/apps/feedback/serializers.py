@@ -34,7 +34,7 @@ class MessageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Message
-        fields = ["id", "sender_name", "is_admin", "text", "attachments", "created_at"]
+        fields = ["id", "sender_name", "is_admin", "text", "attachments", "edited_at", "created_at"]
 
 
 class ConversationSerializer(serializers.ModelSerializer):
@@ -45,6 +45,7 @@ class ConversationSerializer(serializers.ModelSerializer):
         model = Conversation
         fields = [
             "id", "status", "tag", "created_at", "updated_at",
+            "user_last_read_at",
             "last_message_preview", "unread_count",
         ]
 
@@ -93,8 +94,10 @@ class AdminConversationUserSerializer(serializers.Serializer):
 class AdminConversationListSerializer(serializers.ModelSerializer):
     user = AdminConversationUserSerializer(read_only=True)
     last_message_preview = serializers.SerializerMethodField()
-    unread_by_admin = serializers.SerializerMethodField()
-    rewards_total = serializers.SerializerMethodField()
+    unread_by_admin = serializers.IntegerField(source='unread_count', read_only=True)
+    rewards_total = serializers.DecimalField(
+        source='total_rewards', max_digits=10, decimal_places=2, read_only=True
+    )
 
     class Meta:
         model = Conversation
@@ -104,19 +107,14 @@ class AdminConversationListSerializer(serializers.ModelSerializer):
         ]
 
     def get_last_message_preview(self, obj):
-        msg = obj.messages.order_by("-created_at").first()
-        if not msg:
+        # Use annotated fields from the view queryset — no extra queries
+        if obj.last_msg_created_at is None:
             return None
-        return {"text": msg.text[:100], "is_admin": msg.is_admin, "created_at": msg.created_at.isoformat()}
-
-    def get_unread_by_admin(self, obj):
-        if not obj.admin_last_read_at:
-            return obj.messages.filter(is_admin=False).count()
-        return obj.messages.filter(is_admin=False, created_at__gt=obj.admin_last_read_at).count()
-
-    def get_rewards_total(self, obj):
-        total = sum(r.amount for r in obj.rewards.all())
-        return str(total)
+        return {
+            "text": (obj.last_msg_text or "")[:100],
+            "is_admin": bool(obj.last_msg_is_admin),
+            "created_at": obj.last_msg_created_at.isoformat(),
+        }
 
 
 class AdminConversationUpdateSerializer(serializers.Serializer):

@@ -4,6 +4,8 @@ import uuid
 import boto3
 from django.conf import settings
 from django.db import models
+from django.db.models import Q, F, Subquery, OuterRef, Count, Sum
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.authentication import SessionAuthentication
@@ -11,7 +13,7 @@ from rest_framework.decorators import api_view, authentication_classes, permissi
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 
-from .models import Conversation, Message, Attachment
+from .models import Conversation, Message, Attachment, FeedbackReward
 from .serializers import (
     ConversationSerializer,
     MessageSerializer,
@@ -56,10 +58,10 @@ def messages_view(request):
         if not conv:
             return Response([])
         cursor = request.query_params.get("cursor")
-        qs = conv.messages.select_related("sender").prefetch_related("attachments")
+        qs = conv.messages.filter(is_deleted=False).select_related("sender").prefetch_related("attachments")
         if cursor:
             qs = qs.filter(id__lt=int(cursor))
-        messages = qs.order_by("-created_at")[:50]
+        messages = qs.order_by("-created_at")[:30]
         return Response(MessageSerializer(reversed(list(messages)), many=True).data)
 
     ser = SendMessageSerializer(data=request.data)
@@ -186,12 +188,49 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 ADMIN_AUTH = [SessionAuthentication, JWTAuthentication]
 
 
+def _annotated_conversations_qs():
+    """Queryset with annotations for AdminConversationListSerializer.
+
+    Replaces prefetch_related('messages', 'rewards') with DB-level aggregation,
+    reducing ~3N+1 queries to ~4 subqueries regardless of conversation count.
+    """
+    last_msg_sub = Message.objects.filter(
+        conversation=OuterRef('pk'), is_deleted=False
+    ).order_by('-created_at')
+
+    return Conversation.objects.select_related("user").annotate(
+        last_msg_text=Subquery(last_msg_sub.values('text')[:1]),
+        last_msg_is_admin=Subquery(last_msg_sub.values('is_admin')[:1]),
+        last_msg_created_at=Subquery(last_msg_sub.values('created_at')[:1]),
+        unread_count=Count(
+            'messages',
+            filter=Q(
+                messages__is_admin=False,
+                messages__is_deleted=False,
+            ) & (
+                Q(admin_last_read_at__isnull=True)
+                | Q(messages__created_at__gt=F('admin_last_read_at'))
+            )
+        ),
+        total_rewards=Coalesce(
+            Subquery(
+                FeedbackReward.objects.filter(conversation=OuterRef('pk'))
+                .values('conversation')
+                .annotate(total=Sum('amount'))
+                .values('total')[:1]
+            ),
+            0,
+            output_field=models.DecimalField()
+        ),
+    )
+
+
 @api_view(["GET"])
 @authentication_classes(ADMIN_AUTH)
 @permission_classes([IsAdminUser])
 def admin_conversations_list(request):
-    """Список всех диалогов с фильтрами."""
-    qs = Conversation.objects.select_related("user").prefetch_related("messages", "rewards")
+    """Список всех диалогов с фильтрами — оптимизированный."""
+    qs = _annotated_conversations_qs()
 
     status_filter = request.query_params.get("status")
     if status_filter:
@@ -204,8 +243,8 @@ def admin_conversations_list(request):
     search = request.query_params.get("search")
     if search:
         qs = qs.filter(
-            models.Q(user__username__icontains=search)
-            | models.Q(user__email__icontains=search)
+            Q(user__username__icontains=search)
+            | Q(user__email__icontains=search)
         )
 
     return Response(AdminConversationListSerializer(qs[:500], many=True).data)
@@ -216,8 +255,10 @@ def admin_conversations_list(request):
 @permission_classes([IsAdminUser])
 def admin_conversation_detail(request, conversation_id):
     """GET: детали диалога. PATCH: обновить status/tag."""
+    qs = _annotated_conversations_qs()
+
     try:
-        conv = Conversation.objects.select_related("user").get(id=conversation_id)
+        conv = qs.get(id=conversation_id)
     except Conversation.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -232,6 +273,8 @@ def admin_conversation_detail(request, conversation_id):
     conv.save(update_fields=list(ser.validated_data.keys()))
 
     notify_conversation_updated(conv)
+    # Re-fetch with annotations after update
+    conv = qs.get(id=conversation_id)
     return Response(AdminConversationListSerializer(conv).data)
 
 
@@ -247,10 +290,10 @@ def admin_conversation_messages(request, conversation_id):
 
     if request.method == "GET":
         cursor = request.query_params.get("cursor")
-        qs = conv.messages.select_related("sender").prefetch_related("attachments")
+        qs = conv.messages.filter(is_deleted=False).select_related("sender").prefetch_related("attachments")
         if cursor:
             qs = qs.filter(id__lt=int(cursor))
-        messages = qs.order_by("-created_at")[:50]
+        messages = qs.order_by("-created_at")[:30]
         return Response(MessageSerializer(reversed(list(messages)), many=True).data)
 
     ser = SendMessageSerializer(data=request.data)
@@ -316,12 +359,57 @@ def admin_unread_total(request):
     return Response({"unread_total": total})
 
 
-@api_view(["DELETE"])
+@api_view(["PATCH", "DELETE"])
 @authentication_classes(ADMIN_AUTH)
 @permission_classes([IsAdminUser])
-def admin_delete_message(request, message_id):
-    """Удалить сообщение (модерация)."""
-    deleted, _ = Message.objects.filter(id=message_id).delete()
-    if not deleted:
+def admin_message_actions(request, message_id):
+    """PATCH: edit admin message. DELETE: soft-delete any message (moderation)."""
+    from .services import _send_to_conversation
+
+    if request.method == "PATCH":
+        msg = Message.objects.filter(id=message_id, is_admin=True, is_deleted=False).first()
+        if not msg:
+            return Response({"detail": "Сообщение не найдено"}, status=status.HTTP_404_NOT_FOUND)
+
+        text = request.data.get("text", "").strip()
+        if not text:
+            return Response({"detail": "Текст не может быть пустым"}, status=status.HTTP_400_BAD_REQUEST)
+
+        msg.text = text
+        msg.edited_at = timezone.now()
+        msg.save(update_fields=["text", "edited_at"])
+
+        _send_to_conversation(msg.conversation_id, {
+            "type": "message_edited",
+            "message": MessageSerializer(msg).data,
+        })
+        return Response(MessageSerializer(msg).data)
+
+    # DELETE — soft delete
+    msg = Message.objects.filter(id=message_id, is_deleted=False).first()
+    if not msg:
         return Response(status=status.HTTP_404_NOT_FOUND)
+
+    conversation_id = msg.conversation_id
+    msg.is_deleted = True
+    msg.text = ""
+    msg.save(update_fields=["is_deleted", "text"])
+
+    # Delete attachments from S3
+    for att in msg.attachments.all():
+        if att.file_key:
+            try:
+                from .utils import get_s3_client
+                client = get_s3_client()
+                client.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=att.file_key)
+            except Exception:
+                pass
+            att.file_key = ""
+            att.is_expired = True
+            att.save(update_fields=["file_key", "is_expired"])
+
+    _send_to_conversation(conversation_id, {
+        "type": "message_deleted",
+        "message_id": message_id,
+    })
     return Response(status=status.HTTP_204_NO_CONTENT)

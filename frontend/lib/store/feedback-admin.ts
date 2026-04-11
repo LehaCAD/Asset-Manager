@@ -17,6 +17,7 @@ interface FeedbackAdminState {
 
   loadConversations: () => Promise<void>
   selectConversation: (id: number) => Promise<void>
+  loadOlderMessages: () => Promise<FeedbackMessage[]>
   sendReply: (text: string) => Promise<FeedbackMessage | null>
   updateConversation: (id: number, data: { status?: string; tag?: string }) => Promise<void>
   grantReward: (id: number, amount: number, comment: string) => Promise<void>
@@ -26,6 +27,7 @@ interface FeedbackAdminState {
   startPolling: () => void
   stopPolling: () => void
   uploadAttachment: (messageId: number, file: File) => Promise<void>
+  sendTyping: () => void
 }
 
 export const useFeedbackAdminStore = create<FeedbackAdminState>((set, get) => {
@@ -66,6 +68,20 @@ export const useFeedbackAdminStore = create<FeedbackAdminState>((set, get) => {
           ),
         }))
         get().connectWS(id)
+      }
+    },
+
+    loadOlderMessages: async () => {
+      const conv = get().activeConversation
+      const current = get().messages
+      if (!conv || !current.length) return []
+      try {
+        const oldest = current[0]
+        const msgs = await feedbackApi.getConversationMessages(conv.id, oldest.id)
+        set((s) => ({ messages: [...msgs, ...s.messages] }))
+        return msgs
+      } catch {
+        return []
       }
     },
 
@@ -143,6 +159,18 @@ export const useFeedbackAdminStore = create<FeedbackAdminState>((set, get) => {
             }),
           }))
         }
+        if (event.type === 'message_edited') {
+          set((s) => ({
+            messages: s.messages.map((m) =>
+              m.id === event.message.id ? event.message : m
+            ),
+          }))
+        }
+        if (event.type === 'message_deleted') {
+          set((s) => ({
+            messages: s.messages.filter((m) => m.id !== event.message_id),
+          }))
+        }
       })
     },
 
@@ -152,7 +180,9 @@ export const useFeedbackAdminStore = create<FeedbackAdminState>((set, get) => {
     },
 
     startPolling: () => {
-      const interval = setInterval(() => get().loadConversations(), 30000)
+      // 60s — only needed for detecting new conversations; active conversation
+      // updates come via WebSocket
+      const interval = setInterval(() => get().loadConversations(), 60000)
       set({ _pollInterval: interval as unknown as ReturnType<typeof setInterval> })
     },
     stopPolling: () => {
@@ -170,6 +200,10 @@ export const useFeedbackAdminStore = create<FeedbackAdminState>((set, get) => {
       await feedbackApi.adminConfirmAttachment(
         messageId, presign.file_key, file.name, file.size, file.type,
       )
+    },
+
+    sendTyping: () => {
+      adminFeedbackWS.send({ type: 'typing' })
     },
   }
 })
