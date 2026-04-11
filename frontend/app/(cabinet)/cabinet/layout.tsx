@@ -15,8 +15,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/lib/store/auth";
-import { ChargeIcon } from "@/components/ui/charge-icon";
+import { KadrIcon } from "@/components/ui/kadr-icon";
 import { useCreditsStore } from "@/lib/store/credits";
+import { useFeedbackAdminStore } from "@/lib/store/feedback-admin";
 import { formatCurrency } from "@/lib/utils/format";
 import { useEffect } from "react";
 
@@ -67,8 +68,14 @@ export default function CabinetLayout({
   const user = useAuthStore((s) => s.user);
   const balance = useCreditsStore((s) => s.balance);
   const loadBalance = useCreditsStore((s) => s.loadBalance);
+  const totalUnread = useFeedbackAdminStore((s) => s.totalUnread);
+  const loadAdminConversations = useFeedbackAdminStore((s) => s.loadConversations);
 
   useEffect(() => { loadBalance(); }, [loadBalance]);
+
+  useEffect(() => {
+    if (user?.is_staff) loadAdminConversations();
+  }, [user?.is_staff, loadAdminConversations]);
 
   const NAV_SECTIONS = getNavSections(!!user?.is_staff);
 
@@ -115,6 +122,7 @@ export default function CabinetLayout({
                 <div className="flex flex-col gap-0.5">
                   {section.items.map(({ href, label, icon: Icon }) => {
                     const active = pathname.startsWith(href);
+                    const showUnreadBadge = href === '/cabinet/inbox' && totalUnread > 0;
                     return (
                       <Link
                         key={href}
@@ -128,6 +136,11 @@ export default function CabinetLayout({
                       >
                         <Icon className={cn("h-4 w-4 shrink-0", active && "text-primary")} />
                         {label}
+                        {showUnreadBadge && (
+                          <span className="min-w-[18px] h-[18px] rounded-full bg-primary text-primary-foreground text-[10px] font-medium flex items-center justify-center px-1 ml-auto">
+                            {totalUnread > 99 ? '99+' : totalUnread}
+                          </span>
+                        )}
                       </Link>
                     );
                   })}
@@ -141,23 +154,28 @@ export default function CabinetLayout({
         <div className="mt-4 rounded-md bg-card border border-border px-3 py-2.5">
           <p className="text-[11px] text-muted-foreground mb-1">Баланс</p>
           <div className="flex items-center gap-1.5">
-            <ChargeIcon size="sm" className="relative top-[-0.5px]" />
+            <KadrIcon size="sm" className="relative top-[-0.5px]" />
             <span className="text-sm font-bold font-mono text-foreground">{formatCurrency(balance)}</span>
           </div>
         </div>
       </nav>
 
       {/* Content — also in a rounded card */}
-      <div className={cn(
-        "flex-1 rounded-md border border-border bg-background shadow-[var(--shadow-card)]",
-        pathname === "/cabinet/inbox" ? "flex flex-col overflow-hidden" : "overflow-y-auto"
-      )}>
-        {pathname === "/cabinet/inbox" ? (
-          children
-        ) : (
-          <div className="max-w-5xl mx-auto p-8 space-y-6">{children}</div>
-        )}
-      </div>
+      {(() => {
+        const isFullHeight = pathname === "/cabinet/inbox" || pathname === "/cabinet/feedback";
+        return (
+          <div className={cn(
+            "flex-1 rounded-md border border-border bg-background shadow-[var(--shadow-card)]",
+            isFullHeight ? "flex flex-col overflow-hidden" : "overflow-y-auto"
+          )}>
+            {isFullHeight ? (
+              children
+            ) : (
+              <div className="max-w-5xl mx-auto p-8 space-y-6">{children}</div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
