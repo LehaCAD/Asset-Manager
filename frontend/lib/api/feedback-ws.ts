@@ -14,7 +14,7 @@ const RECONNECT_DELAY_BASE_MS = 1_000
 const RECONNECT_DELAY_MAX_MS = 30_000
 const MAX_RECONNECT_ATTEMPTS = 10
 
-class FeedbackWSManager {
+export class FeedbackWSManager {
   private ws: WebSocket | null = null
   private handlers = new Set<Handler>()
   private conversationId: number | null = null
