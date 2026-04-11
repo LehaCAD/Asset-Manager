@@ -4,12 +4,11 @@ import uuid
 from datetime import timedelta
 
 from celery import shared_task
-from django.conf import settings
 from django.utils import timezone
 from PIL import Image
 
+from apps.common.s3 import get_s3_client, get_bucket_name
 from .models import Attachment, Message
-from .utils import get_s3_client
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +22,7 @@ def process_feedback_attachment(
 ):
     """Скачать из S3 tmp, resize, upload в final, удалить tmp."""
     s3 = get_s3_client()
-    bucket = settings.AWS_STORAGE_BUCKET_NAME
+    bucket = get_bucket_name()
 
     try:
         # Скачать из tmp
@@ -44,7 +43,16 @@ def process_feedback_attachment(
         if is_image:
             # Resize
             img = Image.open(io.BytesIO(data))
-            img = img.convert("RGB")
+
+            # Если изображение содержит альфа-канал (PNG с прозрачностью),
+            # накладываем на белый фон перед конвертацией в RGB/JPEG.
+            # Иначе прозрачные области заливаются чёрным.
+            if img.mode in ("RGBA", "LA", "PA"):
+                background = Image.new("RGB", img.size, (255, 255, 255))
+                background.paste(img, mask=img.split()[-1])  # alpha channel as mask
+                img = background
+            else:
+                img = img.convert("RGB")
 
             w, h = img.size
             if max(w, h) > MAX_DIMENSION:
@@ -115,16 +123,19 @@ def process_feedback_attachment(
 def cleanup_feedback_tmp():
     """Удалить файлы в feedback/tmp/ старше 1 часа."""
     s3 = get_s3_client()
-    bucket = settings.AWS_STORAGE_BUCKET_NAME
+    bucket = get_bucket_name()
     cutoff = timezone.now() - timedelta(hours=1)
 
-    response = s3.list_objects_v2(Bucket=bucket, Prefix="feedback/tmp/")
+    # Используем paginator: list_objects_v2 возвращает максимум 1000 объектов за вызов.
+    # Без пагинации файлы сверх лимита молча пропускаются.
+    paginator = s3.get_paginator("list_objects_v2")
     deleted = 0
 
-    for obj in response.get("Contents", []):
-        if obj["LastModified"] < cutoff:
-            s3.delete_object(Bucket=bucket, Key=obj["Key"])
-            deleted += 1
+    for page in paginator.paginate(Bucket=bucket, Prefix="feedback/tmp/"):
+        for obj in page.get("Contents", []):
+            if obj["LastModified"] < cutoff:
+                s3.delete_object(Bucket=bucket, Key=obj["Key"])
+                deleted += 1
 
     if deleted:
         logger.info("Cleaned up %d stale feedback tmp files", deleted)
@@ -137,7 +148,7 @@ def cleanup_old_attachments():
     attachments = Attachment.objects.filter(created_at__lt=cutoff, is_expired=False)
 
     s3 = get_s3_client()
-    bucket = settings.AWS_STORAGE_BUCKET_NAME
+    bucket = get_bucket_name()
     count = 0
 
     for att in attachments:

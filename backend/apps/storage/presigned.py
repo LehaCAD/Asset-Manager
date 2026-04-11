@@ -5,8 +5,9 @@ Public interface — import from apps.storage.services instead.
 """
 import uuid
 
-import boto3
 from django.conf import settings
+
+from apps.common.s3 import get_s3_client as _shared_get_s3_client
 
 PRESIGN_TTL = 900  # 15 minutes
 
@@ -23,14 +24,8 @@ EXTENSION_TO_CONTENT_TYPE = {
 
 
 def _get_s3_client():
-    """Dedicated boto3 client for presigned URLs (not default_storage)."""
-    return boto3.client(
-        's3',
-        endpoint_url=settings.AWS_S3_ENDPOINT_URL,
-        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-        region_name=settings.AWS_S3_REGION_NAME,
-    )
+    """Dedicated boto3 client for presigned URLs (delegates to apps.common.s3)."""
+    return _shared_get_s3_client()
 
 
 def generate_upload_presigned_urls(

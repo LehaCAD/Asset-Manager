@@ -1,7 +1,6 @@
 # backend/apps/feedback/views.py
 import uuid
 
-import boto3
 from django.conf import settings
 from django.db import models
 from django.db.models import Q, F, Subquery, OuterRef, Count, Sum
@@ -24,6 +23,7 @@ from .serializers import (
     AdminConversationUpdateSerializer,
     RewardSerializer,
 )
+from apps.common.s3 import get_s3_client, get_bucket_name
 from .services import grant_reward, notify_new_message, notify_conversation_updated
 
 
@@ -116,17 +116,11 @@ def presign_view(request, message_id):
     ext = ext_map.get(content_type, ".bin")
     file_key = f"feedback/tmp/{uuid.uuid4()}{ext}"
 
-    client = boto3.client(
-        "s3",
-        endpoint_url=settings.AWS_S3_ENDPOINT_URL,
-        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-        region_name=settings.AWS_S3_REGION_NAME,
-    )
+    client = get_s3_client()
     presigned_url = client.generate_presigned_url(
         "put_object",
         Params={
-            "Bucket": settings.AWS_STORAGE_BUCKET_NAME,
+            "Bucket": get_bucket_name(),
             "Key": file_key,
             "ContentType": content_type,
         },
@@ -399,9 +393,8 @@ def admin_message_actions(request, message_id):
     for att in msg.attachments.all():
         if att.file_key:
             try:
-                from .utils import get_s3_client
                 client = get_s3_client()
-                client.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=att.file_key)
+                client.delete_object(Bucket=get_bucket_name(), Key=att.file_key)
             except Exception:
                 pass
             att.file_key = ""

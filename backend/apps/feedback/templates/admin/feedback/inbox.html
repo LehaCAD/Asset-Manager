@@ -339,6 +339,31 @@ function connectAdminWS(convId) {
                 btn.style.display = 'flex';
                 btn.innerHTML = `\u2193<span class="jump-badge">${newMsgCount}</span>`;
               }
+              // Show unread badge in conversation list if admin is scrolled up
+              if (!msg.is_admin) {
+                const ci = conversations.findIndex(c => c.id === activeId);
+                if (ci >= 0) {
+                  conversations[ci] = {
+                    ...conversations[ci],
+                    unread_by_admin: (conversations[ci].unread_by_admin || 0) + 1,
+                  };
+                  renderConversations();
+                }
+              }
+            }
+            // Update conversation preview in sidebar
+            const convIdx = conversations.findIndex(c => c.id === activeId);
+            if (convIdx >= 0) {
+              conversations[convIdx] = {
+                ...conversations[convIdx],
+                last_message_preview: {
+                  text: msg.text || '\ud83d\udcce \u0412\u043b\u043e\u0436\u0435\u043d\u0438\u0435',
+                  is_admin: msg.is_admin,
+                  created_at: msg.created_at,
+                },
+                updated_at: msg.created_at,
+              };
+              renderConversations();
             }
             // Mark as read immediately since admin is viewing
             api(`${API}/conversations/${convId}/read/`, {method: 'POST'});
@@ -497,6 +522,14 @@ function renderChat(conv) {
     scrollToBottom();
     newMsgCount = 0;
     jumpBtn.style.display = 'none';
+    // Clear unread badge in conversation list
+    const ci = conversations.findIndex(c => c.id === activeId);
+    if (ci >= 0) {
+      conversations[ci] = { ...conversations[ci], unread_by_admin: 0 };
+      renderConversations();
+    }
+    // Mark as read on server
+    api(`${API}/conversations/${activeId}/read/`, {method: 'POST'});
   };
   document.getElementById('chat-panel').appendChild(jumpBtn);
 

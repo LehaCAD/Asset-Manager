@@ -1,7 +1,6 @@
 from rest_framework import serializers
-from django.conf import settings
+from apps.common.s3 import get_s3_client, get_bucket_name
 from .models import Conversation, Message, Attachment, FeedbackReward
-from .utils import get_s3_client
 
 
 def _presigned_get_url(file_key: str) -> str:
@@ -10,7 +9,7 @@ def _presigned_get_url(file_key: str) -> str:
         return ""
     return get_s3_client().generate_presigned_url(
         "get_object",
-        Params={"Bucket": settings.AWS_STORAGE_BUCKET_NAME, "Key": file_key},
+        Params={"Bucket": get_bucket_name(), "Key": file_key},
         ExpiresIn=3600,
     )
 

@@ -2,10 +2,10 @@ from decimal import Decimal
 
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+from django.db import transaction
 
-from apps.credits.services import CreditsService
-from apps.credits.models import CreditsTransaction
 from apps.notifications.services import create_notification
+from .adapters import CreditsAdapter
 from .models import Conversation, Message, FeedbackReward
 
 import logging
@@ -23,45 +23,40 @@ def grant_reward(
     import uuid as _uuid
     reward_marker = str(_uuid.uuid4())
 
-    credits_service = CreditsService()
-    credits_service.topup(
-        user=conversation.user,
-        amount=amount,
-        reason=CreditsTransaction.REASON_FEEDBACK_REWARD,
-        metadata={
+    # Атомарная транзакция: топап кредитов и создание записи FeedbackReward
+    # должны коммититься вместе — иначе при сбое юзер получит кредиты без аудит-трейла.
+    with transaction.atomic():
+        metadata = {
             "feedback_conversation_id": conversation.id,
             "comment": comment,
             "reward_marker": reward_marker,
-        },
-    )
+        }
+        tx = CreditsAdapter.grant_reward(
+            user=conversation.user,
+            amount=amount,
+            metadata=metadata,
+        )
 
-    # Найти транзакцию по уникальному маркеру
-    tx = CreditsTransaction.objects.filter(
-        user=conversation.user,
-        reason=CreditsTransaction.REASON_FEEDBACK_REWARD,
-        metadata__contains={"reward_marker": reward_marker},
-    ).first()
+        reward = FeedbackReward.objects.create(
+            conversation=conversation,
+            amount=amount,
+            comment=comment,
+            transaction=tx,
+            granted_by=granted_by,
+        )
 
-    reward = FeedbackReward.objects.create(
-        conversation=conversation,
-        amount=amount,
-        comment=comment,
-        transaction=tx,
-        granted_by=granted_by,
-    )
+        # Системное сообщение в чат
+        system_text = f"Начислено {amount} Кадров"
+        if comment:
+            system_text += f": {comment}"
+        sys_msg = Message.objects.create(
+            conversation=conversation,
+            sender=granted_by,
+            is_admin=True,
+            text=f"[SYS] {system_text}",
+        )
 
-    # Системное сообщение в чат
-    system_text = f"Начислено {amount} Кадров"
-    if comment:
-        system_text += f": {comment}"
-    sys_msg = Message.objects.create(
-        conversation=conversation,
-        sender=granted_by,
-        is_admin=True,
-        text=f"[SYS] {system_text}",
-    )
-
-    # WebSocket: reward_granted
+    # WebSocket и notification — вне транзакции (side effects после коммита)
     _send_to_conversation(conversation.id, {
         "type": "reward_granted",
         "amount": str(amount),
@@ -108,6 +103,8 @@ def notify_new_message(conversation: Conversation, message: Message):
     if not message.is_admin:
         from django.contrib.auth import get_user_model
         User = get_user_model()
+        # TODO: bulk_create notifications — сейчас N запросов по числу staff-юзеров,
+        # но при малом числе админов некритично.
         for admin in User.objects.filter(is_staff=True):
             create_notification(
                 user=admin,
