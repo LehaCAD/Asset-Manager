@@ -72,20 +72,20 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => {
     },
 
     uploadAttachment: async (messageId, file) => {
+      const presign = await feedbackApi.presignAttachment(messageId, file.name, file.type)
       try {
-        const presign = await feedbackApi.presignAttachment(messageId, file.name, file.type)
         await fetch(presign.upload_url, {
           method: 'PUT',
           body: file,
           headers: { 'Content-Type': file.type },
         })
-        await feedbackApi.confirmAttachment(
-          messageId, presign.file_key, file.name, file.size, file.type,
-        )
-        // No optimistic update here — the WS attachment_ready event will carry the real attachment with URL
-      } catch (err) {
-        throw err
+      } catch {
+        throw new Error('Не удалось загрузить файл. Проверьте подключение.')
       }
+      await feedbackApi.confirmAttachment(
+        messageId, presign.file_key, file.name, file.size, file.type,
+      )
+      // No optimistic update here — the WS attachment_ready event will carry the real attachment with URL
     },
 
     markAsRead: async () => {

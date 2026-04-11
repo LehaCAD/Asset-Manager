@@ -77,7 +77,7 @@ export function MessageBubble({ message, isOwn, position }: MessageBubbleProps) 
     >
       <div
         className={cn(
-          'max-w-[80%] px-3 py-2 text-sm',
+          'max-w-[80%] px-3 py-1.5 text-sm',
           bubbleColor,
           radiusClasses(position, isOwn),
         )}
@@ -96,7 +96,7 @@ export function MessageBubble({ message, isOwn, position }: MessageBubbleProps) 
           </div>
         )}
 
-        <p className={cn('text-[10px] text-right mt-1', timeColor)}>
+        <p className={cn('text-[10px] text-right mt-0.5', timeColor)}>
           {new Date(message.created_at).toLocaleTimeString('ru-RU', {
             hour: '2-digit',
             minute: '2-digit',
