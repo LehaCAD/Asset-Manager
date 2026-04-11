@@ -168,11 +168,16 @@ class TestAdminAPI(TestCase):
         self.assertEqual(FeedbackReward.objects.count(), 1)
         mock_cs.topup.assert_called_once()
 
-    def test_delete_message(self):
+    @patch("apps.feedback.services.get_channel_layer")
+    def test_delete_message(self, mock_channel):
+        mock_channel.return_value = MagicMock()
         msg = _make_message(self.conv, self.user, text="spam")
         resp = self.client.delete(f"/api/feedback/admin/messages/{msg.id}/")
         self.assertEqual(resp.status_code, 204)
-        self.assertFalse(Message.objects.filter(id=msg.id).exists())
+        # Soft-delete: message still exists but is marked deleted
+        msg.refresh_from_db()
+        self.assertTrue(msg.is_deleted)
+        self.assertEqual(msg.text, "")
 
     def test_admin_mark_read(self):
         resp = self.client.post(
@@ -215,3 +220,255 @@ class TestAdminAPI(TestCase):
         self.client.force_authenticate(user=self.user)
         resp = self.client.get("/api/feedback/admin/conversations/")
         self.assertEqual(resp.status_code, 403)
+
+
+class TestAdvancedFeatures(TestCase):
+    """Tests for message editing, soft delete, pagination, and serializer output."""
+
+    def setUp(self):
+        self.admin = _make_user("admin", is_staff=True)
+        self.user = _make_user("user1")
+        self.conv = _make_conversation(self.user)
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.admin)
+
+    # ─── Message editing ────────────────────────────────────
+
+    @patch("apps.feedback.services.get_channel_layer")
+    @patch("apps.feedback.services.create_notification")
+    def test_admin_can_edit_own_message(self, mock_notify, mock_channel):
+        mock_channel.return_value = MagicMock()
+        # Admin sends a reply
+        resp = self.client.post(
+            f"/api/feedback/admin/conversations/{self.conv.id}/messages/",
+            {"text": "Original text"},
+        )
+        msg_id = resp.data["id"]
+
+        # Admin edits the reply
+        resp = self.client.patch(
+            f"/api/feedback/admin/messages/{msg_id}/",
+            {"text": "Updated text"},
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["text"], "Updated text")
+        self.assertIsNotNone(resp.data["edited_at"])
+
+        # Verify in DB
+        msg = Message.objects.get(id=msg_id)
+        self.assertEqual(msg.text, "Updated text")
+        self.assertIsNotNone(msg.edited_at)
+
+    def test_admin_cannot_edit_user_message(self):
+        """Admin cannot PATCH a user's message (is_admin=False)."""
+        msg = _make_message(self.conv, self.user, is_admin=False, text="User message")
+        resp = self.client.patch(
+            f"/api/feedback/admin/messages/{msg.id}/",
+            {"text": "Hacked"},
+        )
+        self.assertEqual(resp.status_code, 404)
+        # DB unchanged
+        msg.refresh_from_db()
+        self.assertEqual(msg.text, "User message")
+
+    @patch("apps.feedback.services.get_channel_layer")
+    @patch("apps.feedback.services.create_notification")
+    def test_admin_cannot_edit_with_empty_text(self, mock_notify, mock_channel):
+        mock_channel.return_value = MagicMock()
+        # Admin sends a reply
+        resp = self.client.post(
+            f"/api/feedback/admin/conversations/{self.conv.id}/messages/",
+            {"text": "Will try to blank this"},
+        )
+        msg_id = resp.data["id"]
+
+        # Try editing with empty text
+        resp = self.client.patch(
+            f"/api/feedback/admin/messages/{msg_id}/",
+            {"text": ""},
+        )
+        self.assertEqual(resp.status_code, 400)
+
+        # Try editing with whitespace-only text
+        resp = self.client.patch(
+            f"/api/feedback/admin/messages/{msg_id}/",
+            {"text": "   "},
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    @patch("apps.feedback.services.get_channel_layer")
+    @patch("apps.feedback.services.create_notification")
+    def test_edit_preserves_attachments(self, mock_notify, mock_channel):
+        mock_channel.return_value = MagicMock()
+        # Admin sends a reply
+        resp = self.client.post(
+            f"/api/feedback/admin/conversations/{self.conv.id}/messages/",
+            {"text": "See attached"},
+        )
+        msg_id = resp.data["id"]
+        msg = Message.objects.get(id=msg_id)
+
+        # Create attachment directly in DB
+        att = Attachment.objects.create(
+            message=msg,
+            file_key="feedback/test/screenshot.png",
+            file_name="screenshot.png",
+            file_size=12345,
+            content_type="image/png",
+        )
+
+        # Edit the message
+        resp = self.client.patch(
+            f"/api/feedback/admin/messages/{msg_id}/",
+            {"text": "Updated: see attached"},
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["text"], "Updated: see attached")
+
+        # Attachments still exist
+        self.assertTrue(Attachment.objects.filter(id=att.id).exists())
+        self.assertEqual(msg.attachments.count(), 1)
+
+    # ─── Soft delete ────────────────────────────────────────
+
+    @patch("apps.feedback.views.admin_message_actions.__wrapped__", None)
+    @patch("apps.feedback.services.get_channel_layer")
+    def test_soft_delete_message(self, mock_channel):
+        mock_channel.return_value = MagicMock()
+        msg = _make_message(self.conv, self.user, text="delete me")
+
+        resp = self.client.delete(f"/api/feedback/admin/messages/{msg.id}/")
+        self.assertEqual(resp.status_code, 204)
+
+        # Message still in DB but soft-deleted
+        msg.refresh_from_db()
+        self.assertTrue(msg.is_deleted)
+        self.assertEqual(msg.text, "")
+
+    @patch("apps.feedback.services.get_channel_layer")
+    def test_soft_delete_already_deleted(self, mock_channel):
+        mock_channel.return_value = MagicMock()
+        msg = _make_message(self.conv, self.user, text="already gone")
+
+        # First delete
+        self.client.delete(f"/api/feedback/admin/messages/{msg.id}/")
+
+        # Second delete should 404
+        resp = self.client.delete(f"/api/feedback/admin/messages/{msg.id}/")
+        self.assertEqual(resp.status_code, 404)
+
+    @patch("apps.feedback.services.get_channel_layer")
+    @patch("apps.feedback.services.create_notification")
+    def test_deleted_messages_hidden_from_api(self, mock_notify, mock_channel):
+        mock_channel.return_value = MagicMock()
+        # Create 3 messages
+        msg1 = _make_message(self.conv, self.user, text="msg1")
+        msg2 = _make_message(self.conv, self.user, text="msg2")
+        msg3 = _make_message(self.conv, self.user, text="msg3")
+
+        # Soft-delete msg2
+        self.client.delete(f"/api/feedback/admin/messages/{msg2.id}/")
+
+        # Admin messages endpoint should return only 2
+        resp = self.client.get(
+            f"/api/feedback/admin/conversations/{self.conv.id}/messages/"
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 2)
+        returned_ids = [m["id"] for m in resp.data]
+        self.assertIn(msg1.id, returned_ids)
+        self.assertNotIn(msg2.id, returned_ids)
+        self.assertIn(msg3.id, returned_ids)
+
+        # User messages endpoint should also hide deleted
+        self.client.force_authenticate(user=self.user)
+        resp = self.client.get("/api/feedback/messages/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 2)
+        returned_ids = [m["id"] for m in resp.data]
+        self.assertNotIn(msg2.id, returned_ids)
+
+    # ─── Pagination ─────────────────────────────────────────
+
+    @patch("apps.feedback.services.get_channel_layer")
+    def test_messages_pagination_30(self, mock_channel):
+        mock_channel.return_value = MagicMock()
+        # Create 35 messages
+        for i in range(35):
+            _make_message(self.conv, self.user, text=f"msg-{i}")
+
+        # First page: should return 30
+        resp = self.client.get(
+            f"/api/feedback/admin/conversations/{self.conv.id}/messages/"
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 30)
+
+        # Second page: use the oldest message id from first page as cursor
+        # The response is ordered chronologically (oldest first after reversing)
+        oldest_id = resp.data[0]["id"]
+        resp2 = self.client.get(
+            f"/api/feedback/admin/conversations/{self.conv.id}/messages/?cursor={oldest_id}"
+        )
+        self.assertEqual(resp2.status_code, 200)
+        self.assertEqual(len(resp2.data), 5)
+
+    @patch("apps.feedback.services.get_channel_layer")
+    def test_cursor_pagination(self, mock_channel):
+        mock_channel.return_value = MagicMock()
+        # Create 5 messages
+        msgs = []
+        for i in range(5):
+            msgs.append(_make_message(self.conv, self.user, text=f"cursor-{i}"))
+
+        # Request with cursor = id of the 3rd message (index 2)
+        # Should return messages with id < cursor, i.e. msg[0] and msg[1]
+        cursor_id = msgs[2].id
+        resp = self.client.get(
+            f"/api/feedback/admin/conversations/{self.conv.id}/messages/?cursor={cursor_id}"
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 2)
+        # All returned IDs should be < cursor_id
+        for m in resp.data:
+            self.assertLess(m["id"], cursor_id)
+
+    # ─── Edited message serialization ───────────────────────
+
+    @patch("apps.feedback.services.get_channel_layer")
+    @patch("apps.feedback.services.create_notification")
+    def test_edited_at_in_serializer(self, mock_notify, mock_channel):
+        mock_channel.return_value = MagicMock()
+        # Admin sends and then edits a message
+        resp = self.client.post(
+            f"/api/feedback/admin/conversations/{self.conv.id}/messages/",
+            {"text": "Before edit"},
+        )
+        msg_id = resp.data["id"]
+
+        # Edit it
+        resp = self.client.patch(
+            f"/api/feedback/admin/messages/{msg_id}/",
+            {"text": "After edit"},
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertIsNotNone(resp.data["edited_at"])
+        self.assertEqual(resp.data["text"], "After edit")
+
+        # Also verify via the messages list endpoint
+        resp = self.client.get(
+            f"/api/feedback/admin/conversations/{self.conv.id}/messages/"
+        )
+        edited_msg = next(m for m in resp.data if m["id"] == msg_id)
+        self.assertIsNotNone(edited_msg["edited_at"])
+
+    @patch("apps.feedback.services.get_channel_layer")
+    @patch("apps.feedback.services.create_notification")
+    def test_unedited_message_has_null_edited_at(self, mock_notify, mock_channel):
+        mock_channel.return_value = MagicMock()
+        resp = self.client.post(
+            f"/api/feedback/admin/conversations/{self.conv.id}/messages/",
+            {"text": "Never edited"},
+        )
+        self.assertEqual(resp.status_code, 201)
+        self.assertIsNone(resp.data["edited_at"])
