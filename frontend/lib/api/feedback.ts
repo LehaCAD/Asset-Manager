@@ -150,4 +150,34 @@ export const feedbackApi = {
       throw normalizeError(error)
     }
   },
+  adminPresignAttachment: async (messageId: number, fileName: string, contentType: string) => {
+    try {
+      const { data } = await apiClient.post<{ upload_url: string; file_key: string }>(
+        `/api/feedback/messages/${messageId}/presign/`,
+        { file_name: fileName, content_type: contentType },
+      )
+      return data
+    } catch (error) {
+      throw normalizeError(error)
+    }
+  },
+  adminConfirmAttachment: async (messageId: number, fileKey: string, fileName: string, fileSize: number, contentType: string) => {
+    try {
+      const { data } = await apiClient.post<{ status: string }>(
+        `/api/feedback/messages/${messageId}/confirm-attach/`,
+        { file_key: fileKey, file_name: fileName, file_size: fileSize, content_type: contentType },
+      )
+      return data
+    } catch (error) {
+      throw normalizeError(error)
+    }
+  },
+  getUnreadTotal: async () => {
+    try {
+      const { data } = await apiClient.get<{ unread_total: number }>('/api/feedback/admin/unread-total/')
+      return data.unread_total
+    } catch (error) {
+      throw normalizeError(error)
+    }
+  },
 }

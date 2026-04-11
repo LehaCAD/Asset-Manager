@@ -1,8 +1,10 @@
 // frontend/lib/store/feedback-admin.ts
 import { create } from 'zustand'
 import { feedbackApi } from '@/lib/api/feedback'
-import { feedbackWS } from '@/lib/api/feedback-ws'
+import { FeedbackWSManager } from '@/lib/api/feedback-ws'
 import type { AdminConversation, FeedbackMessage } from '@/lib/types'
+
+const adminFeedbackWS = new FeedbackWSManager()
 
 interface FeedbackAdminState {
   conversations: AdminConversation[]
@@ -10,15 +12,20 @@ interface FeedbackAdminState {
   messages: FeedbackMessage[]
   filters: { status?: string; tag?: string; search?: string }
   isLoading: boolean
+  totalUnread: number
+  _pollInterval: ReturnType<typeof setInterval> | null
 
   loadConversations: () => Promise<void>
   selectConversation: (id: number) => Promise<void>
-  sendReply: (text: string) => Promise<void>
+  sendReply: (text: string) => Promise<FeedbackMessage | null>
   updateConversation: (id: number, data: { status?: string; tag?: string }) => Promise<void>
   grantReward: (id: number, amount: number, comment: string) => Promise<void>
   setFilters: (filtersOrUpdater: { status?: string; tag?: string; search?: string } | ((prev: { status?: string; tag?: string; search?: string }) => { status?: string; tag?: string; search?: string })) => void
   connectWS: (conversationId: number) => void
   disconnectWS: () => void
+  startPolling: () => void
+  stopPolling: () => void
+  uploadAttachment: (messageId: number, file: File) => Promise<void>
 }
 
 export const useFeedbackAdminStore = create<FeedbackAdminState>((set, get) => {
@@ -30,12 +37,19 @@ export const useFeedbackAdminStore = create<FeedbackAdminState>((set, get) => {
     messages: [],
     filters: {},
     isLoading: false,
+    totalUnread: 0,
+    _pollInterval: null,
 
     loadConversations: async () => {
       set({ isLoading: true })
       try {
         const convs = await feedbackApi.getConversations(get().filters)
-        set({ conversations: convs })
+        const totalUnread = convs.reduce((sum, c) => sum + c.unread_by_admin, 0)
+        set({ conversations: convs, totalUnread })
+        // Auto-select first conversation if none active
+        if (convs.length > 0 && !get().activeConversation) {
+          await get().selectConversation(convs[0].id)
+        }
       } finally {
         set({ isLoading: false })
       }
@@ -43,7 +57,7 @@ export const useFeedbackAdminStore = create<FeedbackAdminState>((set, get) => {
 
     selectConversation: async (id) => {
       const conv = get().conversations.find((c) => c.id === id) || null
-      set({ activeConversation: conv, messages: [] })
+      set({ activeConversation: conv })
 
       if (conv) {
         const msgs = await feedbackApi.getConversationMessages(id)
@@ -61,9 +75,10 @@ export const useFeedbackAdminStore = create<FeedbackAdminState>((set, get) => {
 
     sendReply: async (text) => {
       const conv = get().activeConversation
-      if (!conv) return
+      if (!conv) return null
       const msg = await feedbackApi.sendAdminReply(conv.id, text)
       set((s) => ({ messages: [...s.messages, msg] }))
+      return msg
     },
 
     updateConversation: async (id, data) => {
@@ -76,6 +91,9 @@ export const useFeedbackAdminStore = create<FeedbackAdminState>((set, get) => {
 
     grantReward: async (id, amount, comment) => {
       await feedbackApi.grantReward(id, amount, comment)
+      const msgs = await feedbackApi.getConversationMessages(id)
+      set({ messages: msgs })
+      get().loadConversations()
     },
 
     setFilters: (filtersOrUpdater) => {
@@ -89,10 +107,10 @@ export const useFeedbackAdminStore = create<FeedbackAdminState>((set, get) => {
 
     connectWS: (conversationId) => {
       wsUnsub?.()
-      feedbackWS.disconnect()
+      adminFeedbackWS.disconnect()
 
-      feedbackWS.connect(conversationId)
-      wsUnsub = feedbackWS.on((event) => {
+      adminFeedbackWS.connect(conversationId)
+      wsUnsub = adminFeedbackWS.on((event) => {
         if (event.type === 'new_message' || event.type === 'reward_granted') {
           const msg = 'message' in event ? event.message : null
           if (msg) set((s) => {
@@ -101,16 +119,23 @@ export const useFeedbackAdminStore = create<FeedbackAdminState>((set, get) => {
           })
           // Increment unread badge for conversations that are not currently open
           if (event.type === 'new_message' && !event.message.is_admin) {
-            set((s) => {
-              if (s.activeConversation?.id === conversationId) return s
-              return {
+            // If this conversation is currently active, mark as read immediately
+            if (get().activeConversation?.id === conversationId) {
+              feedbackApi.adminMarkRead(conversationId)
+              set((s) => ({
+                conversations: s.conversations.map((c) =>
+                  c.id === conversationId ? { ...c, unread_by_admin: 0 } : c,
+                ),
+              }))
+            } else {
+              set((s) => ({
                 conversations: s.conversations.map((c) =>
                   c.id === conversationId
                     ? { ...c, unread_by_admin: c.unread_by_admin + 1 }
                     : c,
                 ),
-              }
-            })
+              }))
+            }
           }
         }
         if (event.type === 'attachment_ready') {
@@ -127,7 +152,28 @@ export const useFeedbackAdminStore = create<FeedbackAdminState>((set, get) => {
 
     disconnectWS: () => {
       wsUnsub?.()
-      feedbackWS.disconnect()
+      adminFeedbackWS.disconnect()
+    },
+
+    startPolling: () => {
+      const interval = setInterval(() => get().loadConversations(), 30000)
+      set({ _pollInterval: interval as unknown as ReturnType<typeof setInterval> })
+    },
+    stopPolling: () => {
+      const interval = get()._pollInterval
+      if (interval) clearInterval(interval)
+      set({ _pollInterval: null })
+    },
+    uploadAttachment: async (messageId, file) => {
+      const presign = await feedbackApi.adminPresignAttachment(messageId, file.name, file.type)
+      await fetch(presign.upload_url, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type },
+      })
+      await feedbackApi.adminConfirmAttachment(
+        messageId, presign.file_key, file.name, file.size, file.type,
+      )
     },
   }
 })

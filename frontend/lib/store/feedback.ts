@@ -96,7 +96,7 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => {
     connectWS: () => {
       const conv = get().conversation
       if (!conv || get().wsConnected) return
-
+      wsUnsub?.()
       feedbackWS.connect(conv.id)
       wsUnsub = feedbackWS.on((event) => {
         if (event.type === 'new_message' || event.type === 'reward_granted') {
@@ -106,9 +106,13 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => {
               if (s.messages.some((m) => m.id === msg.id)) return s
               return {
                 messages: [...s.messages, msg],
-                hasUnreadReply: msg.is_admin ? true : s.hasUnreadReply,
+                // Don't set hasUnreadReply — we auto-mark as read below
               }
             })
+            // Auto mark-as-read since chat is open (WS connected = chat visible)
+            if (msg.is_admin) {
+              get().markAsRead()
+            }
           }
         }
         if (event.type === 'attachment_ready') {
