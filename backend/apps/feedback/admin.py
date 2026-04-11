@@ -36,3 +36,6 @@ def inbox_view(request):
         "title": "Входящие — Обратная связь",
     }
     return TemplateResponse(request, "admin/feedback/inbox.html", context)
+
+
+admin.site.index_template = 'admin/custom_index.html'

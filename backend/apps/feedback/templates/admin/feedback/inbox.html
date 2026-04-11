@@ -305,6 +305,11 @@ async function loadConversations() {
   if (searchQuery) params.set('search', searchQuery);
   const qs = params.toString();
   conversations = await api(`${API}/conversations/${qs ? '?' + qs : ''}`) || [];
+  // Force-clear unread for the conversation we're currently viewing
+  if (activeId) {
+    const idx = conversations.findIndex(c => c.id === activeId);
+    if (idx >= 0) conversations[idx] = { ...conversations[idx], unread_by_admin: 0 };
+  }
   renderConversations();
 }
 
@@ -369,7 +374,7 @@ function renderChat(conv) {
         </div>
       </div>
       <div id="chat-actions">
-        <button class="chat-btn" onclick="openRewardModal(${conv.id}, '${escAttr(u.username)}')">&#11088; Начислить</button>
+        <button class="chat-btn" onclick="openRewardModal(${conv.id}, '${escAttr(u.username)}')"><svg width="14" height="14" viewBox="0 0 256 256" style="vertical-align:-2px;margin-right:4px"><ellipse cx="128" cy="128" rx="128" ry="128" fill="#FFDE50"/><ellipse cx="128" cy="128" rx="99" ry="99" fill="#FAA300"/><path d="M57.88,198.17L198.15,57.91C180.2,39.95,155.4,28.83,128,28.83c-54.77,0-99.17,44.41-99.17,99.19C28.83,155.42,39.93,180.22,57.88,198.17z" fill="#FFBD00"/><path d="M84.83,198.26V57.74h28.87v54.48h13.67l23.1-54.48h31.38l-28.88,67.18L183,198.26h-31.76l-23.87-59.48H113.7v59.48H84.83z" fill="#FFEA94"/></svg>Начислить</button>
         <button class="chat-btn" onclick="toggleStatus(${conv.id}, '${conv.status}')">${conv.status === 'open' ? '&#10003; Решено' : '&#8634; Открыть'}</button>
         <select class="chat-select" onchange="setTag(${conv.id}, this.value)">
           <option value="" ${!conv.tag ? 'selected' : ''}>Без тега</option>
