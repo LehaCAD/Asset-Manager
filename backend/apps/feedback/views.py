@@ -73,6 +73,9 @@ def messages_view(request):
         conv.status = Conversation.STATUS_OPEN
         conv.save(update_fields=["status"])
 
+    # Пустой text допустим: фронтенд создаёт сообщение с пустым текстом,
+    # а затем отдельным запросом прикрепляет файлы (confirm-attach).
+    # Не валидируем text на непустоту — это ломает attachment-only messages.
     msg = Message.objects.create(
         conversation=conv,
         sender=request.user,
@@ -88,9 +91,12 @@ def messages_view(request):
 @permission_classes([IsAuthenticated])
 def presign_view(request, message_id):
     """Получить presigned PUT URL для загрузки в S3."""
-    msg = Message.objects.filter(
-        id=message_id, conversation__user=request.user, is_admin=False,
-    ).first()
+    if request.user.is_staff:
+        msg = Message.objects.filter(id=message_id).first()
+    else:
+        msg = Message.objects.filter(
+            id=message_id, conversation__user=request.user, is_admin=False,
+        ).first()
     if not msg:
         return Response({"detail": "Сообщение не найдено"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -135,9 +141,12 @@ def presign_view(request, message_id):
 @permission_classes([IsAuthenticated])
 def confirm_attach_view(request, message_id):
     """Подтвердить загрузку, запустить resize в Celery."""
-    msg = Message.objects.filter(
-        id=message_id, conversation__user=request.user, is_admin=False,
-    ).select_related("conversation").first()
+    if request.user.is_staff:
+        msg = Message.objects.filter(id=message_id).select_related("conversation").first()
+    else:
+        msg = Message.objects.filter(
+            id=message_id, conversation__user=request.user, is_admin=False,
+        ).select_related("conversation").first()
     if not msg:
         return Response({"detail": "Сообщение не найдено"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -199,7 +208,7 @@ def admin_conversations_list(request):
             | models.Q(user__email__icontains=search)
         )
 
-    return Response(AdminConversationListSerializer(qs[:100], many=True).data)
+    return Response(AdminConversationListSerializer(qs[:500], many=True).data)
 
 
 @api_view(["GET", "PATCH"])
@@ -293,6 +302,18 @@ def admin_mark_read_view(request, conversation_id):
         admin_last_read_at=timezone.now()
     )
     return Response({"status": "ok"})
+
+
+@api_view(["GET"])
+@authentication_classes(ADMIN_AUTH)
+@permission_classes([IsAdminUser])
+def admin_unread_total(request):
+    """Суммарное количество непрочитанных обращений."""
+    total = Conversation.objects.filter(
+        models.Q(admin_last_read_at__isnull=True, messages__is_admin=False)
+        | models.Q(messages__is_admin=False, messages__created_at__gt=models.F("admin_last_read_at"))
+    ).distinct().count()
+    return Response({"unread_total": total})
 
 
 @api_view(["DELETE"])

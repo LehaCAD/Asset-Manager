@@ -11,6 +11,7 @@ urlpatterns = [
     path("conversation/read/", views.mark_read_view),
 
     # Admin
+    path("admin/unread-total/", views.admin_unread_total),
     path("admin/conversations/", views.admin_conversations_list),
     path("admin/conversations/<int:conversation_id>/", views.admin_conversation_detail),
     path("admin/conversations/<int:conversation_id>/messages/", views.admin_conversation_messages),

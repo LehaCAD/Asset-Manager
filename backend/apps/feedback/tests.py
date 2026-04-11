@@ -182,6 +182,35 @@ class TestAdminAPI(TestCase):
         self.conv.refresh_from_db()
         self.assertIsNotNone(self.conv.admin_last_read_at)
 
+    @patch("apps.feedback.services.get_channel_layer")
+    @patch("apps.feedback.services.create_notification")
+    def test_staff_can_presign_for_admin_message(self, mock_notify, mock_channel):
+        mock_channel.return_value = MagicMock()
+        # Admin sends a reply first
+        resp = self.client.post(
+            f"/api/feedback/admin/conversations/{self.conv.id}/messages/",
+            {"text": "Let me check"},
+        )
+        msg_id = resp.data["id"]
+        # Admin can presign for their own message
+        with patch("apps.feedback.views.boto3.client") as mock_boto:
+            mock_s3 = MagicMock()
+            mock_s3.generate_presigned_url.return_value = "https://s3.example.com/presigned"
+            mock_boto.return_value = mock_s3
+            resp = self.client.post(
+                f"/api/feedback/messages/{msg_id}/presign/",
+                {"file_name": "screen.png", "content_type": "image/png"},
+            )
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("upload_url", resp.data)
+
+    def test_unread_total(self):
+        # user already sent one message in setUp
+        resp = self.client.get("/api/feedback/admin/unread-total/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("unread_total", resp.data)
+        self.assertGreaterEqual(resp.data["unread_total"], 0)
+
     def test_non_staff_cannot_access_admin_endpoints(self):
         self.client.force_authenticate(user=self.user)
         resp = self.client.get("/api/feedback/admin/conversations/")
