@@ -69,7 +69,6 @@ export function FeedbackChat() {
         <ChatInput
           onSend={handleSend}
           onAttachment={handleAttachment}
-          placeholder="Написать сообщение..."
         />
       </div>
     </div>

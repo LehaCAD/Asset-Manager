@@ -73,15 +73,18 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => {
 
     uploadAttachment: async (messageId, file) => {
       const presign = await feedbackApi.presignAttachment(messageId, file.name, file.type)
-      try {
-        await fetch(presign.upload_url, {
-          method: 'PUT',
-          body: file,
-          headers: { 'Content-Type': file.type },
-        })
-      } catch {
-        throw new Error('Не удалось загрузить файл. Проверьте подключение.')
-      }
+      // Use XHR instead of fetch — fetch fails on CORS with S3 presigned URLs
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        xhr.open('PUT', presign.upload_url)
+        xhr.setRequestHeader('Content-Type', file.type)
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) resolve()
+          else reject(new Error(`Ошибка загрузки: ${xhr.status}`))
+        }
+        xhr.onerror = () => reject(new Error('Не удалось загрузить файл'))
+        xhr.send(file)
+      })
       await feedbackApi.confirmAttachment(
         messageId, presign.file_key, file.name, file.size, file.type,
       )

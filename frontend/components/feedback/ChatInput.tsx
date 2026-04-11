@@ -18,7 +18,7 @@ interface ChatInputProps {
 export function ChatInput({
   onSend,
   onAttachment,
-  placeholder = 'Написать сообщение...',
+  placeholder = 'Сообщение...',
   showAttachButton = true,
 }: ChatInputProps) {
   const [text, setText] = useState('')
@@ -141,7 +141,7 @@ export function ChatInput({
         onPaste={handlePaste}
         placeholder={placeholder}
         rows={1}
-        className="flex-1 resize-none bg-muted/30 text-foreground rounded-lg text-sm border border-border/50 outline-none focus:border-primary/50 placeholder:text-muted-foreground h-9 max-h-[120px] px-3 py-2 transition-colors overflow-y-auto"
+        className="flex-1 resize-none bg-muted/30 text-foreground rounded-lg text-sm border border-border/50 outline-none focus:border-primary/50 placeholder:text-muted-foreground min-h-9 max-h-[120px] px-3 py-2 transition-colors overflow-y-auto"
       />
 
       <Button

@@ -38,8 +38,6 @@ export function FeedbackDropdown() {
     await uploadAttachment(msg.id, file)
   }
 
-  const lastMessages = messages.slice(-15)
-
   return (
     <div className="flex flex-col">
       {/* Header — changed from "Связаться с нами" */}
@@ -49,12 +47,12 @@ export function FeedbackDropdown() {
 
       {/* Messages — increased height */}
       <div className="max-h-[400px] overflow-y-auto px-3 py-2">
-        {lastMessages.length === 0 && !isLoading && (
+        {messages.length === 0 && !isLoading && (
           <p className="text-sm text-muted-foreground text-center py-4">
             Нашли баг? Есть идея? Напишите — мы читаем каждое сообщение.
           </p>
         )}
-        <ChatMessageList messages={lastMessages} isOwnMessage={(m) => !m.is_admin} />
+        <ChatMessageList messages={messages} isOwnMessage={(m) => !m.is_admin} />
       </div>
 
       {/* Input — now with attachments */}
@@ -62,7 +60,6 @@ export function FeedbackDropdown() {
         <ChatInput
           onSend={handleSend}
           onAttachment={handleAttachment}
-          placeholder="Написать сообщение..."
         />
       </div>
 
