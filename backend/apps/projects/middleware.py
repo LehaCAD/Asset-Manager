@@ -23,12 +23,46 @@ def get_user_from_token(token_str: str):
         return AnonymousUser()
 
 
+@database_sync_to_async
+def get_user_from_session(scope):
+    """Получить пользователя из Django session (для admin WebSocket)."""
+    try:
+        from django.contrib.sessions.models import Session
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        cookies = dict(
+            item.split('=', 1) for item in
+            scope.get('headers', {}).get(b'cookie', b'').decode().split('; ')
+            if '=' in item
+        ) if isinstance(scope.get('headers'), dict) else {}
+        # Parse cookies from headers list
+        if not cookies:
+            for header_name, header_value in scope.get('headers', []):
+                if header_name == b'cookie':
+                    cookies = dict(
+                        item.strip().split('=', 1) for item in
+                        header_value.decode().split(';')
+                        if '=' in item
+                    )
+                    break
+        session_key = cookies.get('sessionid', '').strip()
+        if not session_key:
+            return AnonymousUser()
+        session = Session.objects.get(session_key=session_key)
+        uid = session.get_decoded().get('_auth_user_id')
+        if uid:
+            return User.objects.get(id=uid)
+    except Exception:
+        pass
+    return AnonymousUser()
+
+
 class JWTAuthMiddleware(BaseMiddleware):
     """
-    Middleware для аутентификации WebSocket через JWT.
-    
-    Использование на клиенте:
-        new WebSocket('ws://host/ws/projects/1/?token=eyJ...')
+    Middleware для аутентификации WebSocket через JWT или Django session.
+
+    JWT (frontend):  ws://host/ws/projects/1/?token=eyJ...
+    Session (admin): ws://host/ws/feedback/1/ (uses sessionid cookie)
     """
 
     async def __call__(self, scope, receive, send):
@@ -38,6 +72,7 @@ class JWTAuthMiddleware(BaseMiddleware):
         if token_list:
             scope['user'] = await get_user_from_token(token_list[0])
         else:
-            scope['user'] = AnonymousUser()
+            # Fallback to Django session auth (for admin interface)
+            scope['user'] = await get_user_from_session(scope)
 
         return await super().__call__(scope, receive, send)

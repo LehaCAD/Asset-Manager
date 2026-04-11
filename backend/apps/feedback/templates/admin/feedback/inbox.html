@@ -313,6 +313,60 @@ let loadingMore = false;
 let isNearBottom = true;
 let newMsgCount = 0;
 
+// ─── WebSocket for real-time messages ────────────────
+let adminWS = null;
+
+function connectAdminWS(convId) {
+  if (adminWS) { adminWS.close(); adminWS = null; }
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  // Get session cookie for auth (Django admin uses session auth)
+  const url = `${proto}//${location.host}/ws/feedback/${convId}/`;
+  try {
+    adminWS = new WebSocket(url);
+    adminWS.onmessage = (e) => {
+      try {
+        const event = JSON.parse(e.data);
+        if (event.type === 'new_message' || event.type === 'reward_granted') {
+          const msg = event.message;
+          if (msg && !messages.some(m => m.id === msg.id)) {
+            messages.push(msg);
+            renderMessages();
+            if (isNearBottom) scrollToBottom();
+            else {
+              newMsgCount++;
+              const btn = document.querySelector('.jump-to-bottom');
+              if (btn) {
+                btn.style.display = 'flex';
+                btn.innerHTML = `\u2193<span class="jump-badge">${newMsgCount}</span>`;
+              }
+            }
+            // Mark as read immediately since admin is viewing
+            api(`${API}/conversations/${convId}/read/`, {method: 'POST'});
+          }
+        }
+        if (event.type === 'attachment_ready') {
+          const idx = messages.findIndex(m => m.id === event.message_id);
+          if (idx >= 0) {
+            if (!messages[idx].attachments) messages[idx].attachments = [];
+            messages[idx].attachments.push(event.attachment);
+            renderMessages();
+          }
+        }
+        if (event.type === 'message_edited') {
+          const idx = messages.findIndex(m => m.id === event.message.id);
+          if (idx >= 0) { messages[idx] = event.message; renderMessages(); }
+        }
+        if (event.type === 'message_deleted') {
+          messages = messages.filter(m => m.id !== event.message_id);
+          renderMessages();
+        }
+      } catch (err) { console.error('WS parse error:', err); }
+    };
+    adminWS.onclose = () => { adminWS = null; };
+    adminWS.onerror = () => { adminWS = null; };
+  } catch (err) { console.error('WS connect error:', err); }
+}
+
 // ─── API helpers ─────────────────────────────────────
 async function api(path, opts = {}) {
   const res = await fetch(path, {
@@ -376,6 +430,9 @@ function renderConversations() {
 
 // ─── Select conversation ─────────────────────────────
 async function selectConv(id) {
+  // Не перерисовывать если кликнули на тот же чат
+  if (id === activeId) return;
+
   activeId = id;
   hasMore = true;
   isNearBottom = true;
@@ -393,6 +450,7 @@ async function selectConv(id) {
   renderConversations();
 
   renderChat(conv);
+  connectAdminWS(id);
   startPolling(id);
 }
 
