@@ -106,29 +106,34 @@ export function ConversationList() {
               </div>
 
               <div className="flex-1 min-w-0">
+                {/* Row 1: Name + Tag + Time */}
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium truncate">{conv.user.username}</span>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-sm font-medium truncate">{conv.user.username}</span>
+                    {conv.tag && (
+                      <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 shrink-0">
+                        {TAG_LABELS[conv.tag] || conv.tag}
+                      </Badge>
+                    )}
+                  </div>
                   <span className="text-[10px] text-muted-foreground shrink-0 ml-2">
                     {conv.last_message_preview && formatTime(conv.last_message_preview.created_at)}
                   </span>
                 </div>
 
-                {conv.last_message_preview && (
-                  <p className="text-xs text-muted-foreground truncate mt-0.5">
-                    {conv.last_message_preview.is_admin && <span className="text-primary">Вы: </span>}
-                    {conv.last_message_preview.text}
-                  </p>
-                )}
-
-                <div className="flex items-center gap-1 mt-1">
-                  {conv.tag && (
-                    <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">
-                      {TAG_LABELS[conv.tag] || conv.tag}
-                    </Badge>
+                {/* Row 2: Preview + Unread badge */}
+                <div className="flex items-center justify-between mt-0.5">
+                  {conv.last_message_preview ? (
+                    <p className="text-xs text-muted-foreground truncate flex-1 min-w-0">
+                      {conv.last_message_preview.is_admin && <span className="text-primary">Вы: </span>}
+                      {conv.last_message_preview.text}
+                    </p>
+                  ) : (
+                    <span />
                   )}
                   {conv.unread_by_admin > 0 && (
-                    <span className="w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center">
-                      {conv.unread_by_admin}
+                    <span className="min-w-[20px] h-5 rounded-full bg-primary text-primary-foreground text-[11px] font-medium flex items-center justify-center px-1.5 ml-2 shrink-0">
+                      {conv.unread_by_admin > 99 ? '99+' : conv.unread_by_admin}
                     </span>
                   )}
                 </div>
