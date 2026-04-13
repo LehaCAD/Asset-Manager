@@ -24,8 +24,9 @@ import { scenesApi } from '@/lib/api/scenes';
 import { elementsApi } from '@/lib/api/elements';
 import { MoveToGroupDialog } from '@/components/element/MoveToGroupDialog';
 import { RenameDialog } from '@/components/element/RenameDialog';
-import { Upload, ChevronLeft, ChevronRight, FolderPlus, Share2, Plus } from 'lucide-react';
+import { Upload, ChevronLeft, ChevronRight, FolderPlus, Share2, Plus, MessageSquare } from 'lucide-react';
 
+import { ReviewsOverlay } from '@/components/sharing/ReviewsOverlay';
 import { ShareSelectionMode } from '@/components/sharing/ShareSelectionMode';
 import { CreateLinkDialog } from '@/components/sharing/CreateLinkDialog';
 import { ShareLinksPanel } from '@/components/sharing/ShareLinksPanel';
@@ -138,6 +139,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   }, []);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [shareElements, setShareElements] = useState<Array<{ id: number; element_type: string; is_favorite: boolean; source_type: string }>>([]);
+  const [reviewsOpen, setReviewsOpen] = useState(false);
   const [linksPanelOpen, setLinksPanelOpen] = useState(false);
   const [linksRefreshKey, setLinksRefreshKey] = useState(0);
   const [promptBarHeight, setPromptBarHeight] = useState(0);
@@ -768,8 +770,21 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
             </button>
           </div>
 
-          {/* Right: active links + filters + view */}
+          {/* Right: reviews + active links + filters + view */}
           <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setReviewsOpen(!reviewsOpen)}
+              className={cn(
+                "flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium transition-colors shrink-0",
+                reviewsOpen
+                  ? "bg-primary/20 text-primary"
+                  : "text-muted-foreground bg-card hover:text-foreground"
+              )}
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>Отзывы</span>
+            </button>
             <button
               type="button"
               onClick={() => setLinksPanelOpen(true)}
@@ -1025,6 +1040,17 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
           onOpenChange={(open) => {
             setCreateGroupOpen(open);
             if (!open) loadWorkspace(projectId, groupId);
+          }}
+        />
+
+        {/* Reviews Overlay */}
+        <ReviewsOverlay
+          projectId={projectId}
+          isOpen={reviewsOpen}
+          onClose={() => setReviewsOpen(false)}
+          onOpenLightbox={(elementId) => {
+            setReviewsOpen(false)
+            openLightbox(elementId)
           }}
         />
 

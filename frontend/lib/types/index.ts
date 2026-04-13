@@ -475,6 +475,39 @@ export interface CreateCommentPayload {
   parent_id?: number
 }
 
+/* ── Project Feedback (Reviews Overlay) ───────────────────── */
+
+export interface ProjectFeedbackElement {
+  id: number
+  original_filename: string
+  thumbnail_url: string
+  element_type: ElementType
+  review_summary: { action: string; author_name: string } | null
+  reviews: { session_id: string; author_name: string; action: string }[]
+  likes: number
+  dislikes: number
+  comments: Comment[]
+}
+
+export interface ProjectFeedbackLink {
+  id: number
+  name: string
+  token: string
+  unread_count: number
+  stats: {
+    approved: number
+    changes_requested: number
+    rejected: number
+    total_elements: number
+  }
+  elements: ProjectFeedbackElement[]
+  general_comments: Comment[]
+}
+
+export interface ProjectFeedbackResponse {
+  links: ProjectFeedbackLink[]
+}
+
 /* ── WebSocket events ─────────────────────────────────────── */
 
 export interface WSElementStatusChangedEvent {
