@@ -96,10 +96,7 @@ export function ChatInput({
 
   const stageFile = useCallback((file: File) => {
     if (!validateFile(file)) return
-    if (stagedFiles.length >= 5) {
-      toast.error('Максимум 5 вложений')
-      return
-    }
+    if (stagedFiles.length >= 5) return
     const isImage = file.type.startsWith('image/')
     const previewUrl = isImage ? URL.createObjectURL(file) : null
     setStagedFiles(prev => [...prev, { file, previewUrl }])
@@ -148,31 +145,34 @@ export function ChatInput({
     <div className="flex flex-col gap-2">
       {/* Staged files preview */}
       {stagedFiles.length > 0 && (
-        <div className="flex gap-2 flex-wrap px-1">
+        <div className="flex items-center gap-1.5 px-1">
           {stagedFiles.map((sf, i) => (
             <div key={i} className="relative group">
               {sf.previewUrl ? (
                 <img
                   src={sf.previewUrl}
                   alt={sf.file.name}
-                  className="w-16 h-16 object-cover rounded-lg border border-border/50"
+                  className="w-8 h-8 object-cover rounded border border-border/50"
                 />
               ) : (
-                <div className="w-16 h-16 rounded-lg border border-border/50 bg-muted/30 flex items-center justify-center">
-                  <span className="text-[10px] text-muted-foreground text-center px-1 truncate">
-                    {sf.file.name.split('.').pop()?.toUpperCase()}
+                <div className="w-8 h-8 rounded border border-border/50 bg-muted/30 flex items-center justify-center">
+                  <span className="text-[8px] text-muted-foreground">
+                    {sf.file.name.split('.').pop()?.toUpperCase()?.slice(0, 3)}
                   </span>
                 </div>
               )}
               <button
                 type="button"
                 onClick={() => removeStaged(i)}
-                className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
               >
-                <X className="w-3 h-3" />
+                <X className="w-2.5 h-2.5" />
               </button>
             </div>
           ))}
+          <span className="text-[10px] text-muted-foreground ml-1">
+            {stagedFiles.length}/5
+          </span>
         </div>
       )}
 
