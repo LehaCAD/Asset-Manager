@@ -35,7 +35,10 @@ export function Navbar() {
   const balance = useCreditsStore((s) => s.balance);
   const loadBalance = useCreditsStore((s) => s.loadBalance);
 
-  const unreadCount = useNotificationStore((s) => s.getBellUnreadCount());
+  const allNotifications = useNotificationStore((s) => s.notifications);
+  const unreadCount = allNotifications.filter(
+    (n) => !['comment_new', 'reaction_new', 'review_new'].includes(n.type) && !n.is_read
+  ).length;
   const fetchUnreadCount = useNotificationStore((s) => s.fetchUnreadCount);
   const addNotification = useNotificationStore((s) => s.addNotification);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);

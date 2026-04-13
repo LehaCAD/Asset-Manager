@@ -75,10 +75,13 @@ interface NotificationDropdownProps {
 
 export function NotificationDropdown({ children }: NotificationDropdownProps) {
   const [open, setOpen] = useState(false)
-  const bellNotifications = useNotificationStore((s) => s.getBellNotifications())
-  const bellUnreadCount = useNotificationStore((s) => s.getBellUnreadCount())
+  const notifications = useNotificationStore((s) => s.notifications)
   const markAllRead = useNotificationStore((s) => s.markAllRead)
   const fetchNotifications = useNotificationStore((s) => s.fetchNotifications)
+
+  const FEEDBACK_TYPES = ['comment_new', 'reaction_new', 'review_new']
+  const bellNotifications = notifications.filter((n) => !FEEDBACK_TYPES.includes(n.type))
+  const bellUnreadCount = bellNotifications.filter((n) => !n.is_read).length
 
   function handleOpenChange(next: boolean) {
     setOpen(next)
