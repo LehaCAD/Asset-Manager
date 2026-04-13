@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ChevronRight,
   MessageCircle,
+  MessageSquare,
   Play,
   Pencil,
   Download,
@@ -19,7 +20,9 @@ import { toast } from 'sonner'
 import { sharingApi } from '@/lib/api/sharing'
 import { ReviewerLightbox } from '@/components/sharing/ReviewerLightbox'
 import { ReviewerNameInput } from '@/components/sharing/ReviewerNameInput'
+import { CommentThread } from '@/components/sharing/CommentThread'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
 import { DisplaySettingsPopover } from '@/components/display/DisplaySettingsPopover'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
@@ -343,6 +346,9 @@ export default function PublicSharePage() {
   // Comments map: elementId -> Comment[]
   const [commentsMap, setCommentsMap] = useState<Record<number, Comment[]>>({})
 
+  // General (link-level) comments
+  const [generalComments, setGeneralComments] = useState<Comment[]>([])
+
   // Reactions state: elementId -> 'like' | 'dislike' | null
   const [reactionsMap, setReactionsMap] = useState<Record<number, string | null>>({})
   const [sessionId, setSessionId] = useState('')
@@ -421,6 +427,11 @@ export default function PublicSharePage() {
           }
         }
         setCommentsMap(map)
+
+        // Load general (link-level) comments
+        if (data.general_comments) {
+          setGeneralComments(data.general_comments.filter((c: any) => !c.is_system))
+        }
 
         // Initialize reactionsMap — resolve effective session_id the same way
         // as the identity effect: auth user → user.id, guest → reviewer_session_id
@@ -512,6 +523,28 @@ export default function PublicSharePage() {
     setReviewMap((prev) => ({ ...prev, [elementId]: action }))
   }, [])
 
+  // General comment submit handler
+  const handleGeneralCommentSubmit = useCallback(async (text: string, parentId?: number) => {
+    const resp = await sharingApi.addPublicComment(token as string, {
+      text,
+      author_name: reviewerName,
+      session_id: sessionId,
+      parent_id: parentId,
+    })
+    if (resp) {
+      setGeneralComments((prev) => {
+        if (parentId) {
+          return prev.map(c =>
+            c.id === parentId
+              ? { ...c, replies: [...(c.replies || []), resp] }
+              : c
+          )
+        }
+        return [...prev, resp]
+      })
+    }
+  }, [token, reviewerName, sessionId])
+
   // WebSocket подключение для real-time обновлений
   const projectLoaded = !!project
   useEffect(() => {
@@ -540,24 +573,42 @@ export default function PublicSharePage() {
         try {
           const data = JSON.parse(event.data)
 
-          if (data.type === 'new_comment' && data.element_id) {
-            const newComment: Comment = {
-              id: data.comment_id,
-              element: data.element_id,
-              scene: data.scene_id,
-              parent: null,
-              author_name: data.author_name,
-              author_user: null,
-              session_id: data.session_id || '',
-              text: data.text,
-              is_read: false,
-              created_at: data.created_at,
-              replies: [],
+          if (data.type === 'new_comment') {
+            if (data.element_id) {
+              const newComment: Comment = {
+                id: data.comment_id,
+                element: data.element_id,
+                scene: data.scene_id,
+                parent: null,
+                author_name: data.author_name,
+                author_user: null,
+                session_id: data.session_id || '',
+                text: data.text,
+                is_read: false,
+                created_at: data.created_at,
+                replies: [],
+              }
+              setCommentsMap((prev) => ({
+                ...prev,
+                [data.element_id]: [...(prev[data.element_id] || []), newComment],
+              }))
+            } else if (data.shared_link_id) {
+              // General comment (link-level)
+              const newComment: Comment = {
+                id: data.comment_id,
+                element: null,
+                scene: null,
+                parent: null,
+                author_name: data.author_name,
+                author_user: null,
+                session_id: data.session_id || '',
+                text: data.text,
+                is_read: false,
+                created_at: data.created_at,
+                replies: [],
+              }
+              setGeneralComments((prev) => [...prev, newComment])
             }
-            setCommentsMap((prev) => ({
-              ...prev,
-              [data.element_id]: [...(prev[data.element_id] || []), newComment],
-            }))
           } else if (data.type === 'reaction_updated') {
             setProject((prev) => {
               if (!prev) return prev
@@ -719,6 +770,42 @@ export default function PublicSharePage() {
 
           {/* Controls */}
           <div className="flex items-center gap-1">
+            <Sheet>
+              <SheetTrigger asChild>
+                <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+                  <MessageSquare className="w-4 h-4" />
+                  <span className="hidden sm:inline">Обсуждение</span>
+                  {generalComments.length > 0 && (
+                    <span className="bg-emerald-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
+                      {generalComments.length}
+                    </span>
+                  )}
+                </button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-[380px] sm:w-[380px] p-0 flex flex-col">
+                <SheetHeader className="px-4 py-3 border-b border-border shrink-0">
+                  <SheetTitle className="text-sm font-medium">Обсуждение</SheetTitle>
+                </SheetHeader>
+                <div className="flex-1 overflow-y-auto px-4 py-3">
+                  {!hasIdentity ? (
+                    <div className="flex flex-col items-center gap-3 py-8">
+                      <MessageSquare className="w-8 h-8 text-muted-foreground/40" />
+                      <p className="text-sm text-muted-foreground text-center">Представьтесь, чтобы участвовать в обсуждении</p>
+                      <ReviewerNameInput onSave={(name, sid) => {
+                        setReviewerName(name)
+                        setSessionId(sid)
+                      }} />
+                    </div>
+                  ) : (
+                    <CommentThread
+                      comments={generalComments}
+                      onSubmit={handleGeneralCommentSubmit}
+                      isAuthenticated={hasIdentity}
+                    />
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
             <DisplaySettingsPopover />
             <ThemeToggle />
             <Popover>

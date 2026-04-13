@@ -405,6 +405,7 @@ export interface PublicProject {
   name: string
   scenes: PublicScene[]
   ungrouped_elements: PublicElement[]
+  general_comments?: Comment[]
   display_preferences?: {
     size?: string
     aspectRatio?: string
@@ -745,7 +746,7 @@ export interface FeedbackMessage {
 
 export interface FeedbackConversation {
   id: number
-  status: 'open' | 'resolved' | 'closed'
+  status: 'open' | 'closed'
   tag: '' | 'bug' | 'question' | 'idea'
   created_at: string
   updated_at: string
@@ -765,7 +766,7 @@ export interface AdminConversationUser {
 export interface AdminConversation {
   id: number
   user: AdminConversationUser
-  status: 'open' | 'resolved' | 'closed'
+  status: 'open' | 'closed'
   tag: '' | 'bug' | 'question' | 'idea'
   created_at: string
   updated_at: string
