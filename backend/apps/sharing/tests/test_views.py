@@ -298,14 +298,18 @@ class CommentValidationTest(SharingViewTestBase):
         comment = Comment.objects.filter(element=self.element).last()
         self.assertNotIn('<img', comment.author_name)
 
-    def test_neither_element_nor_scene_returns_400(self):
-        """Must provide exactly one of element_id or scene_id."""
+    def test_neither_element_nor_scene_creates_general_comment(self):
+        """No element_id/scene_id creates a general comment on the shared link."""
         resp = self.client.post(self._comment_url(), {
-            'text': 'No target',
+            'text': 'General feedback',
             'author_name': 'Guest',
             'session_id': 'abc',
         })
-        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.status_code, 201)
+        comment = Comment.objects.get(id=resp.data['id'])
+        self.assertIsNotNone(comment.shared_link_id)
+        self.assertIsNone(comment.element_id)
+        self.assertIsNone(comment.scene_id)
 
     def test_both_element_and_scene_returns_400(self):
         resp = self.client.post(self._comment_url(), {

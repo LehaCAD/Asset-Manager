@@ -165,11 +165,17 @@ def public_share_view(request, token):
 
     scenes = sorted(scenes_map.values(), key=lambda s: s['order_index'])
 
+    # Load general comments for the shared link
+    general_comments = Comment.objects.filter(
+        shared_link=link, parent__isnull=True, is_system=False
+    ).prefetch_related('replies').order_by('created_at')
+
     return Response({
         'name': link.project.name,
         'scenes': scenes,
         'ungrouped_elements': ungrouped,
         'display_preferences': link.display_preferences,
+        'general_comments': CommentSerializer(general_comments, many=True).data,
     })
 
 
@@ -306,6 +312,48 @@ def public_comment_view(request, token):
                 )
         except Exception as e:
             logger.warning(f'Failed to broadcast scene comment: {e}')
+
+    elif not data.get('element_id') and not data.get('scene_id'):
+        # General comment to the shared link itself
+        comment = Comment(
+            shared_link=link,
+            author_name=data['author_name'],
+            session_id=data['session_id'],
+            text=clean_text,
+            parent_id=data.get('parent_id'),
+            is_system=False,
+        )
+        try:
+            comment.full_clean()
+        except ValidationError as e:
+            return Response(
+                {'detail': e.message_dict if hasattr(e, 'message_dict') else str(e)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        comment.save()
+
+        # Broadcast to share group
+        try:
+            from channels.layers import get_channel_layer
+            from asgiref.sync import async_to_sync
+            channel_layer = get_channel_layer()
+            if channel_layer:
+                async_to_sync(channel_layer.group_send)(
+                    f'share_{link.token}',
+                    {'type': 'new_comment', 'data': {
+                        'type': 'new_comment',
+                        'comment_id': comment.id,
+                        'element_id': None,
+                        'scene_id': None,
+                        'shared_link_id': link.id,
+                        'author_name': comment.author_name,
+                        'text': comment.text[:200],
+                        'created_at': comment.created_at.isoformat(),
+                        'session_id': comment.session_id,
+                    }}
+                )
+        except Exception as e:
+            logger.warning(f'Failed to broadcast general comment: {e}')
 
     # Send notifications
     try:
@@ -584,6 +632,36 @@ def scene_comments_view(request, scene_id):
     text = strip_tags(serializer.validated_data['text'])
     comment = Comment(
         scene=scene,
+        author_name=request.user.username,
+        author_user=request.user,
+        session_id='',
+        text=text,
+        parent_id=serializer.validated_data.get('parent_id'),
+        is_system=False,
+    )
+    comment.full_clean()
+    comment.save()
+    return Response(CommentSerializer(comment).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+@throttle_classes([AuthCommentThrottle])
+def link_comments_view(request, link_id):
+    """GET/POST /api/sharing/links/{id}/comments/ — general comments on shared link."""
+    link = get_object_or_404(SharedLink, id=link_id, created_by=request.user)
+
+    if request.method == 'GET':
+        comments = Comment.objects.filter(
+            shared_link=link, parent__isnull=True, is_system=False
+        ).prefetch_related('replies').order_by('created_at')
+        return Response(CommentSerializer(comments, many=True).data)
+
+    serializer = CreateCommentAuthSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    text = strip_tags(serializer.validated_data['text'])
+    comment = Comment(
+        shared_link=link,
         author_name=request.user.username,
         author_user=request.user,
         session_id='',
