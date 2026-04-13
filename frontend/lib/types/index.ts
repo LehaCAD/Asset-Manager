@@ -553,7 +553,21 @@ export interface WSNewNotificationEvent {
   notification: Notification
 }
 
-export type WSEvent = WSElementStatusChangedEvent | WSNewCommentEvent
+export interface WSReactionUpdatedEvent {
+  type: 'reaction_updated'
+  element_id: number
+  likes: number
+  dislikes: number
+}
+
+export interface WSReviewUpdatedEvent {
+  type: 'review_updated'
+  element_id: number
+  action: string | null
+  author_name: string
+}
+
+export type WSEvent = WSElementStatusChangedEvent | WSNewCommentEvent | WSReactionUpdatedEvent | WSReviewUpdatedEvent
 
 // --- Share page WebSocket events ---
 
@@ -775,6 +789,7 @@ export interface FeedbackMessage {
   attachments: FeedbackAttachment[]
   created_at: string
   edited_at: string | null
+  conversation_id?: number
 }
 
 export interface FeedbackConversation {

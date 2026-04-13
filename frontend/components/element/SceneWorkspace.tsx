@@ -166,6 +166,16 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
           useSceneWorkspaceStore.getState().incrementCommentCount(event.element_id);
         }
         toast.info(`Новый комментарий от ${event.author_name}`);
+      } else if (event.type === 'reaction_updated') {
+        // Реакции не хранятся в WorkspaceElement напрямую
+      } else if (event.type === 'review_updated') {
+        if (event.element_id) {
+          updateElement(event.element_id, {
+            review_summary: event.action
+              ? { action: event.action, author_name: event.author_name }
+              : null,
+          } as any);
+        }
       }
     });
     const unsubscribeConnect = wsManager.onConnect(() => {

@@ -75,14 +75,14 @@ interface NotificationDropdownProps {
 
 export function NotificationDropdown({ children }: NotificationDropdownProps) {
   const [open, setOpen] = useState(false)
-  const notifications = useNotificationStore((s) => s.notifications)
-  const unreadCount = useNotificationStore((s) => s.unreadCount)
+  const bellNotifications = useNotificationStore((s) => s.getBellNotifications())
+  const bellUnreadCount = useNotificationStore((s) => s.getBellUnreadCount())
   const markAllRead = useNotificationStore((s) => s.markAllRead)
   const fetchNotifications = useNotificationStore((s) => s.fetchNotifications)
 
   function handleOpenChange(next: boolean) {
     setOpen(next)
-    if (next && notifications.length === 0) {
+    if (next && bellNotifications.length === 0) {
       fetchNotifications(0).catch(() => {})
     }
   }
@@ -94,7 +94,7 @@ export function NotificationDropdown({ children }: NotificationDropdownProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
           <span className="text-sm font-semibold">Уведомления</span>
-          {unreadCount > 0 && (
+          {bellUnreadCount > 0 && (
             <Button
               variant="ghost"
               size="sm"
@@ -108,13 +108,13 @@ export function NotificationDropdown({ children }: NotificationDropdownProps) {
 
         {/* List */}
         <div className="max-h-[360px] overflow-y-auto px-1">
-          {notifications.length === 0 ? (
+          {bellNotifications.length === 0 ? (
             <div className="py-8 text-center">
               <p className="text-sm text-muted-foreground">Уведомлений пока нет</p>
             </div>
           ) : (
             <div className="flex flex-col gap-0.5 py-1">
-              {notifications.slice(0, 10).map((n) => (
+              {bellNotifications.slice(0, 10).map((n) => (
                 <NotificationItem key={n.id} notification={n} onClose={() => setOpen(false)} />
               ))}
             </div>

@@ -4,9 +4,12 @@ import type { Notification } from "@/lib/types";
 
 type NotificationTab = 'all' | 'feedback' | 'content';
 
+// Типы фидбека — теперь живут в overlay «Отзывы», не в bell
+const FEEDBACK_TYPES = ['comment_new', 'reaction_new', 'review_new'];
+
 const TAB_TYPES: Record<NotificationTab, string[] | null> = {
-  all: null,
-  feedback: ['comment_new', 'reaction_new', 'review_new'],
+  all: null, // всё кроме feedback (фильтруется ниже)
+  feedback: FEEDBACK_TYPES, // для /cabinet/notifications архива
   content: ['generation_completed', 'generation_failed', 'upload_completed'],
 };
 
@@ -26,6 +29,8 @@ interface NotificationState {
   markRead: (id: number) => Promise<void>;
   markAllRead: () => Promise<void>;
   addNotification: (notification: Notification) => void;
+  getBellNotifications: () => Notification[];
+  getBellUnreadCount: () => number;
 }
 
 export type { NotificationTab };
@@ -104,5 +109,17 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       notifications: [notification, ...state.notifications],
       unreadCount: state.unreadCount + 1,
     }));
+  },
+
+  getBellNotifications: () => {
+    return get().notifications.filter(
+      (n) => !FEEDBACK_TYPES.includes(n.type)
+    );
+  },
+
+  getBellUnreadCount: () => {
+    return get().notifications.filter(
+      (n) => !FEEDBACK_TYPES.includes(n.type) && !n.is_read
+    ).length;
   },
 }));

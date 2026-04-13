@@ -305,6 +305,18 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
           useSceneWorkspaceStore.getState().incrementCommentCount(event.element_id);
         }
         toast.info(`Новый комментарий от ${event.author_name}`);
+      } else if (event.type === 'reaction_updated') {
+        // Реакции не хранятся в WorkspaceElement напрямую, но обновляем если нужно
+        // (для будущего использования в DetailPanel)
+      } else if (event.type === 'review_updated') {
+        // Обновить review_summary на элементе (полоска ревью на карточке)
+        if (event.element_id) {
+          updateElement(event.element_id, {
+            review_summary: event.action
+              ? { action: event.action, author_name: event.author_name }
+              : null,
+          } as Partial<WorkspaceElement>);
+        }
       }
     });
 

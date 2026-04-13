@@ -35,7 +35,7 @@ export function Navbar() {
   const balance = useCreditsStore((s) => s.balance);
   const loadBalance = useCreditsStore((s) => s.loadBalance);
 
-  const unreadCount = useNotificationStore((s) => s.unreadCount);
+  const unreadCount = useNotificationStore((s) => s.getBellUnreadCount());
   const fetchUnreadCount = useNotificationStore((s) => s.fetchUnreadCount);
   const addNotification = useNotificationStore((s) => s.addNotification);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
