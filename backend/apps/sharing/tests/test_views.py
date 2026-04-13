@@ -774,3 +774,68 @@ class GeneralCommentsTest(SharingViewTestBase):
         ]
         target = [e for e in elements if e['id'] == self.element.id][0]
         self.assertEqual(target['comment_count'], 1)  # Only element comment, not general
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 13. Project feedback endpoint
+# ─────────────────────────────────────────────────────────────────────
+class ProjectFeedbackTest(SharingViewTestBase):
+    """Tests for project-feedback endpoint."""
+
+    def test_unauthenticated_returns_401(self):
+        """Must be authenticated."""
+        self.client.logout()
+        response = self.client.get(f'/api/sharing/project-feedback/{self.project.id}/')
+        self.assertIn(response.status_code, [401, 403])
+
+    def test_non_owner_returns_404(self):
+        """Non-owner cannot see feedback."""
+        other = User.objects.create_user(username='other2', password='pass')
+        self.client.force_authenticate(other)
+        response = self.client.get(f'/api/sharing/project-feedback/{self.project.id}/')
+        self.assertEqual(response.status_code, 404)
+
+    def test_returns_links_with_feedback(self):
+        """Returns links grouped with elements and comments."""
+        self.client.force_authenticate(self.owner)
+        Comment.objects.create(element=self.element, author_name='G', session_id='x', text='Hi')
+        response = self.client.get(f'/api/sharing/project-feedback/{self.project.id}/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('links', response.data)
+        self.assertEqual(len(response.data['links']), 1)
+        link_data = response.data['links'][0]
+        self.assertGreaterEqual(len(link_data['elements']), 1)
+
+    def test_includes_general_comments(self):
+        """Returns general comments for each link."""
+        self.client.force_authenticate(self.owner)
+        Comment.objects.create(shared_link=self.link, author_name='G', session_id='x', text='General')
+        response = self.client.get(f'/api/sharing/project-feedback/{self.project.id}/')
+        link_data = response.data['links'][0]
+        self.assertEqual(len(link_data['general_comments']), 1)
+
+    def test_unread_count(self):
+        """Unread count should reflect unread comments."""
+        self.client.force_authenticate(self.owner)
+        Comment.objects.create(element=self.element, author_name='G', session_id='x', text='Unread', is_read=False)
+        Comment.objects.create(element=self.element, author_name='G', session_id='y', text='Read', is_read=True)
+        response = self.client.get(f'/api/sharing/project-feedback/{self.project.id}/')
+        link_data = response.data['links'][0]
+        self.assertEqual(link_data['unread_count'], 1)
+
+    def test_stats_counts(self):
+        """Stats should count approved/changes_requested/rejected elements."""
+        self.client.force_authenticate(self.owner)
+        ElementReview.objects.create(element=self.element, session_id='a', author_name='A', action='approved')
+        response = self.client.get(f'/api/sharing/project-feedback/{self.project.id}/')
+        stats = response.data['links'][0]['stats']
+        self.assertEqual(stats['approved'], 1)
+        self.assertEqual(stats['total_elements'], 1)
+
+    def test_empty_project_returns_empty_links(self):
+        """Project with no links returns empty list."""
+        self.client.force_authenticate(self.owner)
+        empty_project = Project.objects.create(name='Empty', user=self.owner)
+        response = self.client.get(f'/api/sharing/project-feedback/{empty_project.id}/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['links']), 0)
