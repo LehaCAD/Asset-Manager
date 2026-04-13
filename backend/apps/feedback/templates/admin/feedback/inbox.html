@@ -346,7 +346,7 @@
     <div id="conv-filters">
       <button class="filter-btn active" data-status="">Все</button>
       <button class="filter-btn" data-status="open">Открытые</button>
-      <button class="filter-btn" data-status="resolved">Решённые</button>
+      <button class="filter-btn" data-status="closed">Закрытые</button>
     </div>
     <div id="conversations"></div>
   </div>
@@ -516,10 +516,11 @@ function renderConversations() {
     const time = preview ? formatTime(preview.created_at) : '';
     const previewText = preview ? ((preview.is_admin ? 'Вы: ' : '') + preview.text) : '';
     const isActive = c.id === activeId;
+    const isClosed = c.status === 'closed';
     const tag = c.tag ? `<span class="conv-tag">${TAG_LABELS[c.tag] || c.tag}</span>` : '';
     const unread = c.unread_by_admin > 0 ? `<span class="conv-unread">${c.unread_by_admin}</span>` : '';
     return `
-      <div class="conv-item ${isActive ? 'active' : ''}" onclick="selectConv(${c.id})">
+      <div class="conv-item ${isActive ? 'active' : ''}" onclick="selectConv(${c.id})" style="${isClosed ? 'opacity:0.5' : ''}">
         <div class="conv-avatar" style="background:${color}">${initial}</div>
         <div class="conv-info">
           <div class="conv-name"><span>${escHtml(c.user.username)} ${tag}</span><span class="conv-time">${time}</span></div>
@@ -572,7 +573,7 @@ function renderChat(conv) {
       </div>
       <div id="chat-actions">
         <button class="chat-btn" onclick="openRewardModal(${conv.id}, '${escAttr(u.username)}')"><svg width="14" height="14" viewBox="0 0 256 256" style="vertical-align:-2px;margin-right:4px"><ellipse cx="128" cy="128" rx="128" ry="128" fill="#FFDE50"/><ellipse cx="128" cy="128" rx="99" ry="99" fill="#FAA300"/><path d="M57.88,198.17L198.15,57.91C180.2,39.95,155.4,28.83,128,28.83c-54.77,0-99.17,44.41-99.17,99.19C28.83,155.42,39.93,180.22,57.88,198.17z" fill="#FFBD00"/><path d="M84.83,198.26V57.74h28.87v54.48h13.67l23.1-54.48h31.38l-28.88,67.18L183,198.26h-31.76l-23.87-59.48H113.7v59.48H84.83z" fill="#FFEA94"/></svg>Начислить</button>
-        <button class="chat-btn" onclick="toggleStatus(${conv.id}, '${conv.status}')">${conv.status === 'open' ? '&#10003; Решено' : '&#8634; Открыть'}</button>
+        <button class="chat-btn" onclick="toggleStatus(${conv.id}, '${conv.status}')">${conv.status === 'open' ? '&#128274; Закрыть' : '&#8634; Открыть'}</button>
         <select class="chat-select" onchange="setTag(${conv.id}, this.value)">
           <option value="" ${!conv.tag ? 'selected' : ''}>Без тега</option>
           <option value="bug" ${conv.tag === 'bug' ? 'selected' : ''}>Баг</option>
@@ -583,6 +584,7 @@ function renderChat(conv) {
           <button class="chat-btn" onclick="toggleMgmtMenu()" title="Управление">&#8942;</button>
           <div id="mgmt-menu" style="display:none">
             <button onclick="showConvStats()">&#128202; Статистика</button>
+            <button onclick="confirmMerge()">&#128279; Объединить с другим</button>
             <button onclick="confirmClearHistory()">&#128465; Очистить историю</button>
             <button onclick="confirmClearAttachments()">&#128206; Удалить вложения</button>
             <button onclick="confirmDeleteConversation()">&#10060; Удалить диалог</button>
@@ -718,7 +720,7 @@ async function sendReply() {
     method: 'POST',
     body: JSON.stringify({text}),
   });
-  if (msg) {
+  if (msg && !messages.some(m => m.id === msg.id)) {
     messages.push(msg);
     renderMessages();
     scrollToBottom();
@@ -747,7 +749,7 @@ function autoGrow(el) {
 }
 
 async function toggleStatus(id, current) {
-  const newStatus = current === 'open' ? 'resolved' : 'open';
+  const newStatus = current === 'open' ? 'closed' : 'open';
   const updated = await api(`${API}/conversations/${id}/`, {
     method: 'PATCH',
     body: JSON.stringify({status: newStatus}),
@@ -1099,6 +1101,63 @@ async function confirmDeleteConversation() {
   const panel = document.getElementById('chat-panel');
   if (panel) panel.innerHTML = '<div id="chat-empty">Выберите диалог</div>';
   loadConversations();
+}
+
+// ─── Merge conversations ────────────────────────────
+async function confirmMerge() {
+  toggleMgmtMenu();
+  if (!activeId) return;
+  const conv = conversations.find(c => c.id === activeId);
+  if (!conv) return;
+
+  // Find other conversations from the same user
+  const sameUserConvs = conversations.filter(c => c.user.id === conv.user.id && c.id !== activeId);
+  if (!sameUserConvs.length) {
+    alert('Нет других диалогов с этим пользователем');
+    return;
+  }
+
+  // Build modal with dropdown
+  const modal = document.getElementById('reward-modal');
+  modal.style.display = 'block';
+  const options = sameUserConvs.map(c => {
+    const preview = c.last_message_preview ? c.last_message_preview.text.slice(0, 40) : 'пусто';
+    const statusIcon = c.status === 'open' ? '\uD83D\uDFE2' : '\u26AA';
+    return '<option value="' + c.id + '">' + statusIcon + ' #' + c.id + ' \u2014 ' + escHtml(preview) + '...</option>';
+  }).join('');
+
+  modal.innerHTML = '<div class="modal-overlay" onclick="closeRewardModal(event)">' +
+    '<div class="modal-box" onclick="event.stopPropagation()">' +
+      '<h3>Объединить диалоги</h3>' +
+      '<div class="modal-sub">Перенести сообщения из текущего диалога в выбранный</div>' +
+      '<label>Целевой диалог</label>' +
+      '<select id="merge-target" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text-primary);font-size:13px;margin-bottom:12px;">' +
+        options +
+      '</select>' +
+      '<div class="modal-actions">' +
+        '<button class="chat-btn" onclick="closeRewardModal()">Отмена</button>' +
+        '<button class="chat-btn" style="background:var(--accent);color:#fff;border-color:var(--accent)" onclick="executeMerge()">Объединить</button>' +
+      '</div>' +
+    '</div></div>';
+}
+
+async function executeMerge() {
+  const select = document.getElementById('merge-target');
+  if (!select) return;
+  const targetId = Number(select.value);
+
+  const result = await api(API + '/merge/', {
+    method: 'POST',
+    body: JSON.stringify({ source_id: activeId, target_id: targetId }),
+  });
+  if (result) {
+    closeRewardModal();
+    activeId = targetId;
+    messages = await api(API + '/conversations/' + targetId + '/messages/') || [];
+    await loadConversations();
+    const newConv = conversations.find(c => c.id === targetId);
+    if (newConv) renderChat(newConv);
+  }
 }
 
 // ─── Helpers ─────────────────────────────────────────
