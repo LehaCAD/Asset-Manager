@@ -27,6 +27,15 @@ import { useDisplayStore } from '@/lib/store/project-display'
 import { ASPECT_RATIO_CLASSES, FIT_MODE_CLASSES, DISPLAY_GRID_CONFIG, CARD_SIZES, WS_BASE_URL } from '@/lib/utils/constants'
 import type { PublicProject, PublicElement, Comment, DisplayCardSize, DisplayAspectRatio, DisplayFitMode } from '@/lib/types'
 
+/** Aggregate review status (worst-wins): rejected > changes_requested > approved */
+function getReviewStatus(reviews?: { action: string }[]): string | null {
+  if (!reviews || reviews.length === 0) return null
+  const actions = reviews.map(r => r.action)
+  if (actions.includes('rejected')) return 'rejected'
+  if (actions.includes('changes_requested')) return 'changes_requested'
+  return 'approved'
+}
+
 // ── Download helper ─────────────────────────────────────────
 
 async function handleDownload(url: string, filename?: string) {
@@ -95,6 +104,7 @@ function ElementCard({
 }) {
   const [imgError, setImgError] = useState(false)
   const isVideo = element.element_type === 'VIDEO'
+  const reviewStatus = getReviewStatus(element.reviews)
   const hasLikes = (element.likes ?? 0) > 0
   const hasDislikes = (element.dislikes ?? 0) > 0
   const hasReactions = hasLikes || hasDislikes
@@ -109,6 +119,16 @@ function ElementCard({
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick() }}
         className={`group relative rounded-t-md overflow-hidden bg-muted cursor-pointer ${aspectRatioClass}`}
       >
+        {/* Review status bar */}
+        {reviewStatus && (
+          <div className={cn(
+            "absolute top-0 left-0 right-0 h-[3px] z-10",
+            reviewStatus === 'approved' && "bg-emerald-500",
+            reviewStatus === 'changes_requested' && "bg-orange-500",
+            reviewStatus === 'rejected' && "bg-red-500/70",
+          )} />
+        )}
+
         {imgError ? (
           <div className="w-full h-full flex items-center justify-center bg-muted">
             <ImageOff className="w-8 h-8 text-muted-foreground/30" />

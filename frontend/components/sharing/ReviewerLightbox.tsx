@@ -13,6 +13,15 @@ import { sharingApi } from '@/lib/api/sharing'
 import { cn } from '@/lib/utils'
 import type { PublicElement, Comment } from '@/lib/types'
 
+/** Aggregate review status (worst-wins): rejected > changes_requested > approved */
+function getReviewStatus(reviews?: { action: string }[]): string | null {
+  if (!reviews || reviews.length === 0) return null
+  const actions = reviews.map(r => r.action)
+  if (actions.includes('rejected')) return 'rejected'
+  if (actions.includes('changes_requested')) return 'changes_requested'
+  return 'approved'
+}
+
 // ── Download helper ─────────────────────────────────────────
 
 async function handleDownload(url: string, filename?: string) {
@@ -380,6 +389,7 @@ export function ReviewerLightbox({
             {elements.map((el, idx) => {
               const isActive = idx === currentIndex
               const elIsVideo = el.element_type === 'VIDEO'
+              const thumbReviewStatus = getReviewStatus(el.reviews)
 
               return (
                 <button
@@ -390,6 +400,9 @@ export function ReviewerLightbox({
                     'shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all relative group',
                     isActive
                       ? 'border-primary ring-2 ring-primary/30'
+                      : thumbReviewStatus === 'approved' ? 'border-emerald-500/50 hover:border-emerald-500/70'
+                      : thumbReviewStatus === 'changes_requested' ? 'border-orange-500/50 hover:border-orange-500/70'
+                      : thumbReviewStatus === 'rejected' ? 'border-red-500/50 hover:border-red-500/70'
                       : 'border-transparent hover:border-muted-foreground/30'
                   )}
                 >
