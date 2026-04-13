@@ -230,6 +230,13 @@
   .modal-actions .chat-btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
   .modal-actions .chat-btn-primary:hover { background: #4A8BC4; }
 
+  .reward-preset {
+    padding: 6px 16px; font-size: 13px; border: 1px solid var(--border);
+    border-radius: 8px; cursor: pointer; background: transparent;
+    color: var(--text-secondary); transition: all 0.15s; font-weight: 500;
+  }
+  .reward-preset:hover { border-color: var(--accent); color: var(--text-primary); }
+
   /* ─── Jump-to-bottom button ─── */
   .jump-to-bottom {
     position: absolute; bottom: 80px; right: 24px;
@@ -596,7 +603,7 @@ function renderMessages() {
   const el = document.getElementById('chat-messages');
   if (!el) return;
 
-  let html = '';
+  let html = '<div style="flex:1"></div>'; // Spacer pushes messages to bottom
   let lastDate = '';
   let lastSender = null;
   let lastIsSystem = false;
@@ -730,7 +737,10 @@ async function setTag(id, tag) {
 }
 
 // ─── Reward modal ────────────────────────────────────
+let selectedRewardAmount = null;
+
 function openRewardModal(convId, username) {
+  selectedRewardAmount = null;
   const modal = document.getElementById('reward-modal');
   modal.style.display = 'block';
   modal.innerHTML = `
@@ -738,36 +748,92 @@ function openRewardModal(convId, username) {
       <div class="modal-box" onclick="event.stopPropagation()">
         <h3>Начислить Кадры</h3>
         <div class="modal-sub">Награда для <b>${escHtml(username)}</b></div>
-        <label>Сумма</label>
-        <input type="number" id="reward-amount" min="1" placeholder="100">
-        <label>Комментарий</label>
+
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+          <button class="reward-preset" onclick="selectRewardAmount(10, event)">10</button>
+          <button class="reward-preset" onclick="selectRewardAmount(25, event)">25</button>
+          <button class="reward-preset" onclick="selectRewardAmount(50, event)">50</button>
+          <button class="reward-preset" onclick="selectRewardAmount(100, event)">100</button>
+          <button class="reward-preset" onclick="showCustomAmount(event)">Другая сумма</button>
+        </div>
+
+        <div id="custom-amount-row" style="display:none;margin-bottom:12px;">
+          <label>Сумма</label>
+          <input type="number" id="reward-amount" min="1" placeholder="Введите сумму">
+        </div>
+
+        <label>Комментарий <span style="font-weight:400;color:var(--text-muted)">(необязательно)</span></label>
         <textarea id="reward-comment" rows="2" placeholder="За репорт бага"></textarea>
+
         <div class="modal-actions">
           <button class="chat-btn" onclick="closeRewardModal()">Отмена</button>
-          <button class="chat-btn chat-btn-primary" onclick="submitReward(${convId})">Начислить</button>
+          <button class="chat-btn" id="reward-submit-btn" onclick="submitReward(${convId})" disabled style="opacity:0.4">Начислить</button>
         </div>
       </div>
     </div>`;
 }
 
+function selectRewardAmount(amount, e) {
+  selectedRewardAmount = amount;
+  document.querySelectorAll('.reward-preset').forEach(b => {
+    b.style.background = 'transparent';
+    b.style.color = 'var(--text-secondary)';
+    b.style.borderColor = 'var(--border)';
+  });
+  e.target.style.background = 'var(--accent)';
+  e.target.style.color = '#fff';
+  e.target.style.borderColor = 'var(--accent)';
+  document.getElementById('custom-amount-row').style.display = 'none';
+  const btn = document.getElementById('reward-submit-btn');
+  if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+}
+
+function showCustomAmount(e) {
+  selectedRewardAmount = null;
+  document.querySelectorAll('.reward-preset').forEach(b => {
+    b.style.background = 'transparent';
+    b.style.color = 'var(--text-secondary)';
+    b.style.borderColor = 'var(--border)';
+  });
+  e.target.style.background = 'var(--accent)';
+  e.target.style.color = '#fff';
+  e.target.style.borderColor = 'var(--accent)';
+  const row = document.getElementById('custom-amount-row');
+  row.style.display = 'block';
+  document.getElementById('reward-amount').focus();
+  document.getElementById('reward-amount').oninput = function() {
+    const btn = document.getElementById('reward-submit-btn');
+    const val = Number(this.value);
+    if (val >= 1) { btn.disabled = false; btn.style.opacity = '1'; }
+    else { btn.disabled = true; btn.style.opacity = '0.4'; }
+  };
+  // Disable submit until amount entered
+  const btn = document.getElementById('reward-submit-btn');
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.4'; }
+}
+
 function closeRewardModal(e) {
   if (e && e.target !== e.currentTarget) return;
   document.getElementById('reward-modal').style.display = 'none';
+  selectedRewardAmount = null;
 }
 
 async function submitReward(convId) {
-  const amount = document.getElementById('reward-amount').value;
-  const comment = document.getElementById('reward-comment').value;
-  if (!amount || Number(amount) < 1) return alert('Укажите сумму');
+  const customInput = document.getElementById('reward-amount');
+  const amount = selectedRewardAmount || (customInput ? Number(customInput.value) : 0);
+  const comment = document.getElementById('reward-comment')?.value || '';
+  if (!amount || amount < 1) return;
+
   const result = await api(`${API}/conversations/${convId}/reward/`, {
     method: 'POST',
-    body: JSON.stringify({amount: Number(amount), comment}),
+    body: JSON.stringify({amount, comment}),
   });
   if (!result) {
     alert('Ошибка при начислении');
     return;
   }
   closeRewardModal();
+  selectedRewardAmount = null;
   messages = await api(`${API}/conversations/${convId}/messages/`) || [];
   renderMessages();
   scrollToBottom();
@@ -1005,8 +1071,28 @@ function escAttr(s) { return String(s || '').replace(/&/g,'&amp;').replace(/'/g,
 // ─── Init ────────────────────────────────────────────
 loadConversations();
 
-// Background polling for conversation list (catches new conversations + unread badges)
-// Runs every 10s — lightweight endpoint with DB annotations, not N+1
-setInterval(() => loadConversations(), 10000);
+// Background polling as fallback (WS handles real-time updates)
+setInterval(() => loadConversations(), 60000);
+
+// ─── Admin-wide WebSocket for instant list updates ───
+let adminListWS = null;
+function connectAdminListWS() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const url = `${proto}//${location.host}/ws/feedback/admin/`;
+  try {
+    adminListWS = new WebSocket(url);
+    adminListWS.onmessage = () => {
+      // Any event = reload conversation list
+      loadConversations();
+    };
+    adminListWS.onclose = () => {
+      adminListWS = null;
+      // Reconnect after 5 seconds
+      setTimeout(connectAdminListWS, 5000);
+    };
+    adminListWS.onerror = () => { adminListWS = null; };
+  } catch (e) { console.error('Admin WS error:', e); }
+}
+connectAdminListWS();
 </script>
 {% endblock %}

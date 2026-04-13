@@ -7,6 +7,26 @@ from channels.db import database_sync_to_async
 from .models import Conversation
 
 
+class AdminFeedbackConsumer(AsyncJsonWebsocketConsumer):
+    """WebSocket for admin — receives events from ALL conversations."""
+    GROUP_NAME = "feedback_admin"
+
+    async def connect(self):
+        user = self.scope.get("user")
+        if not user or user.is_anonymous or not user.is_staff:
+            await self.close()
+            return
+        await self.channel_layer.group_add(self.GROUP_NAME, self.channel_name)
+        await self.accept()
+
+    async def disconnect(self, code):
+        await self.channel_layer.group_discard(self.GROUP_NAME, self.channel_name)
+
+    async def feedback_list_update(self, event):
+        """Notify admin that conversation list changed."""
+        await self.send_json(event)
+
+
 class FeedbackChatConsumer(AsyncJsonWebsocketConsumer):
     """WebSocket consumer for feedback chat conversations."""
 

@@ -70,6 +70,17 @@ def grant_reward(
         },
     })
 
+    # Also notify admin channel for list updates
+    _send_to_admin_channel({
+        "type": "feedback_list_update",
+        "conversation_id": conversation.id,
+        "last_message_preview": {
+            "text": f"[SYS] {system_text}"[:100],
+            "is_admin": True,
+            "created_at": sys_msg.created_at.isoformat(),
+        },
+    })
+
     # Notification юзеру
     create_notification(
         user=conversation.user,
@@ -96,6 +107,17 @@ def notify_new_message(conversation: Conversation, message: Message):
             "text": message.text,
             "created_at": message.created_at.isoformat(),
             "attachments": [],
+        },
+    })
+
+    # Also notify admin channel for list updates
+    _send_to_admin_channel({
+        "type": "feedback_list_update",
+        "conversation_id": conversation.id,
+        "last_message_preview": {
+            "text": message.text[:100] if message.text else "",
+            "is_admin": message.is_admin,
+            "created_at": message.created_at.isoformat(),
         },
     })
 
@@ -131,6 +153,12 @@ def notify_conversation_updated(conversation: Conversation):
         "tag": conversation.tag,
     })
 
+    # Also notify admin channel for list updates
+    _send_to_admin_channel({
+        "type": "feedback_list_update",
+        "conversation_id": conversation.id,
+    })
+
 
 def notify_attachment_ready(conversation_id: int, message_id: int, attachment_data: dict):
     """Отправить WS-событие что вложение обработано."""
@@ -151,3 +179,12 @@ def _send_to_conversation(conversation_id: int, payload: dict):
         )
     except Exception:
         logger.exception("Failed to send WS event to feedback_%s", conversation_id)
+
+
+def _send_to_admin_channel(payload):
+    """Broadcast to admin feedback channel."""
+    try:
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)("feedback_admin", payload)
+    except Exception:
+        pass
