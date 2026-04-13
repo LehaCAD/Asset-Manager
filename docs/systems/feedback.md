@@ -13,6 +13,28 @@
 
 `backend/apps/feedback/`
 
+## Жизненный цикл диалога
+
+```
+[Клиент пишет] → Conversation(open) создаётся
+     ↓
+[Админ решает вопрос] → Нажимает «Решено» → status=resolved
+     ↓
+[24ч без сообщений] → Celery auto_close → status=closed
+     ↓
+[Клиент пишет снова] → Создаётся НОВЫЙ Conversation(open)
+```
+
+Один пользователь может иметь несколько диалогов (ForeignKey, не OneToOne).
+
+| Статус | Для клиента | Для админа |
+|--------|-------------|------------|
+| `open` | Может писать, видит чат | Активный, в списке |
+| `resolved` | Может писать (переоткроет) | В списке, ждёт закрытия |
+| `closed` | Видит историю, не может писать. Новое сообщение → новый диалог | Серым в списке, можно merge |
+
+**Merge диалогов:** Если клиент создал новый диалог по тому же вопросу, админ может объединить: все сообщения переносятся в целевой диалог, исходный удаляется.
+
 ## Модели
 
 ### Conversation (Диалог)
@@ -21,8 +43,8 @@
 
 | Поле | Тип | Назначение |
 |------|-----|------------|
-| `user` | OneToOneField(User) | Владелец диалога (1 юзер = 1 диалог) |
-| `status` | CharField | `open` / `resolved` |
+| `user` | ForeignKey(User) | Владелец диалога (1 юзер = много диалогов) |
+| `status` | CharField | `open` / `resolved` / `closed` |
 | `tag` | CharField | `bug` / `question` / `idea` / пусто |
 | `user_last_read_at` | DateTimeField, null | Когда юзер последний раз прочитал чат |
 | `admin_last_read_at` | DateTimeField, null | Когда админ последний раз прочитал чат |
@@ -96,6 +118,8 @@ Ordering: `-updated_at` (свежие диалоги наверху).
 | GET | `/api/feedback/admin/conversations/{id}/stats/` | Статистика: сообщений, вложений, объём |
 | DELETE | `/api/feedback/admin/conversations/{id}/delete/` | Удалить диалог целиком (cascade + S3) |
 | POST | `/api/feedback/admin/bulk/` | Массовые действия (resolve_all_open, close_old_resolved) |
+| POST | `/api/feedback/admin/merge/` | Объединить два диалога одного пользователя |
+| GET | `/api/feedback/conversations/` | Список всех диалогов пользователя (история) |
 
 ### Presign endpoints для staff
 
@@ -316,7 +340,7 @@ frontend/
 
 ## Тесты
 
-Файл: `backend/apps/feedback/tests.py` — **45 тестов**
+Файл: `backend/apps/feedback/tests.py` — **61 тестов**
 
 | Класс | Тесты | Что покрывает |
 |-------|-------|--------------|
@@ -326,6 +350,8 @@ frontend/
 | `TestAdvancedFeatures` | 15 | Edit, soft delete, pagination 30, serializer output, attachments |
 | `TestAdapterAndIntegration` | 9 | CreditsAdapter, S3 client, presign, unread total |
 | `TestAdminManagement` | 5 | Clear history, delete conv, clear attachments, stats, bulk actions |
+| `TestConversationLifecycle` | 12 | Multi-conversation, closed status, merge, auto-close, can_reply |
+| `TestAutoClose` | 4 | Celery auto-close resolved after 24h |
 
 ---
 
