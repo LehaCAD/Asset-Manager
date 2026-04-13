@@ -521,6 +521,38 @@ export interface WSNewNotificationEvent {
 
 export type WSEvent = WSElementStatusChangedEvent | WSNewCommentEvent
 
+// --- Share page WebSocket events ---
+
+export interface WSShareNewCommentEvent {
+  type: 'new_comment'
+  comment_id: number
+  element_id: number | null
+  scene_id: number | null
+  author_name: string
+  text: string
+  created_at: string
+  session_id: string
+}
+
+export interface WSShareReactionUpdatedEvent {
+  type: 'reaction_updated'
+  element_id: number
+  likes: number
+  dislikes: number
+  session_id: string
+  value: 'like' | 'dislike' | null
+}
+
+export interface WSShareReviewUpdatedEvent {
+  type: 'review_updated'
+  element_id: number
+  session_id: string
+  author_name: string
+  action: 'approved' | 'changes_requested' | 'rejected' | null
+}
+
+export type WSShareEvent = WSShareNewCommentEvent | WSShareReactionUpdatedEvent | WSShareReviewUpdatedEvent
+
 /* ── UI Types ─────────────────────────────────────────────── */
 
 export type GridDensity = "sm" | "md" | "lg";
@@ -713,12 +745,13 @@ export interface FeedbackMessage {
 
 export interface FeedbackConversation {
   id: number
-  status: 'open' | 'resolved'
+  status: 'open' | 'resolved' | 'closed'
   tag: '' | 'bug' | 'question' | 'idea'
   created_at: string
   updated_at: string
   last_message_preview: { text: string; is_admin: boolean; created_at: string } | null
   unread_count: number
+  can_reply: boolean
 }
 
 export interface AdminConversationUser {
@@ -732,7 +765,7 @@ export interface AdminConversationUser {
 export interface AdminConversation {
   id: number
   user: AdminConversationUser
-  status: 'open' | 'resolved'
+  status: 'open' | 'resolved' | 'closed'
   tag: '' | 'bug' | 'question' | 'idea'
   created_at: string
   updated_at: string

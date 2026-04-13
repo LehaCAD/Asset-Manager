@@ -24,7 +24,7 @@ import { cn } from '@/lib/utils'
 import { DisplaySettingsPopover } from '@/components/display/DisplaySettingsPopover'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
 import { useDisplayStore } from '@/lib/store/project-display'
-import { ASPECT_RATIO_CLASSES, FIT_MODE_CLASSES, DISPLAY_GRID_CONFIG, CARD_SIZES } from '@/lib/utils/constants'
+import { ASPECT_RATIO_CLASSES, FIT_MODE_CLASSES, DISPLAY_GRID_CONFIG, CARD_SIZES, WS_BASE_URL } from '@/lib/utils/constants'
 import type { PublicProject, PublicElement, Comment, DisplayCardSize, DisplayAspectRatio, DisplayFitMode } from '@/lib/types'
 
 // ── Download helper ─────────────────────────────────────────
@@ -491,6 +491,115 @@ export default function PublicSharePage() {
   const handleReviewChanged = useCallback((elementId: number, action: string | null) => {
     setReviewMap((prev) => ({ ...prev, [elementId]: action }))
   }, [])
+
+  // WebSocket подключение для real-time обновлений
+  useEffect(() => {
+    if (!project) return
+
+    const wsUrl = `${WS_BASE_URL}/ws/sharing/${token}/`
+    let ws: WebSocket | null = null
+    let pingInterval: ReturnType<typeof setInterval> | null = null
+    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null
+    let reconnectAttempts = 0
+    const MAX_RECONNECT = 5
+
+    function connect() {
+      ws = new WebSocket(wsUrl)
+
+      ws.onopen = () => {
+        reconnectAttempts = 0
+        pingInterval = setInterval(() => {
+          if (ws?.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'ping' }))
+          }
+        }, 30000)
+      }
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data)
+
+          if (data.type === 'new_comment' && data.element_id) {
+            const newComment: Comment = {
+              id: data.comment_id,
+              element: data.element_id,
+              scene: data.scene_id,
+              parent: null,
+              author_name: data.author_name,
+              author_user: null,
+              session_id: data.session_id || '',
+              text: data.text,
+              is_read: false,
+              created_at: data.created_at,
+              replies: [],
+            }
+            setCommentsMap((prev) => ({
+              ...prev,
+              [data.element_id]: [...(prev[data.element_id] || []), newComment],
+            }))
+          } else if (data.type === 'reaction_updated') {
+            setProject((prev) => {
+              if (!prev) return prev
+              const updateElement = (el: PublicElement) => {
+                if (el.id === data.element_id) {
+                  return { ...el, likes: data.likes, dislikes: data.dislikes }
+                }
+                return el
+              }
+              return {
+                ...prev,
+                ungrouped_elements: prev.ungrouped_elements.map(updateElement),
+                scenes: prev.scenes.map((s) => ({
+                  ...s,
+                  elements: s.elements.map(updateElement),
+                })),
+              }
+            })
+            if (data.session_id === sessionId) {
+              setReactionsMap((prev) => ({
+                ...prev,
+                [data.element_id]: data.value,
+              }))
+            }
+          } else if (data.type === 'review_updated') {
+            if (data.session_id === sessionId) {
+              setReviewMap((prev) => ({
+                ...prev,
+                [data.element_id]: data.action,
+              }))
+            }
+          }
+        } catch {
+          // ignore malformed messages
+        }
+      }
+
+      ws.onclose = () => {
+        if (pingInterval) clearInterval(pingInterval)
+        pingInterval = null
+        if (reconnectAttempts < MAX_RECONNECT) {
+          const delay = Math.min(1000 * 2 ** reconnectAttempts, 30000)
+          reconnectAttempts++
+          reconnectTimeout = setTimeout(connect, delay)
+        }
+      }
+
+      ws.onerror = () => {
+        // onclose will handle reconnect
+      }
+    }
+
+    connect()
+
+    return () => {
+      if (pingInterval) clearInterval(pingInterval)
+      if (reconnectTimeout) clearTimeout(reconnectTimeout)
+      if (ws) {
+        ws.onclose = null
+        ws.close()
+      }
+    }
+  }, [project, token, sessionId])
 
   const handleIdentitySaved = useCallback((name: string, sid: string) => {
     setReviewerName(name)
