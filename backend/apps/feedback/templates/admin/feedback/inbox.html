@@ -293,6 +293,41 @@
   }
   #mgmt-menu button:hover { background: var(--sidebar-hover); color: var(--text-primary); }
 
+  /* ─── Lightbox ─── */
+  #lightbox-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.85); display: none; z-index: 9999;
+    align-items: center; justify-content: center;
+    backdrop-filter: blur(4px);
+  }
+  #lightbox-overlay.active { display: flex; }
+  #lightbox-img {
+    max-width: 90vw; max-height: 85vh; object-fit: contain;
+    border-radius: 8px; box-shadow: 0 4px 32px rgba(0,0,0,0.5);
+  }
+  .lightbox-close {
+    position: absolute; top: 16px; right: 16px;
+    width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(255,255,255,0.1); border: none;
+    color: #fff; font-size: 24px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .lightbox-close:hover { background: rgba(255,255,255,0.2); }
+  .lightbox-nav {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    width: 44px; height: 44px; border-radius: 50%;
+    background: rgba(255,255,255,0.1); border: none;
+    color: #fff; font-size: 22px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .lightbox-nav:hover { background: rgba(255,255,255,0.2); }
+  .lightbox-prev { left: 16px; }
+  .lightbox-next { right: 16px; }
+  .lightbox-counter {
+    position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+    color: rgba(255,255,255,0.6); font-size: 13px;
+  }
+
   /* ─── Responsive: admin messages right-aligned on narrow screens ─── */
   @media (max-width: 768px) {
     .msg-group.admin-msg { flex-direction: row-reverse; }
@@ -321,6 +356,14 @@
 </div>
 
 <div id="reward-modal" style="display:none"></div>
+
+<div id="lightbox-overlay" onclick="closeLightbox(event)">
+  <button class="lightbox-close" onclick="closeLightbox()">&times;</button>
+  <button class="lightbox-nav lightbox-prev" onclick="lightboxNav(-1, event)">&#8249;</button>
+  <img id="lightbox-img" src="" alt="">
+  <button class="lightbox-nav lightbox-next" onclick="lightboxNav(1, event)">&#8250;</button>
+  <div class="lightbox-counter" id="lightbox-counter"></div>
+</div>
 
 <script>
 const CSRF = '{{ csrf_token }}';
@@ -641,7 +684,7 @@ function renderMessages() {
     const attachments = (m.attachments || []).map(a => {
       if (a.is_expired) return '<div class="msg-attachment" style="font-size:11px;color:var(--text-muted)">Вложение удалено</div>';
       if (a.content_type && a.content_type.startsWith('image/') && a.url) {
-        return `<div class="msg-attachment"><a href="${a.url}" target="_blank"><img src="${a.url}" alt="${escAttr(a.file_name)}" loading="lazy"></a></div>`;
+        return `<div class="msg-attachment"><img src="${a.url}" alt="${escAttr(a.file_name)}" loading="lazy" onclick="openLightbox('${a.url}', event)" style="cursor:pointer"></div>`;
       }
       return `<div class="msg-attachment"><a href="${a.url || '#'}" target="_blank">${escHtml(a.file_name)}</a></div>`;
     }).join('');
@@ -1079,6 +1122,62 @@ function scrollToBottom() {
 
 function escHtml(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
 function escAttr(s) { return String(s || '').replace(/&/g,'&amp;').replace(/'/g,'&#39;').replace(/"/g,'&quot;').replace(/`/g,'&#96;').replace(/\)/g,'&#41;'); }
+
+// ─── Lightbox ────────────────────────────────────────
+let lightboxImages = [];
+let lightboxIndex = 0;
+
+function collectAllImages() {
+  // Collect all image URLs from current messages
+  lightboxImages = [];
+  for (const m of messages) {
+    for (const a of (m.attachments || [])) {
+      if (a.content_type && a.content_type.startsWith('image/') && a.url && !a.is_expired) {
+        lightboxImages.push(a.url);
+      }
+    }
+  }
+}
+
+function openLightbox(url, e) {
+  if (e) { e.stopPropagation(); e.preventDefault(); }
+  collectAllImages();
+  lightboxIndex = lightboxImages.indexOf(url);
+  if (lightboxIndex < 0) lightboxIndex = 0;
+  showLightboxImage();
+  document.getElementById('lightbox-overlay').classList.add('active');
+}
+
+function closeLightbox(e) {
+  if (e && e.target !== e.currentTarget && !e.target.classList.contains('lightbox-close')) return;
+  document.getElementById('lightbox-overlay').classList.remove('active');
+}
+
+function lightboxNav(dir, e) {
+  if (e) { e.stopPropagation(); e.preventDefault(); }
+  lightboxIndex += dir;
+  if (lightboxIndex < 0) lightboxIndex = lightboxImages.length - 1;
+  if (lightboxIndex >= lightboxImages.length) lightboxIndex = 0;
+  showLightboxImage();
+}
+
+function showLightboxImage() {
+  const img = document.getElementById('lightbox-img');
+  const counter = document.getElementById('lightbox-counter');
+  if (lightboxImages.length > 0) {
+    img.src = lightboxImages[lightboxIndex];
+    counter.textContent = lightboxImages.length > 1 ? `${lightboxIndex + 1} / ${lightboxImages.length}` : '';
+  }
+}
+
+// Keyboard navigation for lightbox
+document.addEventListener('keydown', (e) => {
+  const overlay = document.getElementById('lightbox-overlay');
+  if (!overlay || !overlay.classList.contains('active')) return;
+  if (e.key === 'Escape') closeLightbox();
+  if (e.key === 'ArrowLeft') lightboxNav(-1);
+  if (e.key === 'ArrowRight') lightboxNav(1);
+});
 
 // ─── Init ────────────────────────────────────────────
 loadConversations();
