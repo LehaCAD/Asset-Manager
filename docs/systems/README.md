@@ -15,3 +15,4 @@
 |------|------------|
 | [subscriptions.md](subscriptions.md) | Тарифы, подписки, ограничение фич |
 | [topup-payments.md](topup-payments.md) | Пополнение баланса через ЮKassa |
+| [sharing.md](sharing.md) | Шеринг, комментарии, реакции, согласования, отзывы |
