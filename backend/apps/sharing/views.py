@@ -75,7 +75,7 @@ def public_share_view(request, token):
         )
 
     shared_elements = link.elements.select_related('scene').prefetch_related('reactions', 'reviews').annotate(
-        comment_count=Count('comments', distinct=True),
+        comment_count=Count('comments', filter=Q(comments__is_system=False), distinct=True),
         likes=Count('reactions', filter=Q(reactions__value='like'), distinct=True),
         dislikes=Count('reactions', filter=Q(reactions__value='dislike'), distinct=True),
     ).all()
