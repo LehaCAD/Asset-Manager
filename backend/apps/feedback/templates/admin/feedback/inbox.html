@@ -1004,5 +1004,9 @@ function escAttr(s) { return String(s || '').replace(/&/g,'&amp;').replace(/'/g,
 
 // ─── Init ────────────────────────────────────────────
 loadConversations();
+
+// Background polling for conversation list (catches new conversations + unread badges)
+// Runs every 10s — lightweight endpoint with DB annotations, not N+1
+setInterval(() => loadConversations(), 10000);
 </script>
 {% endblock %}
