@@ -91,6 +91,11 @@ Ordering: `-updated_at` (свежие диалоги наверху).
 | POST | `/api/feedback/admin/conversations/{id}/read/` | Отметить прочитанным |
 | PATCH/DELETE | `/api/feedback/admin/messages/{id}/` | Редактировать / удалить (soft) |
 | GET | `/api/feedback/admin/unread-total/` | Общее количество непрочитанных |
+| POST | `/api/feedback/admin/conversations/{id}/clear/` | Очистить историю (удалить сообщения + S3) |
+| POST | `/api/feedback/admin/conversations/{id}/clear-attachments/` | Удалить вложения (оставить сообщения) |
+| GET | `/api/feedback/admin/conversations/{id}/stats/` | Статистика: сообщений, вложений, объём |
+| DELETE | `/api/feedback/admin/conversations/{id}/delete/` | Удалить диалог целиком (cascade + S3) |
+| POST | `/api/feedback/admin/bulk/` | Массовые действия (resolve_all_open, close_old_resolved) |
 
 ### Presign endpoints для staff
 
@@ -311,7 +316,7 @@ frontend/
 
 ## Тесты
 
-Файл: `backend/apps/feedback/tests.py` — **40 тестов**
+Файл: `backend/apps/feedback/tests.py` — **45 тестов**
 
 | Класс | Тесты | Что покрывает |
 |-------|-------|--------------|
@@ -320,6 +325,7 @@ frontend/
 | `TestAdminAPI` | 8 | List, reply, status, tag, reward, delete, permissions |
 | `TestAdvancedFeatures` | 15 | Edit, soft delete, pagination 30, serializer output, attachments |
 | `TestAdapterAndIntegration` | 9 | CreditsAdapter, S3 client, presign, unread total |
+| `TestAdminManagement` | 5 | Clear history, delete conv, clear attachments, stats, bulk actions |
 
 ---
 
