@@ -90,7 +90,7 @@ class Comment(models.Model):
         settings.AUTH_USER_MODEL, null=True, blank=True,
         on_delete=models.SET_NULL, related_name='comments'
     )
-    session_id = models.CharField(max_length=36, default='')
+    session_id = models.CharField(max_length=36, default='', blank=True)
     text = models.TextField(max_length=2000)
     is_read = models.BooleanField(default=False)
     is_system = models.BooleanField(default=False, verbose_name='Системный комментарий')
