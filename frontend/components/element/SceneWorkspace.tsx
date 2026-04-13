@@ -167,7 +167,8 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
         }
         toast.info(`Новый комментарий от ${event.author_name}`);
       } else if (event.type === 'reaction_updated') {
-        // Реакции не хранятся в WorkspaceElement напрямую
+        // Пока нет reaction counts в WorkspaceElement, просто логируем
+        // В будущем: updateElement(event.element_id, { likes: event.likes, dislikes: event.dislikes })
       } else if (event.type === 'review_updated') {
         if (event.element_id) {
           updateElement(event.element_id, {

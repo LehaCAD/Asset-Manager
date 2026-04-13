@@ -837,7 +837,7 @@ def mark_comment_read(request, comment_id):
     """PATCH /api/sharing/comments/{id}/read/"""
     comment = get_object_or_404(
         Comment,
-        Q(element__project__user=request.user) | Q(scene__project__user=request.user),
+        Q(element__project__user=request.user) | Q(scene__project__user=request.user) | Q(shared_link__created_by=request.user),
         id=comment_id,
     )
     comment.is_read = True
@@ -863,7 +863,7 @@ def mark_all_comments_read(request):
     project = get_object_or_404(Project, id=project_id, user=request.user)
 
     Comment.objects.filter(
-        Q(element__project=project) | Q(scene__project=project),
+        Q(element__project=project) | Q(scene__project=project) | Q(shared_link__project=project),
         is_read=False,
     ).update(is_read=True)
 

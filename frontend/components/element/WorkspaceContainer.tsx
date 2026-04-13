@@ -306,8 +306,8 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
         }
         toast.info(`Новый комментарий от ${event.author_name}`);
       } else if (event.type === 'reaction_updated') {
-        // Реакции не хранятся в WorkspaceElement напрямую, но обновляем если нужно
-        // (для будущего использования в DetailPanel)
+        // Пока нет reaction counts в WorkspaceElement, просто логируем
+        // В будущем: updateElement(event.element_id, { likes: event.likes, dislikes: event.dislikes })
       } else if (event.type === 'review_updated') {
         // Обновить review_summary на элементе (полоска ревью на карточке)
         if (event.element_id) {

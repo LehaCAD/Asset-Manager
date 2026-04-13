@@ -51,11 +51,17 @@ export function ReviewsOverlay({ projectId, isOpen, onClose, onOpenLightbox }: R
     })
   }, [])
 
-  const handleReply = useCallback(async (linkId: number, elementKey: string, parentId?: number) => {
+  const handleReply = useCallback(async (linkId: number, elementKey: string, elementId?: number, parentId?: number) => {
     const text = replyTexts[elementKey]?.trim()
     if (!text) return
     try {
-      await sharingApi.addLinkComment(linkId, { text, parent_id: parentId })
+      if (elementId) {
+        // Ответ на комментарий к элементу
+        await sharingApi.addElementComment(elementId, text, parentId)
+      } else {
+        // Ответ на общий комментарий к ссылке
+        await sharingApi.addLinkComment(linkId, { text, parent_id: parentId })
+      }
       setReplyTexts((prev) => ({ ...prev, [elementKey]: '' }))
       // Refetch
       const data = await sharingApi.getProjectFeedback(projectId)
@@ -138,7 +144,7 @@ export function ReviewsOverlay({ projectId, isOpen, onClose, onOpenLightbox }: R
                       linkId={link.id}
                       replyText={replyTexts[`el-${el.id}`] || ''}
                       onReplyTextChange={(text) => setReplyTexts((prev) => ({ ...prev, [`el-${el.id}`]: text }))}
-                      onSubmitReply={() => handleReply(link.id, `el-${el.id}`)}
+                      onSubmitReply={() => handleReply(link.id, `el-${el.id}`, el.id)}
                       onOpenLightbox={onOpenLightbox}
                     />
                   ))}
