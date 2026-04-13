@@ -352,7 +352,7 @@ export default function PublicSharePage() {
         const username = stored?.state?.user?.username
         if (username) {
           setReviewerName(username)
-          setSessionId(stored?.state?.user?.id?.toString() || crypto.randomUUID())
+          setSessionId(`user_${stored.state.user.id}`)
           return // skip guest identity loading
         }
       } catch { /* ignore parse errors */ }
@@ -407,7 +407,7 @@ export default function PublicSharePage() {
         let effectiveSid = ''
         try {
           const authData = JSON.parse(localStorage.getItem('auth-storage') || '{}')
-          effectiveSid = authData?.state?.user?.id?.toString() || ''
+          effectiveSid = authData?.state?.user?.id ? `user_${authData.state.user.id}` : ''
         } catch { /* ignore */ }
         if (!effectiveSid) {
           effectiveSid = localStorage.getItem('reviewer_session_id') || ''
