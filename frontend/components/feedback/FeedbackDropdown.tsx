@@ -41,18 +41,13 @@ export function FeedbackDropdown() {
     }
   }, [isLoadingMore, messages, loadMessages])
 
-  const handleSend = async (text: string) => {
-    await sendMessage(text)
-  }
-
-  const handleAttachment = async (file: File) => {
-    let msg = messages[messages.length - 1]
-    if (!msg || msg.is_admin) {
-      const newMsg = await sendMessage('')
-      if (!newMsg) throw new Error('Не удалось создать сообщение')
-      msg = newMsg
+  const handleSend = async (text: string, files?: File[]) => {
+    const msg = await sendMessage(text || '')
+    if (files?.length && msg) {
+      for (const file of files) {
+        try { await uploadAttachment(msg.id, file) } catch { /* toast in ChatInput */ }
+      }
     }
-    await uploadAttachment(msg.id, file)
   }
 
   return (
@@ -82,10 +77,7 @@ export function FeedbackDropdown() {
 
       {/* Input — now with attachments */}
       <div className="border-t px-3 py-2">
-        <ChatInput
-          onSend={handleSend}
-          onAttachment={handleAttachment}
-        />
+        <ChatInput onSend={handleSend} />
       </div>
 
       {/* Footer */}

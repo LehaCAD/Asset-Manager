@@ -42,18 +42,13 @@ export function FeedbackChat() {
     }
   }, [isLoadingMore, messages, loadMessages])
 
-  const handleSend = async (text: string) => {
-    await sendMessage(text)
-  }
-
-  const handleAttachment = async (file: File) => {
-    let msg = messages[messages.length - 1]
-    if (!msg || msg.is_admin) {
-      const newMsg = await sendMessage('')
-      if (!newMsg) throw new Error('Не удалось создать сообщение')
-      msg = newMsg
+  const handleSend = async (text: string, files?: File[]) => {
+    const msg = await sendMessage(text || '')
+    if (files?.length && msg) {
+      for (const file of files) {
+        try { await uploadAttachment(msg.id, file) } catch { /* toast shown by ChatInput */ }
+      }
     }
-    await uploadAttachment(msg.id, file)
   }
 
   return (
@@ -99,10 +94,7 @@ export function FeedbackChat() {
 
       {/* Input */}
       <div className="border-t border-border/50 px-4 py-3">
-        <ChatInput
-          onSend={handleSend}
-          onAttachment={handleAttachment}
-        />
+        <ChatInput onSend={handleSend} />
       </div>
     </div>
   )

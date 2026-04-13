@@ -68,14 +68,13 @@ export function AdminChatPanel() {
 
   const conv = activeConversation
 
-  const handleSend = async (text: string) => {
-    await sendReply(text)
-  }
-
-  const handleAttachment = async (file: File) => {
-    const msg = await sendReply('')
-    if (!msg) throw new Error('Не удалось создать сообщение')
-    await uploadAttachment(msg.id, file)
+  const handleSend = async (text: string, files?: File[]) => {
+    const msg = await sendReply(text || '')
+    if (files?.length && msg) {
+      for (const file of files) {
+        try { await uploadAttachment(msg.id, file) } catch { /* toast in ChatInput */ }
+      }
+    }
   }
 
   const toggleStatus = () => {
@@ -174,7 +173,7 @@ export function AdminChatPanel() {
 
       {/* Input */}
       <div className="border-t border-border/50 px-4 py-3">
-        <ChatInput onSend={handleSend} onAttachment={handleAttachment} onTyping={handleTyping} placeholder="Ответить..." />
+        <ChatInput onSend={handleSend} onTyping={handleTyping} placeholder="Ответить..." />
       </div>
 
       <RewardModal

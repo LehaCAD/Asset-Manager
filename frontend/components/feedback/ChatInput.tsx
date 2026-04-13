@@ -1,16 +1,20 @@
 'use client'
 
 import { useState, useRef, useCallback } from 'react'
-import { ArrowUp, Paperclip } from 'lucide-react'
+import { ArrowUp, Paperclip, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
 
+interface StagedFile {
+  file: File
+  previewUrl: string | null // blob URL for images, null for PDFs
+}
+
 interface ChatInputProps {
-  onSend: (text: string) => Promise<void>
-  onAttachment?: (file: File) => Promise<void>
+  onSend: (text: string, files?: File[]) => Promise<void>
   onTyping?: () => void
   placeholder?: string
   showAttachButton?: boolean
@@ -18,13 +22,13 @@ interface ChatInputProps {
 
 export function ChatInput({
   onSend,
-  onAttachment,
   onTyping,
   placeholder = 'Сообщение...',
   showAttachButton = true,
 }: ChatInputProps) {
   const [text, setText] = useState('')
   const [isSending, setIsSending] = useState(false)
+  const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -42,24 +46,30 @@ export function ChatInput({
     el.style.height = 'auto'
     const newHeight = Math.min(el.scrollHeight, 120)
     el.style.height = newHeight + 'px'
-    // Only allow scrolling when at max height, keep scrollbar invisible
     el.style.overflow = el.scrollHeight > 120 ? 'auto' : 'hidden'
   }, [])
 
   const handleSend = useCallback(async () => {
     const trimmed = text.trim()
-    if (!trimmed || isSending) return
+    const hasFiles = stagedFiles.length > 0
+    if (!trimmed && !hasFiles) return
+    if (isSending) return
 
     setIsSending(true)
+    const filesToSend = stagedFiles.map(sf => sf.file)
+
+    // Clean up preview URLs
+    stagedFiles.forEach(sf => { if (sf.previewUrl) URL.revokeObjectURL(sf.previewUrl) })
+    setStagedFiles([])
     setText('')
     resetTextareaHeight()
 
     try {
-      await onSend(trimmed)
+      await onSend(trimmed, filesToSend.length > 0 ? filesToSend : undefined)
     } finally {
       setIsSending(false)
     }
-  }, [text, isSending, onSend, resetTextareaHeight])
+  }, [text, stagedFiles, isSending, onSend, resetTextareaHeight])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -84,81 +94,132 @@ export function ChatInput({
     return true
   }, [])
 
+  const stageFile = useCallback((file: File) => {
+    if (!validateFile(file)) return
+    if (stagedFiles.length >= 5) {
+      toast.error('Максимум 5 вложений')
+      return
+    }
+    const isImage = file.type.startsWith('image/')
+    const previewUrl = isImage ? URL.createObjectURL(file) : null
+    setStagedFiles(prev => [...prev, { file, previewUrl }])
+  }, [validateFile, stagedFiles.length])
+
+  const removeStaged = useCallback((index: number) => {
+    setStagedFiles(prev => {
+      const removed = prev[index]
+      if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl)
+      return prev.filter((_, i) => i !== index)
+    })
+  }, [])
+
   const handlePaste = useCallback(
     (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-      if (!onAttachment) return
       const items = e.clipboardData.items
       for (const item of Array.from(items)) {
         if (item.kind === 'file') {
           const file = item.getAsFile()
-          if (file && validateFile(file)) {
+          if (file) {
             e.preventDefault()
-            onAttachment(file)
+            stageFile(file)
           }
+          return
         }
       }
     },
-    [onAttachment, validateFile],
+    [stageFile],
   )
 
   const handleFileSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (!onAttachment) return
       const files = e.target.files
       if (!files?.length) return
-
       for (const file of Array.from(files)) {
-        if (validateFile(file)) {
-          onAttachment(file)
-        }
+        stageFile(file)
       }
       e.target.value = ''
     },
-    [onAttachment, validateFile],
+    [stageFile],
   )
 
+  const hasContent = text.trim().length > 0 || stagedFiles.length > 0
+
   return (
-    <div className="flex items-end gap-2">
-      {showAttachButton && onAttachment && (
-        <>
-          <button
-            type="button"
-            className="h-9 w-9 shrink-0 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Paperclip className="w-4 h-4" />
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,application/pdf,image/*"
-            className="hidden"
-            onChange={handleFileSelect}
-          />
-        </>
+    <div className="flex flex-col gap-2">
+      {/* Staged files preview */}
+      {stagedFiles.length > 0 && (
+        <div className="flex gap-2 flex-wrap px-1">
+          {stagedFiles.map((sf, i) => (
+            <div key={i} className="relative group">
+              {sf.previewUrl ? (
+                <img
+                  src={sf.previewUrl}
+                  alt={sf.file.name}
+                  className="w-16 h-16 object-cover rounded-lg border border-border/50"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-lg border border-border/50 bg-muted/30 flex items-center justify-center">
+                  <span className="text-[10px] text-muted-foreground text-center px-1 truncate">
+                    {sf.file.name.split('.').pop()?.toUpperCase()}
+                  </span>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => removeStaged(i)}
+                className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+        </div>
       )}
 
-      <textarea
-        ref={textareaRef}
-        value={text}
-        onChange={(e) => { setText(e.target.value); onTyping?.() }}
-        onInput={handleInput}
-        onKeyDown={handleKeyDown}
-        onPaste={handlePaste}
-        placeholder={placeholder}
-        rows={1}
-        style={{ overflow: 'hidden' }}
-        className="flex-1 resize-none bg-muted/30 text-foreground rounded-lg text-sm border border-border/50 outline-none focus:border-primary/50 placeholder:text-muted-foreground min-h-9 max-h-[120px] px-3 py-2 transition-colors [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      />
+      {/* Input row */}
+      <div className="flex items-end gap-2">
+        {showAttachButton && (
+          <>
+            <button
+              type="button"
+              className="h-9 w-9 shrink-0 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Paperclip className="w-4 h-4" />
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,application/pdf,image/*"
+              multiple
+              className="hidden"
+              onChange={handleFileSelect}
+            />
+          </>
+        )}
 
-      <Button
-        size="icon"
-        onClick={handleSend}
-        disabled={!text.trim() || isSending}
-        className="h-9 w-9 shrink-0 rounded-full bg-primary hover:bg-primary/90"
-      >
-        <ArrowUp className="w-4 h-4" />
-      </Button>
+        <textarea
+          ref={textareaRef}
+          value={text}
+          onChange={(e) => { setText(e.target.value); onTyping?.() }}
+          onInput={handleInput}
+          onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
+          placeholder={placeholder}
+          rows={1}
+          style={{ overflow: 'hidden' }}
+          className="flex-1 resize-none bg-muted/30 text-foreground rounded-lg text-sm border border-border/50 outline-none focus:border-primary/50 placeholder:text-muted-foreground min-h-9 max-h-[120px] px-3 py-2 transition-colors [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        />
+
+        <Button
+          size="icon"
+          onClick={handleSend}
+          disabled={!hasContent || isSending}
+          className="h-9 w-9 shrink-0 rounded-full bg-primary hover:bg-primary/90"
+        >
+          <ArrowUp className="w-4 h-4" />
+        </Button>
+      </div>
     </div>
   )
 }
