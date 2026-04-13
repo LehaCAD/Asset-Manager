@@ -5,6 +5,7 @@ from django.conf import settings
 from django.db import models
 from django.db.models import Q, F, Subquery, OuterRef, Count, Sum
 from django.db.models.functions import Coalesce
+from datetime import timedelta
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.authentication import SessionAuthentication
@@ -351,6 +352,132 @@ def admin_unread_total(request):
         | models.Q(messages__is_admin=False, messages__created_at__gt=models.F("admin_last_read_at"))
     ).distinct().count()
     return Response({"unread_total": total})
+
+
+@api_view(["POST"])
+@authentication_classes(ADMIN_AUTH)
+@permission_classes([IsAdminUser])
+def admin_clear_history(request, conversation_id):
+    """Clear all messages and attachments from a conversation."""
+    try:
+        conv = Conversation.objects.get(id=conversation_id)
+    except Conversation.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    # Delete S3 files
+    client = get_s3_client()
+    bucket = get_bucket_name()
+    for att in Attachment.objects.filter(message__conversation=conv, file_key__gt=''):
+        try:
+            client.delete_object(Bucket=bucket, Key=att.file_key)
+        except Exception:
+            pass
+
+    # Delete all messages (cascades to attachments)
+    conv.messages.all().delete()
+
+    # Notify via WS
+    from .services import _send_to_conversation
+    _send_to_conversation(conv.id, {"type": "conversation_updated", "status": conv.status, "tag": conv.tag})
+
+    return Response({"status": "cleared", "conversation_id": conversation_id})
+
+
+@api_view(["DELETE"])
+@authentication_classes(ADMIN_AUTH)
+@permission_classes([IsAdminUser])
+def admin_delete_conversation(request, conversation_id):
+    """Delete entire conversation with all messages and S3 files."""
+    try:
+        conv = Conversation.objects.get(id=conversation_id)
+    except Conversation.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    # Delete S3 files
+    client = get_s3_client()
+    bucket = get_bucket_name()
+    for att in Attachment.objects.filter(message__conversation=conv, file_key__gt=''):
+        try:
+            client.delete_object(Bucket=bucket, Key=att.file_key)
+        except Exception:
+            pass
+
+    conv.delete()  # Cascades to messages, attachments, rewards
+
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(["POST"])
+@authentication_classes(ADMIN_AUTH)
+@permission_classes([IsAdminUser])
+def admin_clear_attachments(request, conversation_id):
+    """Delete all attachment files from S3, mark as expired."""
+    try:
+        conv = Conversation.objects.get(id=conversation_id)
+    except Conversation.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    client = get_s3_client()
+    bucket = get_bucket_name()
+
+    atts = Attachment.objects.filter(message__conversation=conv, is_expired=False)
+    count = 0
+    for att in atts:
+        if att.file_key:
+            try:
+                client.delete_object(Bucket=bucket, Key=att.file_key)
+            except Exception:
+                pass
+        att.file_key = ''
+        att.is_expired = True
+        att.save(update_fields=['file_key', 'is_expired'])
+        count += 1
+
+    return Response({"status": "cleared", "attachments_removed": count})
+
+
+@api_view(["GET"])
+@authentication_classes(ADMIN_AUTH)
+@permission_classes([IsAdminUser])
+def admin_conversation_stats(request, conversation_id):
+    """Get conversation statistics: message count, attachment count, storage size."""
+    try:
+        conv = Conversation.objects.get(id=conversation_id)
+    except Conversation.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    msg_count = conv.messages.filter(is_deleted=False).count()
+    atts = Attachment.objects.filter(message__conversation=conv, is_expired=False)
+    att_count = atts.count()
+    storage_bytes = sum(a.file_size for a in atts if a.file_size)
+
+    return Response({
+        "messages": msg_count,
+        "attachments": att_count,
+        "storage_bytes": storage_bytes,
+    })
+
+
+@api_view(["POST"])
+@authentication_classes(ADMIN_AUTH)
+@permission_classes([IsAdminUser])
+def admin_bulk_action(request):
+    """Bulk actions on conversations."""
+    action = request.data.get("action")
+
+    if action == "close_old_resolved":
+        days = int(request.data.get("days", 30))
+        cutoff = timezone.now() - timedelta(days=days)
+        qs = Conversation.objects.filter(status="resolved", updated_at__lt=cutoff)
+        count = qs.count()
+        qs.delete()  # Cascade deletes messages + attachments (S3 files stay — use cleanup task)
+        return Response({"action": action, "deleted": count})
+
+    if action == "resolve_all_open":
+        count = Conversation.objects.filter(status="open").update(status="resolved")
+        return Response({"action": action, "resolved": count})
+
+    return Response({"detail": "Unknown action"}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(["PATCH", "DELETE"])

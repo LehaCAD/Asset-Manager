@@ -10,6 +10,13 @@ urlpatterns = [
     path("messages/<int:message_id>/confirm-attach/", views.confirm_attach_view),
     path("conversation/read/", views.mark_read_view),
 
+    # Admin — management (before parameterized routes)
+    path("admin/bulk/", views.admin_bulk_action),
+    path("admin/conversations/<int:conversation_id>/clear/", views.admin_clear_history),
+    path("admin/conversations/<int:conversation_id>/clear-attachments/", views.admin_clear_attachments),
+    path("admin/conversations/<int:conversation_id>/stats/", views.admin_conversation_stats),
+    path("admin/conversations/<int:conversation_id>/delete/", views.admin_delete_conversation),
+
     # Admin
     path("admin/unread-total/", views.admin_unread_total),
     path("admin/conversations/", views.admin_conversations_list),

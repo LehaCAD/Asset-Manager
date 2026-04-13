@@ -272,6 +272,20 @@
   }
   #edit-banner .edit-close:hover { color: var(--text-primary); background: var(--sidebar-hover); }
 
+  /* ─── Management menu ─── */
+  .chat-mgmt { position: relative; }
+  #mgmt-menu {
+    position: absolute; top: 100%; right: 0; z-index: 20;
+    background: var(--sidebar-bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 4px; min-width: 200px; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  #mgmt-menu button {
+    display: block; width: 100%; text-align: left; padding: 8px 12px;
+    font-size: 12px; color: var(--text-secondary); background: none;
+    border: none; cursor: pointer; border-radius: 4px;
+  }
+  #mgmt-menu button:hover { background: var(--sidebar-hover); color: var(--text-primary); }
+
   /* ─── Responsive: admin messages right-aligned on narrow screens ─── */
   @media (max-width: 768px) {
     .msg-group.admin-msg { flex-direction: row-reverse; }
@@ -515,6 +529,15 @@ function renderChat(conv) {
           <option value="question" ${conv.tag === 'question' ? 'selected' : ''}>Вопрос</option>
           <option value="idea" ${conv.tag === 'idea' ? 'selected' : ''}>Идея</option>
         </select>
+        <div class="chat-mgmt">
+          <button class="chat-btn" onclick="toggleMgmtMenu()" title="Управление">&#8942;</button>
+          <div id="mgmt-menu" style="display:none">
+            <button onclick="showConvStats()">&#128202; Статистика</button>
+            <button onclick="confirmClearHistory()">&#128465; Очистить историю</button>
+            <button onclick="confirmClearAttachments()">&#128206; Удалить вложения</button>
+            <button onclick="confirmDeleteConversation()">&#10060; Удалить диалог</button>
+          </div>
+        </div>
       </div>
     </div>
     <div id="chat-messages"></div>
@@ -895,6 +918,66 @@ async function saveEdit() {
 function sendOrSaveEdit() {
   if (editingMsgId) saveEdit();
   else sendReply();
+}
+
+// ─── Management menu ─────────────────────────────────
+function toggleMgmtMenu() {
+  const menu = document.getElementById('mgmt-menu');
+  if (menu) menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+
+// Close menu when clicking outside
+document.addEventListener('click', (e) => {
+  const menu = document.getElementById('mgmt-menu');
+  if (menu && menu.style.display === 'block' && !e.target.closest('.chat-mgmt')) {
+    menu.style.display = 'none';
+  }
+});
+
+async function showConvStats() {
+  toggleMgmtMenu();
+  if (!activeId) return;
+  const stats = await api(`${API}/conversations/${activeId}/stats/`);
+  if (stats) {
+    const sizeKb = Math.round((stats.storage_bytes || 0) / 1024);
+    const sizeMb = (sizeKb / 1024).toFixed(1);
+    const sizeStr = sizeKb > 1024 ? `${sizeMb} МБ` : `${sizeKb} КБ`;
+    alert(`Сообщений: ${stats.messages}\nВложений: ${stats.attachments}\nОбъём: ${sizeStr}`);
+  }
+}
+
+async function confirmClearHistory() {
+  toggleMgmtMenu();
+  if (!activeId) return;
+  if (!confirm('Удалить все сообщения и вложения из этого диалога? Отменить нельзя.')) return;
+  await api(`${API}/conversations/${activeId}/clear/`, { method: 'POST' });
+  messages = [];
+  renderMessages();
+  loadConversations();
+}
+
+async function confirmClearAttachments() {
+  toggleMgmtMenu();
+  if (!activeId) return;
+  if (!confirm('Удалить все файлы вложений? Сообщения останутся.')) return;
+  const result = await api(`${API}/conversations/${activeId}/clear-attachments/`, { method: 'POST' });
+  if (result) {
+    // Reload messages to show expired attachments
+    messages = await api(`${API}/conversations/${activeId}/messages/`) || [];
+    renderMessages();
+  }
+}
+
+async function confirmDeleteConversation() {
+  toggleMgmtMenu();
+  if (!activeId) return;
+  if (!confirm('Удалить диалог полностью? Все сообщения, вложения и награды будут удалены. Отменить нельзя.')) return;
+  await api(`${API}/conversations/${activeId}/delete/`, { method: 'DELETE' });
+  activeId = null;
+  messages = [];
+  const panel = document.getElementById('chat-panel');
+  if (panel) panel.innerHTML = '<div id="chat-empty">Выберите диалог</div>';
+  loadConversations();
 }
 
 // ─── Helpers ─────────────────────────────────────────

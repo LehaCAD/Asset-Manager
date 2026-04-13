@@ -496,6 +496,60 @@ class TestAdvancedFeatures(TestCase):
         self.assertTrue(att.is_expired)
 
 
+class TestAdminManagement(TestCase):
+    """Tests for admin management: clear history, delete conv, clear attachments, stats, bulk."""
+
+    def setUp(self):
+        self.admin = _make_user("admin", is_staff=True)
+        self.user = _make_user("user1")
+        self.conv = _make_conversation(self.user)
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.admin)
+
+    @patch("apps.common.s3.get_s3_client")
+    @patch("apps.feedback.services.get_channel_layer")
+    def test_clear_history(self, mock_channel, mock_s3):
+        mock_channel.return_value = MagicMock()
+        mock_s3.return_value = MagicMock()
+        _make_message(self.conv, self.user, text="msg1")
+        _make_message(self.conv, self.user, text="msg2")
+        resp = self.client.post(f"/api/feedback/admin/conversations/{self.conv.id}/clear/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(Message.objects.filter(conversation=self.conv).count(), 0)
+
+    @patch("apps.common.s3.get_s3_client")
+    def test_delete_conversation(self, mock_s3):
+        mock_s3.return_value = MagicMock()
+        _make_message(self.conv, self.user, text="msg")
+        resp = self.client.delete(f"/api/feedback/admin/conversations/{self.conv.id}/delete/")
+        self.assertEqual(resp.status_code, 204)
+        self.assertFalse(Conversation.objects.filter(id=self.conv.id).exists())
+
+    @patch("apps.common.s3.get_s3_client")
+    def test_clear_attachments(self, mock_s3):
+        mock_s3.return_value = MagicMock()
+        msg = _make_message(self.conv, self.user, text="with file")
+        Attachment.objects.create(message=msg, file_key="feedback/1/test.jpg", file_name="test.jpg", file_size=1000, content_type="image/jpeg")
+        resp = self.client.post(f"/api/feedback/admin/conversations/{self.conv.id}/clear-attachments/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["attachments_removed"], 1)
+        att = Attachment.objects.first()
+        self.assertTrue(att.is_expired)
+
+    def test_conversation_stats(self):
+        _make_message(self.conv, self.user, text="msg1")
+        _make_message(self.conv, self.user, text="msg2")
+        resp = self.client.get(f"/api/feedback/admin/conversations/{self.conv.id}/stats/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["messages"], 2)
+
+    def test_bulk_resolve_all(self):
+        resp = self.client.post("/api/feedback/admin/bulk/", {"action": "resolve_all_open"})
+        self.assertEqual(resp.status_code, 200)
+        self.conv.refresh_from_db()
+        self.assertEqual(self.conv.status, "resolved")
+
+
 class TestAdapterAndIntegration(TestCase):
     """Tests for CreditsAdapter, S3 client, and integration points."""
 
