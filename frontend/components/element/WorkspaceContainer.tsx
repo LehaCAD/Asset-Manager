@@ -298,6 +298,11 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
           }
           updateElement(event.element_id, updates);
         }
+      } else if (event.type === 'new_comment') {
+        if (event.element_id) {
+          useSceneWorkspaceStore.getState().incrementCommentCount(event.element_id);
+        }
+        toast.info(`Новый комментарий от ${event.author_name}`);
       }
     });
 

@@ -161,6 +161,11 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
             ...(event.preview_url && { preview_url: event.preview_url }),
           });
         }
+      } else if (event.type === 'new_comment') {
+        if (event.element_id) {
+          useSceneWorkspaceStore.getState().incrementCommentCount(event.element_id);
+        }
+        toast.info(`Новый комментарий от ${event.author_name}`);
       }
     });
     const unsubscribeConnect = wsManager.onConnect(() => {

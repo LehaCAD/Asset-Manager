@@ -297,6 +297,7 @@ interface SceneWorkspaceState {
   loadScene: (sceneId: number) => Promise<void>;
   addElement: (element: WorkspaceElement) => void;
   updateElement: (id: number, updates: Partial<WorkspaceElement>) => void;
+  incrementCommentCount: (elementId: number) => void;
   removeElement: (id: number) => void;
   createOptimisticGeneration: (input: CreateOptimisticGenerationInput) => number;
   resolveOptimisticGeneration: (tempId: number, real: Element) => void;
@@ -453,6 +454,16 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
         if (e.id !== id) return e;
         return { ...e, ...updates };
       }),
+    }));
+  },
+
+  incrementCommentCount: (elementId: number) => {
+    set((state) => ({
+      elements: state.elements.map((el) =>
+        el.id === elementId
+          ? { ...el, comment_count: (el.comment_count ?? 0) + 1 }
+          : el
+      ),
     }));
   },
 
