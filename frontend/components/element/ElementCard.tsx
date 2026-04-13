@@ -237,6 +237,15 @@ export function ElementCard({
     >
       {/* Thumbnail area — has aspect ratio */}
       <div className={cn("relative overflow-hidden", aspectClass)}>
+        {/* Review status bar — 3px colored bar at top */}
+        {reviewSummary && (
+          <div className={cn(
+            "absolute top-0 left-0 right-0 h-[3px] z-30",
+            reviewSummary.action === 'approved' && "bg-emerald-500",
+            reviewSummary.action === 'changes_requested' && "bg-orange-500",
+            reviewSummary.action === 'rejected' && "bg-red-500/70",
+          )} />
+        )}
         {/* Media layer — show image only when COMPLETED, gray placeholder otherwise */}
         {element.status === "COMPLETED" ? (
           isVideo ? (
@@ -598,18 +607,6 @@ export function ElementCard({
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-            {/* Review indicator from reviewer */}
-            {reviewSummary && (
-              <div className={cn(
-                "ml-auto inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium",
-                reviewSummary.action === 'approved' && "bg-[#22C55E]/10 text-[#4ADE80]",
-                reviewSummary.action === 'changes_requested' && "bg-[#F97316]/10 text-[#FB923C]",
-                reviewSummary.action === 'rejected' && "bg-[#EF4444]/10 text-[#F87171]",
-              )}>
-                <span>{reviewSummary.action === 'approved' ? '✓' : reviewSummary.action === 'changes_requested' ? '↻' : '✕'}</span>
-                <span className="truncate max-w-[60px]">{reviewSummary.author_name || 'Гость'}</span>
-              </div>
-            )}
           </div>
         </div>
       )}
