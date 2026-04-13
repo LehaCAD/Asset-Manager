@@ -513,8 +513,9 @@ export default function PublicSharePage() {
   }, [])
 
   // WebSocket подключение для real-time обновлений
+  const projectLoaded = !!project
   useEffect(() => {
-    if (!project) return
+    if (!projectLoaded) return
 
     const wsUrl = `${WS_BASE_URL}/ws/sharing/${token}/`
     let ws: WebSocket | null = null
@@ -582,6 +583,23 @@ export default function PublicSharePage() {
               }))
             }
           } else if (data.type === 'review_updated') {
+            // Обновить reviews на элементе для полоски
+            setProject((prev) => {
+              if (!prev) return prev
+              const updateEl = (el: any) => {
+                if (el.id !== data.element_id) return el
+                const reviews = (el.reviews || []).filter((r: any) => r.session_id !== data.session_id)
+                if (data.action) {
+                  reviews.push({ session_id: data.session_id, author_name: data.author_name, action: data.action })
+                }
+                return { ...el, reviews }
+              }
+              return {
+                ...prev,
+                ungrouped_elements: prev.ungrouped_elements.map(updateEl),
+                scenes: prev.scenes.map((s: any) => ({ ...s, elements: s.elements.map(updateEl) })),
+              }
+            })
             if (data.session_id === sessionId) {
               setReviewMap((prev) => ({
                 ...prev,
@@ -619,7 +637,7 @@ export default function PublicSharePage() {
         ws.close()
       }
     }
-  }, [project, token, sessionId])
+  }, [projectLoaded, token, sessionId])
 
   const handleIdentitySaved = useCallback((name: string, sid: string) => {
     setReviewerName(name)

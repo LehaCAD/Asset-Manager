@@ -283,6 +283,30 @@ def public_comment_view(request, token):
             )
         comment.save()
 
+        # Broadcast scene comment to share groups
+        try:
+            from apps.elements.models import Element
+            scene_element_ids = list(Element.objects.filter(
+                scene_id=data['scene_id']
+            ).values_list('id', flat=True)[:1])
+            if scene_element_ids:
+                _broadcast_to_share_groups(
+                    scene_element_ids[0],
+                    'new_comment',
+                    {
+                        'type': 'new_comment',
+                        'comment_id': comment.id,
+                        'element_id': None,
+                        'scene_id': comment.scene_id,
+                        'author_name': comment.author_name,
+                        'text': comment.text[:200],
+                        'created_at': comment.created_at.isoformat(),
+                        'session_id': comment.session_id,
+                    }
+                )
+        except Exception as e:
+            logger.warning(f'Failed to broadcast scene comment: {e}')
+
     # Send notifications
     try:
         from apps.notifications.services import notify_new_comment
