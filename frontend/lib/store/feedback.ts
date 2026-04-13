@@ -49,7 +49,7 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => {
       if (!conv) return []
       set({ isLoading: true })
       try {
-        const msgs = await feedbackApi.getMessages(cursor)
+        const msgs = await feedbackApi.getAllMessages(cursor)
         set((s) => ({
           messages: cursor ? [...msgs, ...s.messages] : msgs,
         }))
@@ -63,15 +63,32 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => {
 
     sendMessage: async (text) => {
       try {
+        const prevConvId = get().conversation?.id
+        const wasClosed = get().conversation && !get().conversation.can_reply
+
+        // sendMessage POST — backend auto-creates new conversation if needed
         const msg = await feedbackApi.sendMessage(text)
-        if (!get().conversation) {
-          await get().loadConversation()
+
+        // Reload conversation state
+        await get().loadConversation()
+        const newConvId = get().conversation?.id
+
+        const conversationChanged = prevConvId !== newConvId || wasClosed || !prevConvId
+
+        if (conversationChanged) {
+          // New conversation created — full reload: reconnect WS + reload all messages
+          get().disconnectWS()
           get().connectWS()
+          // Reload unified stream to get proper conversation_id boundaries
+          await get().loadMessages()
+        } else {
+          // Same conversation — just append the new message
+          set((s) => {
+            if (s.messages.some((m) => m.id === msg.id)) return s
+            return { messages: [...s.messages, msg] }
+          })
         }
-        set((s) => {
-          if (s.messages.some((m) => m.id === msg.id)) return s
-          return { messages: [...s.messages, msg] }
-        })
+
         return msg
       } catch {
         return null
@@ -143,8 +160,9 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => {
             conversation: s.conversation
               ? {
                   ...s.conversation,
-                  status: event.status as 'open' | 'resolved',
+                  status: event.status as 'open' | 'closed',
                   tag: event.tag as '' | 'bug' | 'question' | 'idea',
+                  can_reply: event.status !== 'closed',
                 }
               : null,
           }))
