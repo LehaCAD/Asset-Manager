@@ -127,4 +127,4 @@ class AdminConversationUpdateSerializer(serializers.Serializer):
 
 class RewardSerializer(serializers.Serializer):
     amount = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=1)
-    comment = serializers.CharField(max_length=200, required=False, default="")
+    comment = serializers.CharField(max_length=200, required=False, default="", allow_blank=True)

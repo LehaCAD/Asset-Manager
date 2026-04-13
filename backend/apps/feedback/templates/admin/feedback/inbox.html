@@ -763,7 +763,14 @@ function openRewardModal(convId, username) {
         </div>
 
         <label>Комментарий <span style="font-weight:400;color:var(--text-muted)">(необязательно)</span></label>
-        <textarea id="reward-comment" rows="2" placeholder="За репорт бага"></textarea>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px;">
+          <button class="reward-preset" style="font-size:11px;padding:3px 10px" onclick="setRewardComment('За отзыв', this)">За отзыв</button>
+          <button class="reward-preset" style="font-size:11px;padding:3px 10px" onclick="setRewardComment('За найденную ошибку', this)">За ошибку</button>
+          <button class="reward-preset" style="font-size:11px;padding:3px 10px" onclick="setRewardComment('За идею', this)">За идею</button>
+          <button class="reward-preset" style="font-size:11px;padding:3px 10px" onclick="setRewardComment('За тестирование', this)">За тестирование</button>
+          <button class="reward-preset" style="font-size:11px;padding:3px 10px" onclick="setRewardComment('Бонус', this)">Бонус</button>
+        </div>
+        <textarea id="reward-comment" rows="2" placeholder="Или напишите свой..."></textarea>
 
         <div class="modal-actions">
           <button class="chat-btn" onclick="closeRewardModal()">Отмена</button>
@@ -810,6 +817,11 @@ function showCustomAmount(e) {
   // Disable submit until amount entered
   const btn = document.getElementById('reward-submit-btn');
   if (btn) { btn.disabled = true; btn.style.opacity = '0.4'; }
+}
+
+function setRewardComment(text, btn) {
+  const textarea = document.getElementById('reward-comment');
+  if (textarea) textarea.value = text;
 }
 
 function closeRewardModal(e) {
