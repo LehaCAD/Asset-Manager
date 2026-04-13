@@ -15,11 +15,12 @@ django_asgi_app = get_asgi_application()
 
 from apps.projects.routing import websocket_urlpatterns as project_ws  # noqa: E402
 from apps.feedback.routing import websocket_urlpatterns as feedback_ws  # noqa: E402
+from apps.sharing.routing import websocket_urlpatterns as sharing_ws  # noqa: E402
 from apps.projects.middleware import JWTAuthMiddleware  # noqa: E402
 
 application = ProtocolTypeRouter({
     'http': django_asgi_app,
     'websocket': JWTAuthMiddleware(
-        URLRouter(project_ws + feedback_ws)
+        URLRouter(project_ws + feedback_ws + sharing_ws)
     ),
 })
