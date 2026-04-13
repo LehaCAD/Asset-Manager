@@ -249,16 +249,28 @@
     padding: 0 4px; font-weight: 600;
   }
 
-  /* ─── Message edit button ─── */
-  .msg-edit-btn {
-    position: absolute; top: 2px; right: -28px;
-    width: 24px; height: 24px; border-radius: 50%;
-    background: var(--sidebar-bg); border: 1px solid var(--border);
-    color: var(--text-muted); cursor: pointer; font-size: 12px;
-    display: none; align-items: center; justify-content: center;
+  /* ─── Admin messages clickable for edit ─── */
+  .msg-bubble.admin { cursor: pointer; }
+  .msg-bubble.admin:hover { filter: brightness(1.1); }
+
+  /* ─── Edit banner above input ─── */
+  #edit-banner {
+    display: none; padding: 8px 16px; border-top: 1px solid var(--border);
+    background: var(--sidebar-bg); flex-shrink: 0;
+    align-items: center; gap: 10px;
   }
-  .msg-bubble.admin:hover .msg-edit-btn { display: flex; }
-  .msg-edit-btn:hover { color: var(--text-primary); background: var(--sidebar-hover); }
+  #edit-banner.active { display: flex; }
+  #edit-banner .edit-icon { color: var(--accent); font-size: 16px; flex-shrink: 0; }
+  #edit-banner .edit-info { flex: 1; min-width: 0; }
+  #edit-banner .edit-label { font-size: 11px; font-weight: 600; color: var(--accent); }
+  #edit-banner .edit-preview { font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #edit-banner .edit-close {
+    width: 24px; height: 24px; border: none; background: none;
+    color: var(--text-muted); cursor: pointer; font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%; flex-shrink: 0;
+  }
+  #edit-banner .edit-close:hover { color: var(--text-primary); background: var(--sidebar-hover); }
 
   /* ─── Responsive: admin messages right-aligned on narrow screens ─── */
   @media (max-width: 768px) {
@@ -506,9 +518,17 @@ function renderChat(conv) {
       </div>
     </div>
     <div id="chat-messages"></div>
+    <div id="edit-banner">
+      <span class="edit-icon">✎</span>
+      <div class="edit-info">
+        <div class="edit-label">Редактирование</div>
+        <div class="edit-preview" id="edit-preview-text"></div>
+      </div>
+      <button class="edit-close" onclick="cancelEdit()">&times;</button>
+    </div>
     <div id="chat-input">
       <textarea id="reply-text" placeholder="Написать сообщение..." oninput="autoGrow(this)" onkeydown="handleKey(event)"></textarea>
-      <button onclick="sendReply()">Отправить</button>
+      <button id="send-btn" onclick="sendOrSaveEdit()">Отправить</button>
     </div>`;
   renderMessages();
   scrollToBottom();
@@ -604,9 +624,9 @@ function renderMessages() {
 
     html += `<div class="msg-content">`;
 
-    const editBtn = m.is_admin ? `<button class="msg-edit-btn" onclick="editMessage(${m.id}, this)" title="Редактировать">✎</button>` : '';
+    const clickEdit = m.is_admin ? ` onclick="startEdit(${m.id})"` : '';
     const editedLabel = m.edited_at ? '<span style="opacity:0.6;margin-right:3px">изм.</span>' : '';
-    html += `<div class="msg-bubble ${bubbleClass} ${cornerClass}">${escHtml(m.text)}${attachments}${editBtn}<div class="msg-time">${editedLabel}${formatHHMM(m.created_at)}</div></div>`;
+    html += `<div class="msg-bubble ${bubbleClass} ${cornerClass}"${clickEdit}>${escHtml(m.text)}${attachments}<div class="msg-time">${editedLabel}${formatHHMM(m.created_at)}</div></div>`;
     html += `</div></div>`;
   }
 
@@ -635,7 +655,11 @@ async function sendReply() {
 function handleKey(e) {
   if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
     e.preventDefault();
-    sendReply();
+    sendOrSaveEdit();
+  }
+  if (e.key === 'Escape' && editingMsgId) {
+    e.preventDefault();
+    cancelEdit();
   }
 }
 
@@ -804,55 +828,73 @@ async function loadOlderMessages() {
   loadingMore = false;
 }
 
-// ─── Message editing ────────────────────────────────
-async function editMessage(msgId, btn) {
+// ─── Telegram-style editing (in input area) ────────
+let editingMsgId = null;
+
+function startEdit(msgId) {
   const msg = messages.find(m => m.id === msgId);
-  if (!msg) return;
+  if (!msg || !msg.is_admin) return;
 
-  const bubble = btn.closest('.msg-bubble');
-  const originalText = msg.text;
-  bubble.innerHTML = `
-    <textarea class="edit-textarea" style="width:100%;min-height:40px;max-height:120px;resize:none;background:transparent;color:var(--text-primary);border:1px solid var(--accent);border-radius:6px;padding:6px 8px;font-size:13px;font-family:inherit;outline:none;overflow:hidden;scrollbar-width:none;">${escHtml(originalText)}</textarea>
-    <div style="display:flex;gap:4px;margin-top:4px;justify-content:flex-end;">
-      <button class="chat-btn" onclick="cancelEdit(${msgId})" style="padding:2px 10px;font-size:11px;">Отмена</button>
-      <button class="chat-btn" onclick="saveEdit(${msgId})" style="padding:2px 10px;font-size:11px;background:var(--accent);color:#fff;border-color:var(--accent);">Сохранить</button>
-    </div>
-  `;
+  editingMsgId = msgId;
 
-  const textarea = bubble.querySelector('.edit-textarea');
-  textarea.focus();
-  textarea.setSelectionRange(textarea.value.length, textarea.value.length);
-  textarea.addEventListener('input', function() {
-    this.style.height = 'auto';
-    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
-  });
-  textarea.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEdit(msgId); }
-    if (e.key === 'Escape') cancelEdit(msgId);
-  });
+  // Show banner
+  const banner = document.getElementById('edit-banner');
+  const preview = document.getElementById('edit-preview-text');
+  if (banner) banner.classList.add('active');
+  if (preview) preview.textContent = msg.text;
+
+  // Put text in input field
+  const textarea = document.getElementById('reply-text');
+  if (textarea) {
+    textarea.value = msg.text;
+    textarea.focus();
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    autoGrow(textarea);
+  }
+
+  // Change send button to checkmark
+  const btn = document.getElementById('send-btn');
+  if (btn) { btn.textContent = '✓'; btn.title = 'Сохранить'; }
 }
 
-async function saveEdit(msgId) {
-  const textarea = document.querySelector('.edit-textarea');
-  if (!textarea) return;
-  const text = textarea.value.trim();
+function cancelEdit() {
+  editingMsgId = null;
+
+  const banner = document.getElementById('edit-banner');
+  if (banner) banner.classList.remove('active');
+
+  const textarea = document.getElementById('reply-text');
+  if (textarea) {
+    textarea.value = '';
+    textarea.style.height = '38px';
+    textarea.style.overflow = 'hidden';
+  }
+
+  const btn = document.getElementById('send-btn');
+  if (btn) { btn.textContent = 'Отправить'; btn.title = ''; }
+}
+
+async function saveEdit() {
+  if (!editingMsgId) return;
+  const textarea = document.getElementById('reply-text');
+  const text = textarea ? textarea.value.trim() : '';
   if (!text) return;
 
-  const updated = await api(`${API}/messages/${msgId}/`, {
+  const updated = await api(`${API}/messages/${editingMsgId}/`, {
     method: 'PATCH',
     body: JSON.stringify({ text }),
   });
   if (updated) {
-    const idx = messages.findIndex(m => m.id === msgId);
+    const idx = messages.findIndex(m => m.id === editingMsgId);
     if (idx >= 0) messages[idx] = updated;
     renderMessages();
-    if (isNearBottom) scrollToBottom();
   }
+  cancelEdit();
 }
 
-function cancelEdit(msgId) {
-  renderMessages();
-  if (isNearBottom) scrollToBottom();
+function sendOrSaveEdit() {
+  if (editingMsgId) saveEdit();
+  else sendReply();
 }
 
 // ─── Helpers ─────────────────────────────────────────
