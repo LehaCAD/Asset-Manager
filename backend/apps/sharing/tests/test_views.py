@@ -669,3 +669,108 @@ class UngroupedElementTest(SharingViewTestBase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(len(resp.data['ungrouped_elements']), 1)
         self.assertEqual(resp.data['ungrouped_elements'][0]['id'], ungrouped.id)
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 12. General (link-level) comments
+# ─────────────────────────────────────────────────────────────────────
+@override_settings(REST_FRAMEWORK={'DEFAULT_THROTTLE_RATES': {'anon': '1000/min', 'user': '1000/min'}})
+class GeneralCommentsTest(SharingViewTestBase):
+    """Tests for link-level (general) comments."""
+
+    def test_create_general_comment_no_element_no_scene(self):
+        """POST without element_id and scene_id creates general comment."""
+        response = self.client.post(
+            f'/api/sharing/public/{self.link.token}/comments/',
+            {'text': 'Всё отлично!', 'author_name': 'Клиент', 'session_id': 'abc'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201)
+        comment = Comment.objects.get(id=response.data['id'])
+        self.assertEqual(comment.shared_link_id, self.link.id)
+        self.assertIsNone(comment.element_id)
+        self.assertIsNone(comment.scene_id)
+
+    def test_general_comments_in_public_share_response(self):
+        """GET public share should include general_comments."""
+        Comment.objects.create(
+            shared_link=self.link, author_name='Guest', session_id='x', text='General 1'
+        )
+        Comment.objects.create(
+            shared_link=self.link, author_name='Guest', session_id='y', text='General 2'
+        )
+        response = self.client.get(f'/api/sharing/public/{self.link.token}/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('general_comments', response.data)
+        self.assertEqual(len(response.data['general_comments']), 2)
+
+    def test_general_comment_reply(self):
+        """Reply to general comment should work."""
+        parent = Comment.objects.create(
+            shared_link=self.link, author_name='Guest', session_id='x', text='Parent'
+        )
+        response = self.client.post(
+            f'/api/sharing/public/{self.link.token}/comments/',
+            {'text': 'Reply', 'author_name': 'Guest2', 'session_id': 'y', 'parent_id': parent.id},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['parent'], parent.id)
+
+    def test_general_comment_notification_to_owner(self):
+        """General comment should create notification for project owner."""
+        self.client.post(
+            f'/api/sharing/public/{self.link.token}/comments/',
+            {'text': 'Hello owner', 'author_name': 'Reviewer', 'session_id': 'abc'},
+            format='json',
+        )
+        self.assertTrue(
+            Notification.objects.filter(
+                user=self.owner, type='comment_new'
+            ).exists()
+        )
+
+    def test_creator_get_link_comments(self):
+        """Creator can GET general comments for their link."""
+        Comment.objects.create(
+            shared_link=self.link, author_name='Guest', session_id='x', text='Feedback'
+        )
+        self.client.force_authenticate(self.owner)
+        response = self.client.get(f'/api/sharing/links/{self.link.id}/comments/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+
+    def test_creator_post_link_comment(self):
+        """Creator can reply to general comments."""
+        self.client.force_authenticate(self.owner)
+        response = self.client.post(
+            f'/api/sharing/links/{self.link.id}/comments/',
+            {'text': 'Thanks for feedback'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201)
+        comment = Comment.objects.get(id=response.data['id'])
+        self.assertEqual(comment.shared_link_id, self.link.id)
+        self.assertEqual(comment.author_user, self.owner)
+
+    def test_other_user_cannot_access_link_comments(self):
+        """Non-owner cannot access link comments."""
+        other = User.objects.create_user(username='other', password='pass123')
+        self.client.force_authenticate(other)
+        response = self.client.get(f'/api/sharing/links/{self.link.id}/comments/')
+        self.assertEqual(response.status_code, 404)
+
+    def test_general_comment_excluded_from_element_comments(self):
+        """General comments should NOT appear in element comment count."""
+        Comment.objects.create(
+            shared_link=self.link, author_name='Guest', session_id='x', text='General'
+        )
+        Comment.objects.create(
+            element=self.element, author_name='Guest', session_id='y', text='Element comment'
+        )
+        response = self.client.get(f'/api/sharing/public/{self.link.token}/')
+        elements = response.data.get('ungrouped_elements', []) + [
+            el for s in response.data.get('scenes', []) for el in s.get('elements', [])
+        ]
+        target = [e for e in elements if e['id'] == self.element.id][0]
+        self.assertEqual(target['comment_count'], 1)  # Only element comment, not general
