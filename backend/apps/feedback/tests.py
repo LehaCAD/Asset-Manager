@@ -1,8 +1,10 @@
+from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import patch, MagicMock
 
 from django.test import TestCase
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from .models import Conversation, Message, Attachment, FeedbackReward
@@ -29,11 +31,27 @@ def _make_message(conv, sender, is_admin=False, text="test"):
 
 
 class TestConversationModel(TestCase):
-    def test_one_conversation_per_user(self):
+    def test_conversation_creation(self):
         user = _make_user()
         conv = _make_conversation(user)
         self.assertEqual(conv.status, Conversation.STATUS_OPEN)
         self.assertEqual(conv.user, user)
+
+    def test_multiple_conversations_per_user(self):
+        """ForeignKey allows multiple conversations per user."""
+        user = _make_user()
+        c1 = _make_conversation(user)
+        c2 = _make_conversation(user)
+        self.assertNotEqual(c1.id, c2.id)
+        self.assertEqual(Conversation.objects.filter(user=user).count(), 2)
+
+    def test_status_closed(self):
+        user = _make_user()
+        conv = _make_conversation(user)
+        conv.status = Conversation.STATUS_CLOSED
+        conv.save()
+        conv.refresh_from_db()
+        self.assertEqual(conv.status, "closed")
 
     def test_ordering_by_updated_at(self):
         u1 = _make_user("user1")
@@ -59,6 +77,35 @@ class TestUserAPI(TestCase):
         resp = self.client.post("/api/feedback/conversation/")
         self.assertEqual(resp.status_code, 201)
         self.assertTrue(Conversation.objects.filter(user=self.user).exists())
+        self.assertIn("can_reply", resp.data)
+        self.assertTrue(resp.data["can_reply"])
+
+    def test_create_conversation_returns_existing_open(self):
+        """POST returns existing open conversation instead of creating new."""
+        self.client.post("/api/feedback/conversation/")
+        resp = self.client.post("/api/feedback/conversation/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(Conversation.objects.filter(user=self.user).count(), 1)
+
+    def test_get_conversation_returns_active_over_closed(self):
+        """GET returns non-closed conversation when both exist."""
+        closed = _make_conversation(self.user)
+        closed.status = Conversation.STATUS_CLOSED
+        closed.save()
+        active = _make_conversation(self.user)
+        resp = self.client.get("/api/feedback/conversation/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["id"], active.id)
+
+    def test_get_conversation_returns_closed_when_no_active(self):
+        """GET returns latest closed if no active conversations."""
+        closed = _make_conversation(self.user)
+        closed.status = Conversation.STATUS_CLOSED
+        closed.save()
+        resp = self.client.get("/api/feedback/conversation/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["id"], closed.id)
+        self.assertFalse(resp.data["can_reply"])
 
     @patch("apps.feedback.services.get_channel_layer")
     @patch("apps.feedback.services.create_notification")
@@ -80,14 +127,45 @@ class TestUserAPI(TestCase):
 
     @patch("apps.feedback.services.get_channel_layer")
     @patch("apps.feedback.services.create_notification")
-    def test_send_message_reopens_resolved(self, mock_notify, mock_channel):
+    def test_send_message_creates_new_when_closed(self, mock_notify, mock_channel):
+        """Sending a message when conversation is closed creates a new one."""
         mock_channel.return_value = MagicMock()
         conv = _make_conversation(self.user)
-        conv.status = Conversation.STATUS_RESOLVED
+        conv.status = Conversation.STATUS_CLOSED
         conv.save()
-        self.client.post("/api/feedback/messages/", {"text": "Still broken"})
-        conv.refresh_from_db()
-        self.assertEqual(conv.status, Conversation.STATUS_OPEN)
+        resp = self.client.post("/api/feedback/messages/", {"text": "Still broken"})
+        self.assertEqual(resp.status_code, 201)
+        # Should have 2 conversations: old closed + new open
+        self.assertEqual(Conversation.objects.filter(user=self.user).count(), 2)
+        new_conv = Conversation.objects.filter(user=self.user, status=Conversation.STATUS_OPEN).first()
+        self.assertIsNotNone(new_conv)
+        self.assertNotEqual(new_conv.id, conv.id)
+
+    @patch("apps.feedback.services.get_channel_layer")
+    @patch("apps.feedback.services.create_notification")
+    def test_send_message_creates_new_when_all_closed(self, mock_notify, mock_channel):
+        """Sending a message when all conversations are closed creates a new one."""
+        mock_channel.return_value = MagicMock()
+        conv = _make_conversation(self.user)
+        conv.status = Conversation.STATUS_CLOSED
+        conv.save()
+        resp = self.client.post("/api/feedback/messages/", {"text": "New topic"})
+        self.assertEqual(resp.status_code, 201)
+        # Should have 2 conversations now: old closed + new open
+        self.assertEqual(Conversation.objects.filter(user=self.user).count(), 2)
+        new_conv = Conversation.objects.filter(user=self.user, status=Conversation.STATUS_OPEN).first()
+        self.assertIsNotNone(new_conv)
+        self.assertNotEqual(new_conv.id, conv.id)
+
+    def test_conversation_history(self):
+        """User can list all their conversations."""
+        c1 = _make_conversation(self.user)
+        c2 = _make_conversation(self.user)
+        c2.status = Conversation.STATUS_CLOSED
+        c2.save()
+        resp = self.client.get("/api/feedback/conversations/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 2)
 
     def test_get_messages(self):
         conv = _make_conversation(self.user)
@@ -120,7 +198,7 @@ class TestAdminAPI(TestCase):
         self.assertEqual(len(resp.data), 1)
 
     def test_filter_by_status(self):
-        resp = self.client.get("/api/feedback/admin/conversations/?status=resolved")
+        resp = self.client.get("/api/feedback/admin/conversations/?status=closed")
         self.assertEqual(len(resp.data), 0)
 
     @patch("apps.feedback.services.get_channel_layer")
@@ -137,11 +215,11 @@ class TestAdminAPI(TestCase):
     def test_update_status(self):
         resp = self.client.patch(
             f"/api/feedback/admin/conversations/{self.conv.id}/",
-            {"status": "resolved"},
+            {"status": "closed"},
         )
         self.assertEqual(resp.status_code, 200)
         self.conv.refresh_from_db()
-        self.assertEqual(self.conv.status, Conversation.STATUS_RESOLVED)
+        self.assertEqual(self.conv.status, Conversation.STATUS_CLOSED)
 
     def test_update_tag(self):
         self.client.patch(
@@ -543,11 +621,11 @@ class TestAdminManagement(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.data["messages"], 2)
 
-    def test_bulk_resolve_all(self):
-        resp = self.client.post("/api/feedback/admin/bulk/", {"action": "resolve_all_open"})
+    def test_bulk_close_all(self):
+        resp = self.client.post("/api/feedback/admin/bulk/", {"action": "close_all_open"})
         self.assertEqual(resp.status_code, 200)
         self.conv.refresh_from_db()
-        self.assertEqual(self.conv.status, "resolved")
+        self.assertEqual(self.conv.status, "closed")
 
 
 class TestAdapterAndIntegration(TestCase):
@@ -652,3 +730,198 @@ class TestAdapterAndIntegration(TestCase):
         )
         self.assertEqual(resp.status_code, 200)
         mock_s3.assert_called()  # Verify shared client was used
+
+
+class TestConversationLifecycle(TestCase):
+    """Tests for multi-conversation lifecycle: merge, auto-close, can_reply."""
+
+    def setUp(self):
+        self.admin = _make_user("admin", is_staff=True)
+        self.user = _make_user("user1")
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.admin)
+
+    def test_merge_conversations(self):
+        """Merge moves messages and rewards from source to target."""
+        c1 = _make_conversation(self.user)
+        c2 = _make_conversation(self.user)
+        m1 = _make_message(c1, self.user, text="msg in c1")
+        m2 = _make_message(c2, self.user, text="msg in c2")
+
+        resp = self.client.post("/api/feedback/admin/merge/", {
+            "source_id": c1.id,
+            "target_id": c2.id,
+        })
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["status"], "merged")
+
+        # Source deleted
+        self.assertFalse(Conversation.objects.filter(id=c1.id).exists())
+
+        # Both messages in target
+        self.assertEqual(Message.objects.filter(conversation=c2).count(), 2)
+
+    def test_merge_different_users_rejected(self):
+        """Cannot merge conversations from different users."""
+        u2 = _make_user("user2")
+        c1 = _make_conversation(self.user)
+        c2 = _make_conversation(u2)
+
+        resp = self.client.post("/api/feedback/admin/merge/", {
+            "source_id": c1.id,
+            "target_id": c2.id,
+        })
+        self.assertEqual(resp.status_code, 400)
+
+    def test_merge_same_id_rejected(self):
+        """Cannot merge a conversation with itself."""
+        c1 = _make_conversation(self.user)
+        resp = self.client.post("/api/feedback/admin/merge/", {
+            "source_id": c1.id,
+            "target_id": c1.id,
+        })
+        self.assertEqual(resp.status_code, 400)
+
+    def test_merge_reopens_closed_target(self):
+        """Merge reopens a closed target conversation."""
+        c1 = _make_conversation(self.user)
+        c2 = _make_conversation(self.user)
+        c2.status = Conversation.STATUS_CLOSED
+        c2.save()
+        _make_message(c1, self.user, text="msg")
+
+        self.client.post("/api/feedback/admin/merge/", {
+            "source_id": c1.id,
+            "target_id": c2.id,
+        })
+        c2.refresh_from_db()
+        self.assertEqual(c2.status, Conversation.STATUS_OPEN)
+
+    def test_auto_close_inactive(self):
+        """Auto-close task closes open conversations inactive for 24h."""
+        from .tasks import auto_close_inactive
+        conv = _make_conversation(self.user)
+        # Manually backdate updated_at
+        Conversation.objects.filter(id=conv.id).update(
+            updated_at=timezone.now() - timedelta(hours=25)
+        )
+        auto_close_inactive()
+        conv.refresh_from_db()
+        self.assertEqual(conv.status, Conversation.STATUS_CLOSED)
+
+    def test_auto_close_skips_recent(self):
+        """Auto-close task does not close recently active open conversations."""
+        from .tasks import auto_close_inactive
+        conv = _make_conversation(self.user)
+        auto_close_inactive()
+        conv.refresh_from_db()
+        self.assertEqual(conv.status, Conversation.STATUS_OPEN)
+
+    def test_can_reply_open(self):
+        """can_reply is True for open conversations."""
+        conv = _make_conversation(self.user)
+        self.client.force_authenticate(user=self.user)
+        resp = self.client.get("/api/feedback/conversation/")
+        self.assertTrue(resp.data["can_reply"])
+
+    def test_can_reply_closed(self):
+        """can_reply is False for closed conversations."""
+        conv = _make_conversation(self.user)
+        conv.status = Conversation.STATUS_CLOSED
+        conv.save()
+        self.client.force_authenticate(user=self.user)
+        resp = self.client.get("/api/feedback/conversation/")
+        self.assertFalse(resp.data["can_reply"])
+
+    def test_admin_can_set_closed_status(self):
+        """Admin can change status to closed."""
+        conv = _make_conversation(self.user)
+        resp = self.client.patch(
+            f"/api/feedback/admin/conversations/{conv.id}/",
+            {"status": "closed"},
+        )
+        self.assertEqual(resp.status_code, 200)
+        conv.refresh_from_db()
+        self.assertEqual(conv.status, Conversation.STATUS_CLOSED)
+
+
+class TestUnifiedStream(TestCase):
+    """Tests for the unified all-messages endpoint and conversation boundaries."""
+
+    def setUp(self):
+        self.user = _make_user()
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def test_all_messages_empty(self):
+        """Returns empty list when no conversations."""
+        resp = self.client.get("/api/feedback/all-messages/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 0)
+
+    def test_all_messages_single_conversation(self):
+        """Returns messages from a single conversation with conversation_id."""
+        conv = _make_conversation(self.user)
+        _make_message(conv, self.user, text="msg1")
+        _make_message(conv, self.user, text="msg2")
+        resp = self.client.get("/api/feedback/all-messages/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 2)
+        self.assertEqual(resp.data[0]["conversation_id"], conv.id)
+        self.assertEqual(resp.data[1]["conversation_id"], conv.id)
+
+    def test_all_messages_multiple_conversations(self):
+        """Returns messages from all conversations with correct conversation_ids."""
+        conv1 = _make_conversation(self.user)
+        _make_message(conv1, self.user, text="conv1 msg")
+        conv2 = Conversation.objects.create(user=self.user)
+        _make_message(conv2, self.user, text="conv2 msg")
+        resp = self.client.get("/api/feedback/all-messages/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 2)
+        conv_ids = [m["conversation_id"] for m in resp.data]
+        self.assertIn(conv1.id, conv_ids)
+        self.assertIn(conv2.id, conv_ids)
+
+    def test_all_messages_excludes_deleted(self):
+        """Deleted messages are excluded from unified stream."""
+        conv = _make_conversation(self.user)
+        msg1 = _make_message(conv, self.user, text="visible")
+        msg2 = _make_message(conv, self.user, text="deleted")
+        msg2.is_deleted = True
+        msg2.save()
+        resp = self.client.get("/api/feedback/all-messages/")
+        self.assertEqual(len(resp.data), 1)
+        self.assertEqual(resp.data[0]["text"], "visible")
+
+    def test_all_messages_pagination(self):
+        """Unified stream respects cursor pagination."""
+        conv = _make_conversation(self.user)
+        msgs = []
+        for i in range(35):
+            msgs.append(_make_message(conv, self.user, text=f"msg{i}"))
+        resp = self.client.get("/api/feedback/all-messages/")
+        self.assertEqual(len(resp.data), 30)
+        # Second page with cursor
+        oldest_id = resp.data[0]["id"]
+        resp2 = self.client.get(f"/api/feedback/all-messages/?cursor={oldest_id}")
+        self.assertEqual(len(resp2.data), 5)
+
+    def test_all_messages_other_user_excluded(self):
+        """User cannot see messages from other users' conversations."""
+        other_user = _make_user("other")
+        other_conv = _make_conversation(other_user)
+        _make_message(other_conv, other_user, text="secret")
+        my_conv = _make_conversation(self.user)
+        _make_message(my_conv, self.user, text="mine")
+        resp = self.client.get("/api/feedback/all-messages/")
+        self.assertEqual(len(resp.data), 1)
+        self.assertEqual(resp.data[0]["text"], "mine")
+
+    def test_conversation_history_multiple(self):
+        """History endpoint returns all user's conversations."""
+        conv1 = _make_conversation(self.user)
+        conv2 = Conversation.objects.create(user=self.user)
+        resp = self.client.get("/api/feedback/conversations/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 2)

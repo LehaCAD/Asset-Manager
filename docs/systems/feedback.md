@@ -1,13 +1,13 @@
 # Обратная связь (Feedback)
 
 > Актуальное состояние подсистемы. Обновлять при внесении изменений.
-> Последнее обновление: 2026-04-11
+> Последнее обновление: 2026-04-13
 
 ---
 
 ## Назначение
 
-Чат поддержки между пользователем и администратором. Один пользователь = один диалог (MVP). Real-time через WebSocket, с поддержкой вложений, наград, тегов и статусов.
+Чат поддержки между пользователем и администратором. Один пользователь может иметь несколько диалогов (ForeignKey). Real-time через WebSocket, с поддержкой вложений, наград, тегов, редактирования и управления диалогами.
 
 ## Приложение
 
@@ -18,22 +18,23 @@
 ```
 [Клиент пишет] → Conversation(open) создаётся
      ↓
-[Админ решает вопрос] → Нажимает «Решено» → status=resolved
-     ↓
-[24ч без сообщений] → Celery auto_close → status=closed
-     ↓
+[Админ закрывает] → Нажимает «Закрыть» → status=closed
+     ↓  (или 24ч без сообщений → Celery auto_close_inactive → status=closed)
 [Клиент пишет снова] → Создаётся НОВЫЙ Conversation(open)
+     ↓
+Клиент видит pill «Новое обращение» между диалогами в unified stream
 ```
-
-Один пользователь может иметь несколько диалогов (ForeignKey, не OneToOne).
 
 | Статус | Для клиента | Для админа |
 |--------|-------------|------------|
 | `open` | Может писать, видит чат | Активный, в списке |
-| `resolved` | Может писать (переоткроет) | В списке, ждёт закрытия |
 | `closed` | Видит историю, не может писать. Новое сообщение → новый диалог | Серым в списке, можно merge |
 
-**Merge диалогов:** Если клиент создал новый диалог по тому же вопросу, админ может объединить: все сообщения переносятся в целевой диалог, исходный удаляется.
+**Merge диалогов:** Админ может объединить два диалога одного пользователя через dropdown-меню (⋮ → Объединить). Все сообщения переносятся в целевой диалог, исходный удаляется.
+
+**Unified message stream:** Клиент видит ВСЕ свои сообщения из всех диалогов единым потоком через `/api/feedback/all-messages/`. Граница между диалогами отмечается pill «Новое обращение» (детектируется по `conversation_id`).
+
+---
 
 ## Модели
 
@@ -44,14 +45,12 @@
 | Поле | Тип | Назначение |
 |------|-----|------------|
 | `user` | ForeignKey(User) | Владелец диалога (1 юзер = много диалогов) |
-| `status` | CharField | `open` / `resolved` / `closed` |
+| `status` | CharField | `open` / `closed` |
 | `tag` | CharField | `bug` / `question` / `idea` / пусто |
 | `user_last_read_at` | DateTimeField, null | Когда юзер последний раз прочитал чат |
 | `admin_last_read_at` | DateTimeField, null | Когда админ последний раз прочитал чат |
 | `created_at` | auto_now_add | |
 | `updated_at` | auto_now | Обновляется при каждом новом сообщении |
-
-Ordering: `-updated_at` (свежие диалоги наверху).
 
 ### Message (Сообщение)
 
@@ -83,7 +82,7 @@ Ordering: `-updated_at` (свежие диалоги наверху).
 |------|-----|------------|
 | `conversation` | FK(Conversation) | |
 | `amount` | DecimalField | Сумма в Кадрах |
-| `comment` | CharField(200) | Комментарий админа |
+| `comment` | CharField(200) | Комментарий админа (необязательный) |
 | `transaction` | FK(CreditsTransaction), null | Связь с транзакцией (SET_NULL) |
 | `granted_by` | FK(User) | Кто начислил |
 | `created_at` | auto_now_add | |
@@ -96,8 +95,10 @@ Ordering: `-updated_at` (свежие диалоги наверху).
 
 | Метод | URL | Назначение |
 |-------|-----|------------|
-| GET/POST | `/api/feedback/conversation/` | Получить/создать свой диалог |
-| GET/POST | `/api/feedback/messages/` | Список сообщений / отправить |
+| GET/POST | `/api/feedback/conversation/` | Получить активный / создать новый диалог |
+| GET | `/api/feedback/conversations/` | Список всех диалогов пользователя (история) |
+| GET/POST | `/api/feedback/messages/` | Сообщения текущего диалога / отправить |
+| GET | `/api/feedback/all-messages/` | Unified stream: ВСЕ сообщения всех диалогов с `conversation_id` |
 | POST | `/api/feedback/messages/{id}/presign/` | Presigned URL для загрузки в S3 |
 | POST | `/api/feedback/messages/{id}/confirm-attach/` | Подтвердить загрузку |
 | POST | `/api/feedback/conversation/read/` | Отметить прочитанным |
@@ -117,13 +118,12 @@ Ordering: `-updated_at` (свежие диалоги наверху).
 | POST | `/api/feedback/admin/conversations/{id}/clear-attachments/` | Удалить вложения (оставить сообщения) |
 | GET | `/api/feedback/admin/conversations/{id}/stats/` | Статистика: сообщений, вложений, объём |
 | DELETE | `/api/feedback/admin/conversations/{id}/delete/` | Удалить диалог целиком (cascade + S3) |
-| POST | `/api/feedback/admin/bulk/` | Массовые действия (resolve_all_open, close_old_resolved) |
+| POST | `/api/feedback/admin/bulk/` | Массовые действия (close_all_open, close_old_inactive) |
 | POST | `/api/feedback/admin/merge/` | Объединить два диалога одного пользователя |
-| GET | `/api/feedback/conversations/` | Список всех диалогов пользователя (история) |
 
 ### Presign endpoints для staff
 
-Endpoints `presign` и `confirm-attach` также доступны для staff (is_staff → доступ к любому сообщению). Используются для отправки вложений из админки.
+Endpoints `presign` и `confirm-attach` также доступны для staff (is_staff → доступ к любому сообщению).
 
 ---
 
@@ -137,7 +137,11 @@ Endpoints `presign` и `confirm-attach` также доступны для staff
 - JWT token в query string (`?token=...`) — для frontend
 - Django session cookie (`sessionid`) — для Django admin
 
-Группа: `feedback_{conversation_id}`
+### Consumer: `AdminFeedbackConsumer`
+
+Маршрут: `ws/feedback/admin/`
+
+Аутентификация: Django session cookie (is_staff required). Получает события из ВСЕХ диалогов для мгновенного обновления списка.
 
 ### Events (server → client)
 
@@ -146,16 +150,11 @@ Endpoints `presign` и `confirm-attach` также доступны для staff
 | `new_message` | `{message: {...}}` | Новое сообщение |
 | `attachment_ready` | `{message_id, attachment: {...}}` | Вложение обработано Celery |
 | `conversation_updated` | `{status, tag}` | Изменён статус/тег |
-| `reward_granted` | `{message: {...}}` | Начислены Кадры (системное сообщение) |
+| `reward_granted` | `{message: {...}}` | Начислены Кадры |
 | `message_edited` | `{message: {...}}` | Сообщение отредактировано |
 | `message_deleted` | `{message_id}` | Сообщение удалено |
 | `typing` | `{sender_name, is_admin}` | Индикатор набора текста |
-
-### Events (client → server)
-
-| Тип | Данные | Когда |
-|-----|--------|-------|
-| `typing` | `{type: "typing"}` | Админ печатает |
+| `feedback_list_update` | `{conversation_id, ...}` | Обновление списка (admin-wide WS) |
 
 ---
 
@@ -166,6 +165,7 @@ Endpoints `presign` и `confirm-attach` также доступны для staff
 | `process_feedback_attachment` | По событию | Resize изображений (800px), upload в S3 |
 | `cleanup_feedback_tmp` | Каждый час | Удаление temp файлов из `feedback/tmp/` |
 | `cleanup_old_attachments` | Каждые 12 часов | Пометка вложений старше 90 дней как expired |
+| `auto_close_inactive` | Каждый час | Закрытие open диалогов без активности 24ч |
 
 ---
 
@@ -176,8 +176,8 @@ Endpoints `presign` и `confirm-attach` также доступны для staff
 | Зависимость | Тип связки | Как |
 |---|---|---|
 | **Credits** | Через адаптер | `CreditsAdapter` в `adapters.py` изолирует от `CreditsService` |
-| **Notifications** | Вызов функции | `create_notification()` с примитивами, без импорта моделей |
-| **S3** | Через общий клиент | `apps.common.s3.get_s3_client()` — единый для всех приложений |
+| **Notifications** | Вызов функции | `create_notification()` с примитивами |
+| **S3** | Через общий клиент | `apps.common.s3.get_s3_client()` |
 | **User** | FK стандартный | `settings.AUTH_USER_MODEL` |
 
 ### Обратные зависимости
@@ -188,34 +188,34 @@ Endpoints `presign` и `confirm-attach` также доступны для staff
 
 ```
 backend/apps/feedback/
-├── adapters.py        → CreditsAdapter (изоляция от credits)
+├── adapters.py        → CreditsAdapter
 ├── admin.py           → ConversationAdmin, inbox_view
-├── consumers.py       → FeedbackChatConsumer (WebSocket)
+├── consumers.py       → FeedbackChatConsumer, AdminFeedbackConsumer
 ├── models.py          → Conversation, Message, Attachment, FeedbackReward
-├── routing.py         → ws/feedback/{id}/
+├── routing.py         → ws/feedback/{id}/, ws/feedback/admin/
 ├── serializers.py     → Message, Conversation, Admin serializers
 ├── services.py        → grant_reward, notify_*, WS broadcasts
-├── tasks.py           → Celery: process_attachment, cleanup
+├── tasks.py           → Celery: process_attachment, cleanup, auto_close
 ├── urls.py            → /api/feedback/...
 ├── utils.py           → re-export S3 client
-├── views.py           → REST API views
-├── tests.py           → 40 unit tests
+├── views.py           → REST API views (user + admin + management)
+├── tests.py           → 68 unit tests
 ├── templates/admin/feedback/
-│   ├── inbox.html     → Telegram-style чат (Django admin)
-│   └── app_index.html → Кнопка «Чат с клиентами» на /admin/feedback/
+│   ├── inbox.html     → Telegram-style чат с лайтбоксом (Django admin)
+│   └── app_index.html → Кнопка «Чат с клиентами»
 ```
 
 ```
 frontend/
 ├── components/feedback/
-│   ├── ChatInput.tsx          → Shared: auto-grow, paste, attach, send
-│   ├── ChatMessageList.tsx    → Shared: grouping, date pills, scroll, jump-to-bottom
-│   ├── MessageBubble.tsx      → Адаптивная раскладка, position-based radius
-│   ├── SystemMessage.tsx      → Системные сообщения (награды, статусы)
-│   ├── AttachmentPreview.tsx  → Превью изображений/файлов
+│   ├── ChatInput.tsx          → Shared: auto-grow, paste, staged preview, send
+│   ├── ChatMessageList.tsx    → Shared: grouping, date pills, scroll, jump-to-bottom, conversation boundaries
+│   ├── MessageBubble.tsx      → Адаптивная раскладка, position-based radius, «изм.» метка
+│   ├── SystemMessage.tsx      → Системные сообщения
+│   ├── AttachmentPreview.tsx  → Превью изображений/файлов (adaptive width)
 │   ├── FeedbackChat.tsx       → Полный чат в /cabinet/feedback
 │   ├── FeedbackDropdown.tsx   → Попап из navbar
-│   ├── FeedbackButton.tsx     → Pill кнопка «Чат поддержки» в navbar
+│   ├── FeedbackButton.tsx     → Pill кнопка «Чат поддержки»
 │   ├── AdminChatPanel.tsx     → Правая панель в /cabinet/inbox
 │   ├── AdminFeedbackInbox.tsx → Контейнер inbox
 │   ├── ConversationList.tsx   → Список диалогов (sidebar)
@@ -240,37 +240,71 @@ frontend/
 - **Имена**: нет
 - **Цвета**: admin = `#2B5278`, user = `#182533`
 - **Адаптивность**: wide (≥768px) = все слева, narrow = свои справа
+- **Границы обращений**: pill «Новое обращение» при смене `conversation_id`
 
 ### Ввод
 
 - **Enter** отправляет, **Shift+Enter** — новая строка
-- **Auto-grow**: поле растёт до max-height (120px), скролл невидимый
-- **Ctrl+V**: вставка скриншотов из буфера
-- **Paperclip**: выбор файлов (images + pdf, max 10MB)
+- **Auto-grow**: поле растёт до 120px, скролл невидимый
+- **Staged preview**: файлы не отправляются сразу, показываются как миниатюры 32x32 с крестиком
+- **Ctrl+V**: вставка скриншотов → staged preview
+- **Paperclip**: выбор файлов (images + pdf, max 10MB, max 5 файлов)
+- **Подсказка**: счётчик `N/5` когда есть файлы
 
 ### Scroll
 
 - **Infinite scroll**: подгрузка 30 сообщений при скролле вверх
-- **Smart auto-scroll**: только если пользователь у дна (< 150px)
+- **Smart auto-scroll**: только если у дна (< 150px)
 - **Jump-to-bottom**: круглая кнопка с badge непрочитанных
-- **Unread separator**: «Новые сообщения» по `last_read_at`
+- **Сообщения снизу**: flex-spacer прижимает к нижнему краю
 
 ### Typing indicator
 
 - Admin → User: «Поддержка печатает...» с анимацией
 - Через WS, debounce 5 сек, автоскрытие 10 сек
 
-### Редактирование (только админ)
+### Редактирование (только админ, Telegram-style)
 
-- Без лимита по времени
+- Клик по своему сообщению → текст в поле ввода, плашка «Редактирование» сверху
+- Enter сохраняет, Escape отменяет
 - Метка «изм.» рядом с timestamp
-- Real-time через WS `message_edited`
+- Real-time через WS
 
 ### Удаление (только админ)
 
-- Soft delete: `is_deleted=True`, текст очищается
-- Сообщение исчезает из выдачи (без placeholder)
-- Real-time через WS `message_deleted`
+- Soft delete, сообщение исчезает без placeholder
+- Real-time через WS
+
+### Награды
+
+- Preset кнопки: 10 / 25 / 50 / 100 / Другая сумма
+- Preset комментарии: За отзыв / За ошибку / За идею / За тестирование / Бонус
+- Комментарий необязателен
+
+### Лайтбокс (admin inbox)
+
+- Клик по изображению → полноэкранный просмотр
+- Стрелки ← → между всеми изображениями чата
+- Клавиши: ArrowLeft/Right, Escape
+- Счётчик `N / M`
+
+---
+
+## Управление диалогами (админ)
+
+Меню ⋮ в шапке чата:
+
+| Действие | Что делает |
+|----------|-----------|
+| 📊 Статистика | Сообщений, вложений, объём |
+| 🗑 Очистить историю | Удалить все сообщения + S3, диалог остаётся |
+| 📎 Удалить вложения | Удалить файлы, сообщения остаются |
+| ❌ Удалить диалог | Каскадное удаление всего |
+| 🔗 Объединить | Merge двух диалогов одного юзера |
+
+Bulk-действия через API:
+- `close_all_open` — закрыть все открытые
+- `close_old_inactive` — удалить закрытые старше N дней
 
 ---
 
@@ -279,43 +313,23 @@ frontend/
 ### Flow
 
 ```
-1. POST /messages/{id}/presign/ → {upload_url, file_key}
-2. XHR PUT upload_url (browser → S3 напрямую)
-3. POST /messages/{id}/confirm-attach/ → Celery task
-4. Celery: download → resize 800px → re-upload → create Attachment
-5. WS: attachment_ready → frontend обновляет сообщение
+1. Файл → staged preview (миниатюра 32x32 в ChatInput)
+2. Enter/кнопка → POST /messages/ (создать сообщение)
+3. POST /messages/{id}/presign/ → {upload_url, file_key}
+4. XHR PUT upload_url (browser → S3)
+5. POST /messages/{id}/confirm-attach/ → Celery task
+6. Celery: download → resize 800px → upload → create Attachment
+7. WS: attachment_ready
 ```
 
 ### Ограничения
 
 - MIME: image/jpeg, image/png, image/webp, application/pdf
 - Max размер: 10 MB
-- Max вложений на сообщение: 5
+- Max вложений: 5 на сообщение
 - Хранение: 90 дней, потом `is_expired=True`
 - S3 path: `feedback/{conversation_id}/{uuid}.{ext}`
-
----
-
-## Django Admin интерфейс
-
-### Inbox (`/admin/feedback/inbox/`)
-
-Полноэкранный Telegram-style чат в Django admin. Vanilla HTML/CSS/JS (не React).
-
-Фичи:
-- Список диалогов с поиском и фильтрами
-- Real-time через WebSocket (session auth)
-- Infinite scroll
-- Редактирование сообщений (inline)
-- Начисление Кадров (модалка)
-- Кнопки: Начислить / Решено / Тег
-- Jump-to-bottom с badge
-
-### Доступ
-
-- `/admin/` → кнопка «Чат с клиентами» (custom index template)
-- `/admin/feedback/` → кнопка «Открыть чат с клиентами»
-- `/admin/feedback/inbox/` → сам чат
+- S3 CORS: `AllowedHeaders: ["*"]`, origins: localhost:3000, raskadrawka.ru
 
 ---
 
@@ -323,35 +337,27 @@ frontend/
 
 ### Оптимизации
 
-- **N+1 fix**: `AdminConversationListSerializer` использует DB annotations (`Subquery`, `Count`) вместо `SerializerMethodField` — 4 SQL запроса вместо 1000+
-- **Polling минимизирован**: FeedbackButton — 1 запрос на mount (без интервала), admin inbox — 60 сек
-- **WebSocket**: real-time доставка сообщений без polling
-- **Session auth в WS**: `JWTAuthMiddleware` с fallback на Django session (для admin)
-
-### Текущие интервалы
-
-| Источник | Интервал | Условие |
-|----------|----------|---------|
-| FeedbackButton | Однократно при mount | Каждый залогиненный юзер |
-| Admin React inbox | 60 сек | Только когда страница открыта |
-| Admin Django inbox | 30 сек (fallback polling) | В дополнение к WS |
+- **N+1 fix**: `AdminConversationListSerializer` — DB annotations (`Subquery`, `Count`)
+- **Admin-wide WS**: `AdminFeedbackConsumer` — мгновенное обновление списка без polling
+- **FeedbackButton**: 1 запрос при mount, далее WS
+- **Fallback polling**: 60 сек (admin Django inbox)
 
 ---
 
 ## Тесты
 
-Файл: `backend/apps/feedback/tests.py` — **61 тестов**
+Файл: `backend/apps/feedback/tests.py` — **68 тестов**
 
 | Класс | Тесты | Что покрывает |
 |-------|-------|--------------|
-| `TestConversationModel` | 2 | Модель, ordering |
-| `TestUserAPI` | 6 | CRUD, mark read, pagination |
+| `TestConversationModel` | 4 | Модель, ordering, multi-conv, closed status |
+| `TestUserAPI` | 12 | CRUD, mark read, history, closed→new conv, unified stream |
 | `TestAdminAPI` | 8 | List, reply, status, tag, reward, delete, permissions |
-| `TestAdvancedFeatures` | 15 | Edit, soft delete, pagination 30, serializer output, attachments |
+| `TestAdvancedFeatures` | 15 | Edit, soft delete, pagination 30, serializer, attachments |
 | `TestAdapterAndIntegration` | 9 | CreditsAdapter, S3 client, presign, unread total |
-| `TestAdminManagement` | 5 | Clear history, delete conv, clear attachments, stats, bulk actions |
-| `TestConversationLifecycle` | 12 | Multi-conversation, closed status, merge, auto-close, can_reply |
-| `TestAutoClose` | 4 | Celery auto-close resolved after 24h |
+| `TestAdminManagement` | 5 | Clear history, delete conv, clear attachments, stats, bulk |
+| `TestConversationLifecycle` | 8 | Merge, auto-close, can_reply, admin close |
+| `TestUnifiedStream` | 7 | All-messages endpoint, pagination, isolation, boundaries |
 
 ---
 
@@ -359,28 +365,21 @@ frontend/
 
 ### Credits
 
-Через `CreditsAdapter` (файл `adapters.py`):
-```python
-CreditsAdapter.grant_reward(user, amount, metadata)
-```
-Внутри вызывает `CreditsService.topup()` с `reason='feedback_reward'`. FK на `CreditsTransaction` optional (SET_NULL).
+Через `CreditsAdapter` (`adapters.py`). FK на `CreditsTransaction` optional (SET_NULL).
 
 ### Notifications
 
-Прямой вызов `create_notification()` с типами:
-- `feedback_new` — новое обращение от юзера (→ всем staff)
-- `feedback_reply` — ответ админа (→ юзеру)
-- `feedback_reward` — начисление награды (→ юзеру)
+`create_notification()` с типами: `feedback_new`, `feedback_reply`, `feedback_reward`.
 
 ### S3
 
-Через `apps.common.s3.get_s3_client()` — единый S3 клиент для всего проекта.
+`apps.common.s3.get_s3_client()` — единый клиент.
 
 ---
 
 ## Известные ограничения
 
-1. **Один диалог на юзера** — MVP ограничение. Для множественных: миграция OneToOne → FK
-2. **S3 CORS** — presigned URL загрузка требует корректной CORS конфигурации на S3 bucket
-3. **Typing indicator** — только admin → user. Через WS, не работает в Django admin (polling mode)
-4. **Редактирование** — только для admin сообщений. Клиент не может редактировать
+1. **S3 CORS** — требует `AllowedHeaders: ["*"]` на bucket
+2. **Typing indicator** — только admin → user, не работает в Django admin template (только React)
+3. **Редактирование** — только для admin сообщений
+4. **Лайтбокс** — только в Django admin inbox, не в React
