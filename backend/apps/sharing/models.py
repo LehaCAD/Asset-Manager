@@ -81,6 +81,10 @@ class Comment(models.Model):
         'elements.Element', null=True, blank=True,
         on_delete=models.CASCADE, related_name='comments'
     )
+    shared_link = models.ForeignKey(
+        'sharing.SharedLink', null=True, blank=True,
+        on_delete=models.CASCADE, related_name='comments'
+    )
     parent = models.ForeignKey(
         'self', null=True, blank=True,
         on_delete=models.CASCADE, related_name='replies'
@@ -102,23 +106,29 @@ class Comment(models.Model):
         constraints = [
             models.CheckConstraint(
                 check=(
-                    models.Q(scene__isnull=False, element__isnull=True) |
-                    models.Q(scene__isnull=True, element__isnull=False)
+                    models.Q(scene__isnull=False, element__isnull=True, shared_link__isnull=True) |
+                    models.Q(scene__isnull=True, element__isnull=False, shared_link__isnull=True) |
+                    models.Q(scene__isnull=True, element__isnull=True, shared_link__isnull=False)
                 ),
                 name='comment_single_target'
             )
         ]
 
     def __str__(self):
-        target = f"element {self.element_id}" if self.element_id else f"scene {self.scene_id}"
+        if self.element_id:
+            target = f"element {self.element_id}"
+        elif self.scene_id:
+            target = f"scene {self.scene_id}"
+        else:
+            target = f"shared_link {self.shared_link_id}"
         return f"Comment by {self.author_name} on {target}"
 
     def clean(self):
         super().clean()
         if self.parent:
-            if self.parent.element_id != self.element_id or self.parent.scene_id != self.scene_id:
+            if self.parent.element_id != self.element_id or self.parent.scene_id != self.scene_id or self.parent.shared_link_id != self.shared_link_id:
                 from django.core.exceptions import ValidationError
-                raise ValidationError('Reply must target the same element/scene as parent.')
+                raise ValidationError('Reply must target the same element/scene/link as parent.')
 
 
 class ElementReaction(models.Model):
