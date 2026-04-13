@@ -743,6 +743,94 @@ def group_element_ids(request, scene_id):
     return Response({'elements': elements})
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def project_feedback_view(request, project_id):
+    """GET /api/sharing/project-feedback/{project_id}/ — all feedback for project grouped by links."""
+    from apps.projects.models import Project
+    project = get_object_or_404(Project, id=project_id, user=request.user)
+
+    links = SharedLink.objects.filter(project=project).order_by('-created_at')
+    result = []
+
+    for link in links:
+        # Get elements with feedback data
+        elements = link.elements.select_related('scene').prefetch_related(
+            'reactions', 'reviews', 'comments'
+        ).annotate(
+            _comment_count=Count('comments', filter=Q(comments__is_system=False)),
+            _likes=Count('reactions', filter=Q(reactions__value='like')),
+            _dislikes=Count('reactions', filter=Q(reactions__value='dislike')),
+        )
+
+        # Only include elements that have feedback (comments, reactions, or reviews)
+        elements_with_feedback = []
+        for el in elements:
+            has_feedback = el._comment_count > 0 or el._likes > 0 or el._dislikes > 0 or el.reviews.exists()
+            if not has_feedback:
+                continue
+
+            # Get comments for this element
+            comments = Comment.objects.filter(
+                element=el, parent__isnull=True, is_system=False
+            ).prefetch_related('replies').order_by('created_at')
+
+            # Review summary (worst-wins)
+            reviews = list(el.reviews.all())
+            review_summary = None
+            if reviews:
+                priority = {'rejected': 0, 'changes_requested': 1, 'approved': 2}
+                worst = min(reviews, key=lambda r: priority.get(r.action, 99))
+                review_summary = {'action': worst.action, 'author_name': worst.author_name}
+
+            elements_with_feedback.append({
+                'id': el.id,
+                'original_filename': el.original_filename or '',
+                'thumbnail_url': el.thumbnail_url or '',
+                'element_type': el.element_type,
+                'review_summary': review_summary,
+                'reviews': [
+                    {'session_id': r.session_id, 'author_name': r.author_name, 'action': r.action}
+                    for r in reviews
+                ],
+                'likes': el._likes,
+                'dislikes': el._dislikes,
+                'comments': CommentSerializer(comments, many=True).data,
+            })
+
+        # General comments for this link
+        general_comments = Comment.objects.filter(
+            shared_link=link, parent__isnull=True, is_system=False
+        ).prefetch_related('replies').order_by('created_at')
+
+        # Stats
+        all_reviews = ElementReview.objects.filter(element__in=link.elements.all())
+        stats = {
+            'approved': all_reviews.filter(action='approved').values('element_id').distinct().count(),
+            'changes_requested': all_reviews.filter(action='changes_requested').values('element_id').distinct().count(),
+            'rejected': all_reviews.filter(action='rejected').values('element_id').distinct().count(),
+            'total_elements': link.elements.count(),
+        }
+
+        # Unread count
+        unread_count = Comment.objects.filter(
+            Q(element__in=link.elements.all()) | Q(shared_link=link),
+            is_read=False, is_system=False,
+        ).exclude(author_user=request.user).count()
+
+        result.append({
+            'id': link.id,
+            'name': link.name,
+            'token': str(link.token),
+            'unread_count': unread_count,
+            'stats': stats,
+            'elements': elements_with_feedback,
+            'general_comments': CommentSerializer(general_comments, many=True).data,
+        })
+
+    return Response({'links': result})
+
+
 @api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
 def mark_comment_read(request, comment_id):
