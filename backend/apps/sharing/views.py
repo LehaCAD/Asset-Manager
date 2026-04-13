@@ -24,6 +24,29 @@ from .serializers import (
 logger = logging.getLogger(__name__)
 
 
+def _broadcast_to_share_groups(element_id, event_type, data):
+    """Broadcast event to all share_{token} groups that include this element."""
+    try:
+        from channels.layers import get_channel_layer
+        from asgiref.sync import async_to_sync
+
+        channel_layer = get_channel_layer()
+        if not channel_layer:
+            return
+
+        tokens = list(SharedLink.objects.filter(
+            elements__id=element_id
+        ).values_list('token', flat=True))
+
+        for token in tokens:
+            async_to_sync(channel_layer.group_send)(
+                f'share_{token}',
+                {'type': event_type, 'data': data}
+            )
+    except Exception as e:
+        logger.warning(f'Failed to broadcast {event_type}: {e}')
+
+
 class AuthCommentThrottle(UserRateThrottle):
     rate = '30/min'
 
@@ -216,6 +239,22 @@ def public_comment_view(request, token):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         comment.save()
+
+        # Broadcast to share group
+        _broadcast_to_share_groups(
+            comment.element_id,
+            'new_comment',
+            {
+                'type': 'new_comment',
+                'comment_id': comment.id,
+                'element_id': comment.element_id,
+                'scene_id': comment.scene_id,
+                'author_name': comment.author_name,
+                'text': comment.text[:200],
+                'created_at': comment.created_at.isoformat(),
+                'session_id': comment.session_id,
+            }
+        )
     elif data.get('scene_id'):
         # Validate scene has at least one shared element
         from apps.elements.models import Element
@@ -289,6 +328,23 @@ def public_review_action(request, token):
 
     if existing and existing.action == action:
         existing.delete()
+
+        _broadcast_to_share_groups(element_id, 'review_updated', {
+            'type': 'review_updated',
+            'element_id': element_id,
+            'session_id': session_id,
+            'author_name': author_name,
+            'action': None,
+        })
+
+        try:
+            from apps.notifications.services import notify_review_updated
+            from apps.elements.models import Element
+            el = Element.objects.get(id=element_id)
+            notify_review_updated(el, None, author_name)
+        except Exception as e:
+            logger.warning(f'Failed to broadcast review to project: {e}')
+
         return Response({'element_id': element_id, 'action': None})
 
     # update_or_create — one review per reviewer per element
@@ -320,6 +376,20 @@ def public_review_action(request, token):
         )
     except Exception as e:
         logger.warning(f'Failed to send review notification: {e}')
+
+    _broadcast_to_share_groups(element_id, 'review_updated', {
+        'type': 'review_updated',
+        'element_id': element_id,
+        'session_id': session_id,
+        'author_name': review.author_name,
+        'action': review.action,
+    })
+
+    try:
+        from apps.notifications.services import notify_review_updated
+        notify_review_updated(el, review.action, review.author_name)
+    except Exception as e:
+        logger.warning(f'Failed to broadcast review to project: {e}')
 
     return Response({
         'element_id': element_id,
@@ -359,6 +429,30 @@ def public_reaction_view(request, token):
         # Return actual counts after removal
         likes = ElementReaction.objects.filter(element_id=element_id, value='like').count()
         dislikes = ElementReaction.objects.filter(element_id=element_id, value='dislike').count()
+
+        # Broadcast to share group
+        _broadcast_to_share_groups(
+            element_id,
+            'reaction_updated',
+            {
+                'type': 'reaction_updated',
+                'element_id': element_id,
+                'likes': likes,
+                'dislikes': dislikes,
+                'session_id': session_id,
+                'value': None,
+            }
+        )
+
+        # Broadcast to project group
+        try:
+            from apps.notifications.services import notify_reaction_updated
+            from apps.elements.models import Element
+            el = Element.objects.get(id=element_id)
+            notify_reaction_updated(el, likes, dislikes)
+        except Exception as e:
+            logger.warning(f'Failed to broadcast reaction to project: {e}')
+
         return Response({'element_id': element_id, 'value': None, 'likes': likes, 'dislikes': dislikes})
 
     if value not in ('like', 'dislike'):
@@ -393,6 +487,30 @@ def public_reaction_view(request, token):
     # Return actual counts — the source of truth, no optimistic drift
     likes = ElementReaction.objects.filter(element_id=element_id, value='like').count()
     dislikes = ElementReaction.objects.filter(element_id=element_id, value='dislike').count()
+
+    # Broadcast to share group
+    _broadcast_to_share_groups(
+        element_id,
+        'reaction_updated',
+        {
+            'type': 'reaction_updated',
+            'element_id': element_id,
+            'likes': likes,
+            'dislikes': dislikes,
+            'session_id': session_id,
+            'value': value,
+        }
+    )
+
+    # Broadcast to project group
+    try:
+        from apps.notifications.services import notify_reaction_updated
+        from apps.elements.models import Element
+        el = Element.objects.get(id=element_id)
+        notify_reaction_updated(el, likes, dislikes)
+    except Exception as e:
+        logger.warning(f'Failed to broadcast reaction to project: {e}')
+
     return Response({'element_id': element_id, 'value': value, 'likes': likes, 'dislikes': dislikes})
 
 
