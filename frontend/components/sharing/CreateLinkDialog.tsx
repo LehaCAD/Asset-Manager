@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dialog'
 import { sharingApi } from '@/lib/api/sharing'
 import { useDisplayStore } from '@/lib/store/project-display'
-import { cn } from '@/lib/utils'
+import { FilterPill, toggleInSet } from '@/components/ui/filter-pill'
 
 interface ShareableElement {
   id: number
@@ -37,43 +37,6 @@ const EXPIRY_OPTIONS = [
   { label: '7 дней', value: '7' },
   { label: '30 дней', value: '30' },
 ]
-
-function toggleInSet<T>(set: Set<T>, value: T): Set<T> {
-  const next = new Set(set)
-  if (next.has(value)) next.delete(value)
-  else next.add(value)
-  return next
-}
-
-function FilterPill({
-  label,
-  count,
-  active,
-  onClick,
-}: {
-  label: string
-  count: number
-  active: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all',
-        active
-          ? 'bg-primary text-primary-foreground'
-          : 'border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30'
-      )}
-    >
-      {label}
-      <span className={cn('tabular-nums', active ? 'text-primary-foreground/70' : 'text-muted-foreground/60')}>
-        {count}
-      </span>
-    </button>
-  )
-}
 
 export function CreateLinkDialog({
   isOpen,
