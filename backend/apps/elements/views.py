@@ -15,6 +15,7 @@ from .serializers import ElementSerializer, ReorderSerializer
 from .services import reorder_elements
 from apps.storage.services import delete_file_from_s3
 from apps.credits.models import CreditsTransaction
+from apps.subscriptions.permissions import feature_required
 
 logger = logging.getLogger(__name__)
 
@@ -234,7 +235,7 @@ DOWNLOAD_META_ELEMENT_FIELDS = (
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, feature_required('batch_download')])
 def download_meta(request):
     """
     GET /api/elements/download-meta/?project_id=X  or  ?scene_id=X

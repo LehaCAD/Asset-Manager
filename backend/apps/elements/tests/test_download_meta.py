@@ -1,17 +1,52 @@
+from datetime import timedelta
+
 from django.test import TestCase
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework.test import APIClient
 from apps.projects.models import Project
 from apps.scenes.models import Scene
 from apps.elements.models import Element
+from apps.subscriptions.models import Feature, Plan, Subscription
 
 User = get_user_model()
 
 
 class DownloadMetaTests(TestCase):
     def setUp(self):
+        # Clean subscription state
+        Subscription.objects.all().delete()
+        Feature.objects.all().delete()
+        Plan.objects.all().delete()
+
+        # Create plan with batch_download feature
+        self.pro_plan = Plan.objects.create(
+            code='pro', name='Pro', price=990,
+            max_projects=0, max_scenes_per_project=0,
+            storage_limit_gb=100, display_order=1,
+        )
+        self.bd_feature = Feature.objects.create(
+            code='batch_download', title='Batch Download', min_plan=self.pro_plan,
+        )
+        self.pro_plan.features.add(self.bd_feature)
+
+        self.free_plan = Plan.objects.create(
+            code='free', name='Free', price=0,
+            max_projects=1, max_scenes_per_project=2,
+            storage_limit_gb=1, is_default=True, display_order=0,
+        )
+
         self.user = User.objects.create_user(username='test', password='test')
         self.other = User.objects.create_user(username='other', password='other')
+
+        # Give both users pro subscription (feature gate tested separately)
+        for u in (self.user, self.other):
+            sub = u.subscription
+            sub.plan = self.pro_plan
+            sub.status = 'active'
+            sub.expires_at = timezone.now() + timedelta(days=30)
+            sub.save()
+
         self.client = APIClient()
         self.client.force_authenticate(self.user)
 
@@ -87,3 +122,16 @@ class DownloadMetaTests(TestCase):
     def test_no_params_returns_400(self):
         resp = self.client.get('/api/elements/download-meta/')
         self.assertEqual(resp.status_code, 400)
+
+    def test_feature_gate_blocks_free_user(self):
+        """Free user without batch_download feature gets 403."""
+        free_user = User.objects.create_user(username='freebie', password='test')
+        sub = free_user.subscription
+        sub.plan = self.free_plan
+        sub.status = 'active'
+        sub.expires_at = timezone.now() + timedelta(days=30)
+        sub.save()
+        client = APIClient()
+        client.force_authenticate(free_user)
+        resp = client.get(f'/api/elements/download-meta/?project_id={self.project.id}')
+        self.assertEqual(resp.status_code, 403)
