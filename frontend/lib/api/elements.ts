@@ -3,6 +3,7 @@ import type {
   Element,
   UpdateElementPayload,
   ReorderElementsPayload,
+  DownloadMetaResponse,
 } from "@/lib/types";
 
 export const elementsApi = {
@@ -86,6 +87,20 @@ export const elementsApi = {
   }): Promise<void> {
     try {
       await apiClient.post("/api/elements/move/", payload);
+    } catch (error) {
+      throw normalizeError(error);
+    }
+  },
+
+  async getDownloadMeta(params: { projectId?: number; sceneId?: number }): Promise<DownloadMetaResponse> {
+    try {
+      const query = params.projectId
+        ? `project_id=${params.projectId}`
+        : `scene_id=${params.sceneId}`
+      const { data } = await apiClient.get<DownloadMetaResponse>(
+        `/api/elements/download-meta/?${query}`
+      );
+      return data;
     } catch (error) {
       throw normalizeError(error);
     }

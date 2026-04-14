@@ -479,6 +479,7 @@ export interface CreateCommentPayload {
 
 export interface ProjectFeedbackElement {
   id: number
+  scene_id: number | null
   original_filename: string
   thumbnail_url: string
   element_type: ElementType
@@ -493,6 +494,11 @@ export interface ProjectFeedbackLink {
   id: number
   name: string
   token: string
+  project_id?: number
+  project_name?: string
+  created_at?: string
+  expires_at: string | null
+  is_expired: boolean
   unread_count: number
   stats: {
     approved: number
@@ -861,4 +867,22 @@ export interface WSOnboardingTaskCompletedEvent {
   new_balance: string;
   completed_count: number;
   total_count: number;
+}
+
+/* ── Batch Download ──────────────────────────────────────── */
+
+export interface DownloadableElement {
+  id: number
+  element_type: ElementType
+  is_favorite: boolean
+  source_type: ElementSource
+  file_url: string
+  original_filename: string
+  file_size: number | null
+  scene_id: number | null
+}
+
+export interface DownloadMetaResponse {
+  elements: DownloadableElement[]
+  groups: Array<{ id: number; name: string; parent_id: number | null }>
 }
