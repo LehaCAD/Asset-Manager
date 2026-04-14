@@ -1,14 +1,13 @@
 'use client';
 
-import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { formatStorage, formatCurrency } from '@/lib/utils/format';
 import { BADGE_MD } from '@/lib/utils/constants';
-import { useSubscriptionStore } from '@/lib/store/subscription';
-import { ProBadge } from '@/components/subscription/ProBadge';
+import { useFeatureGate } from '@/lib/hooks/useFeatureGate';
+import { TierBadge } from '@/components/subscription/TierBadge';
 import { UpgradeModal } from '@/components/subscription/UpgradeModal';
-import { Layers, Check, Trash2, HardDrive, MoreHorizontal, Pencil, Share2, ImageIcon } from 'lucide-react';
-import { ChargeIcon } from '@/components/ui/charge-icon';
+import { Layers, Check, Trash2, HardDrive, MoreHorizontal, Pencil, Share2, Download, ImageIcon } from 'lucide-react';
+import { KadrIcon } from '@/components/ui/kadr-icon';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -35,6 +34,7 @@ export interface GroupCardProps {
   onDelete?: (id: number) => void;
   onRename?: (id: number) => void;
   onShare?: (id: number) => void;
+  onDownload?: (id: number) => void;
   isDropTarget?: boolean;
   className?: string;
   style?: React.CSSProperties;
@@ -52,14 +52,14 @@ export function GroupCard({
   onDelete,
   onRename,
   onShare,
+  onDownload,
   isDropTarget = false,
   className,
   style,
   size = 'medium',
 }: GroupCardProps) {
-  const [upgradeOpen, setUpgradeOpen] = useState(false);
-  const hasFeature = useSubscriptionStore((s) => s.hasFeature);
-  const canShare = hasFeature("sharing");
+  const sharing = useFeatureGate("sharing");
+  const batchDownload = useFeatureGate("batch_download");
   const elementCount = group.element_count ?? group.elements_count ?? 0;
   const headlinerUrl = group.headliner_thumbnail_url || group.headliner_url || (group.preview_thumbnails && group.preview_thumbnails.length > 0 ? group.preview_thumbnails[0] : null);
 
@@ -188,8 +188,8 @@ export function GroupCard({
                     <DropdownMenuItem
                       className="cursor-pointer"
                       onSelect={() => {
-                        if (!canShare) {
-                          setUpgradeOpen(true);
+                        if (sharing.isLocked) {
+                          sharing.openUpgrade();
                           return;
                         }
                         onShare(group.id);
@@ -197,10 +197,26 @@ export function GroupCard({
                     >
                       <Share2 className="mr-2 h-3.5 w-3.5" />
                       Поделиться
-                      {!canShare && <ProBadge className="ml-auto" />}
+                      {sharing.isLocked && <TierBadge tier={sharing.tier} className="ml-auto" />}
                     </DropdownMenuItem>
                   )}
-                  {(onRename || onShare) && onDelete && <DropdownMenuSeparator />}
+                  {onDownload && (
+                    <DropdownMenuItem
+                      className="cursor-pointer"
+                      onSelect={() => {
+                        if (batchDownload.isLocked) {
+                          batchDownload.openUpgrade();
+                          return;
+                        }
+                        onDownload(group.id);
+                      }}
+                    >
+                      <Download className="mr-2 h-3.5 w-3.5" />
+                      Скачать
+                      {batchDownload.isLocked && <TierBadge tier={batchDownload.tier} className="ml-auto" />}
+                    </DropdownMenuItem>
+                  )}
+                  {(onRename || onShare || onDownload) && onDelete && <DropdownMenuSeparator />}
                   {onDelete && (
                     <DropdownMenuItem
                       className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
@@ -223,7 +239,7 @@ export function GroupCard({
               <>
                 <span className="text-muted-foreground/40">·</span>
                 <span className="flex items-center gap-0.5">
-                  <ChargeIcon size="xs" />
+                  <KadrIcon size="xs" />
                   {formatCurrency(group.total_spent)}
                 </span>
               </>
@@ -269,9 +285,14 @@ export function GroupCard({
       </div>
     </div>
     <UpgradeModal
-      open={upgradeOpen}
-      onOpenChange={setUpgradeOpen}
+      open={sharing.upgradeOpen}
+      onOpenChange={sharing.setUpgradeOpen}
       featureCode="sharing"
+    />
+    <UpgradeModal
+      open={batchDownload.upgradeOpen}
+      onOpenChange={batchDownload.setUpgradeOpen}
+      featureCode="batch_download"
     />
     </>
   );

@@ -54,6 +54,7 @@ function SortableGroupCard({
   onDelete,
   onRename,
   onShare,
+  onDownload,
   size,
 }: {
   dndId: string;
@@ -66,6 +67,7 @@ function SortableGroupCard({
   onDelete: (id: number) => void;
   onRename?: (id: number) => void;
   onShare?: (id: number) => void;
+  onDownload?: (id: number) => void;
   size: DisplayCardSize;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: dndId });
@@ -87,6 +89,7 @@ function SortableGroupCard({
         onDelete={onDelete}
         onRename={onRename}
         onShare={onShare}
+        onDownload={onDownload}
         size={size}
       />
     </div>
@@ -131,6 +134,7 @@ interface ElementGridProps {
   onGroupDelete?: (id: number) => void;
   onGroupRename?: (id: number) => void;
   onGroupShare?: (id: number) => void;
+  onGroupDownload?: (id: number) => void;
   shareMode?: boolean;
   shareSelectedIds?: Set<number>;
   onShareToggle?: (id: number) => void;
@@ -138,7 +142,7 @@ interface ElementGridProps {
   onMove?: (id: number) => void;
 }
 
-export function ElementGrid({ className, onRequestDelete, groups = [], onGroupClick, onGroupDelete, onGroupRename, onGroupShare, shareMode, shareSelectedIds, onShareToggle, onRename, onMove }: ElementGridProps) {
+export function ElementGrid({ className, onRequestDelete, groups = [], onGroupClick, onGroupDelete, onGroupRename, onGroupShare, onGroupDownload, shareMode, shareSelectedIds, onShareToggle, onRename, onMove }: ElementGridProps) {
   const {
     getFilteredElements,
     selectedIds,
@@ -404,6 +408,7 @@ export function ElementGrid({ className, onRequestDelete, groups = [], onGroupCl
                         onDelete={onGroupDelete ?? (() => {})}
                         onRename={onGroupRename}
                         onShare={onGroupShare}
+                        onDownload={onGroupDownload}
                         size={preferences.size}
                       />
                     );

@@ -1,13 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useDropzone } from 'react-dropzone';
 import { useSceneWorkspaceStore, getActiveUploadCount } from '@/lib/store/scene-workspace';
 import { preloadImage } from '@/lib/utils/client-upload';
 import { useCreditsStore } from '@/lib/store/credits';
 import { useGenerationStore } from '@/lib/store/generation';
 import { useUIStore } from '@/lib/store/ui';
+import { useNotificationStore } from '@/lib/store/notifications';
 import { useProjectsStore } from '@/lib/store/projects';
 import { wsManager } from '@/lib/api/websocket';
 import { ElementGrid } from '@/components/element/ElementGrid';
@@ -29,7 +30,7 @@ import { Upload, ChevronLeft, ChevronRight, FolderPlus, Share2, Plus, MessageSqu
 import { ReviewsOverlay } from '@/components/sharing/ReviewsOverlay';
 import { ShareSelectionMode } from '@/components/sharing/ShareSelectionMode';
 import { CreateLinkDialog } from '@/components/sharing/CreateLinkDialog';
-import { ShareLinksPanel } from '@/components/sharing/ShareLinksPanel';
+import { BatchDownloadDialog } from '@/components/download/BatchDownloadDialog';
 import { sharingApi } from '@/lib/api/sharing';
 import { CreateSceneDialog } from '@/components/scene/CreateSceneDialog';
 import {
@@ -44,7 +45,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { MAX_FILE_SIZE_MB } from '@/lib/utils/constants';
-import type { WSEvent, WorkspaceElement } from '@/lib/types';
+import type { WSEvent, WorkspaceElement, DownloadableElement } from '@/lib/types';
 
 interface WorkspaceContainerProps {
   projectId: number;
@@ -53,6 +54,7 @@ interface WorkspaceContainerProps {
 
 export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const {
     elements,
@@ -107,6 +109,11 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   const [groupShareProjectId, setGroupShareProjectId] = useState<number>(0);
   const [groupShareElements, setGroupShareElements] = useState<Array<{ id: number; element_type: string; is_favorite: boolean; source_type: string }>>([]);
 
+  // Download state
+  const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
+  const [downloadElements, setDownloadElements] = useState<DownloadableElement[]>([]);
+  const [downloadGroups, setDownloadGroups] = useState<Array<{ id: number; name: string; parent_id: number | null }>>([]);
+
 
   // Share mode persisted in sessionStorage to survive group navigation
   const [shareMode, _setShareMode] = useState(() => {
@@ -140,8 +147,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [shareElements, setShareElements] = useState<Array<{ id: number; element_type: string; is_favorite: boolean; source_type: string }>>([]);
   const [reviewsOpen, setReviewsOpen] = useState(false);
-  const [linksPanelOpen, setLinksPanelOpen] = useState(false);
-  const [linksRefreshKey, setLinksRefreshKey] = useState(0);
+  const feedbackUnread = useNotificationStore((s) => s.feedbackUnreadCount);
   const [promptBarHeight, setPromptBarHeight] = useState(0);
   const promptBarRef = useRef<HTMLDivElement>(null);
   const fallbackRefetchIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -185,24 +191,24 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   }, [elements]);
 
   // Handle lightbox deep-link from URL (?lightbox=elementId)
+  const lightboxParam = searchParams.get('lightbox');
   useEffect(() => {
-    if (isLoading || elements.length === 0) return;
-    const params = new URLSearchParams(window.location.search);
-    const lightboxId = params.get('lightbox');
-    if (lightboxId) {
-      const elementId = parseInt(lightboxId, 10);
-      if (!isNaN(elementId)) {
-        const exists = elements.some((e) => e.id === elementId);
-        if (exists) {
-          openLightbox(elementId);
-        }
-        // Clean URL regardless — avoid re-triggering
-        const url = new URL(window.location.href);
-        url.searchParams.delete('lightbox');
-        window.history.replaceState({}, '', url.toString());
+    if (isLoading || !lightboxParam) return;
+    const elementId = parseInt(lightboxParam, 10);
+    if (isNaN(elementId)) return;
+
+    // Wait for elements to load, then open
+    if (elements.length > 0) {
+      const exists = elements.some((e) => e.id === elementId);
+      if (exists) {
+        openLightbox(elementId);
       }
     }
-  }, [isLoading, elements, openLightbox]);
+    // Clean URL
+    const url = new URL(window.location.href);
+    url.searchParams.delete('lightbox');
+    router.replace(url.pathname, { scroll: false });
+  }, [isLoading, elements, lightboxParam, openLightbox, router]);
 
   // Load models for generation
   useEffect(() => {
@@ -566,6 +572,17 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
     } catch { toast.error('Не удалось загрузить элементы'); }
   }, [projectId]);
 
+  // Group download (from three-dots menu on GroupCard)
+  const handleGroupDownload = useCallback(async (groupIdToDownload: number) => {
+    try {
+      const data = await elementsApi.getDownloadMeta({ sceneId: groupIdToDownload });
+      if (data.elements.length === 0) { toast.error('В группе нет элементов'); return; }
+      setDownloadElements(data.elements);
+      setDownloadGroups(data.groups);
+      setDownloadDialogOpen(true);
+    } catch { toast.error('Не удалось загрузить данные'); }
+  }, []);
+
   // Handle group delete with confirmation (fetches counts first)
   const handleRequestGroupDelete = useCallback(
     async (groupIdToDelete: number) => {
@@ -679,8 +696,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   }, [setShareMode, setShareSelectedIds]);
 
   const handleLinkCreated = useCallback(() => {
-    setLinksRefreshKey((k) => k + 1);
-    setLinksPanelOpen(true);
+    toast.success('Ссылка создана');
   }, []);
 
   // Measure PromptBar height dynamically
@@ -740,7 +756,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
         <input {...getInputProps()} />
 
         {/* Breadcrumbs + Filters toolbar — single row */}
-        <div className="flex items-center justify-between border-b px-4 py-2 shrink-0 bg-surface">
+        <div className="flex items-center justify-between border-b px-4 py-2 shrink-0 bg-surface relative z-50">
           {/* Left: breadcrumbs + create group */}
           <div className="flex items-center gap-1 min-w-0">
             {breadcrumbs.length > 0 && (
@@ -796,13 +812,11 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
             >
               <MessageSquare className="w-3.5 h-3.5" />
               <span>Отзывы</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setLinksPanelOpen(true)}
-              className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-muted-foreground bg-card hover:text-foreground transition-colors shrink-0"
-            >
-              Активные ссылки
+              {feedbackUnread > 0 && !reviewsOpen && (
+                <span className="bg-primary text-white text-[10px] font-bold rounded px-1.5 py-0.5 min-w-[18px] text-center">
+                  {feedbackUnread}
+                </span>
+              )}
             </button>
             <ElementFilters
               filter={filter}
@@ -830,6 +844,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
               onGroupDelete={handleRequestGroupDelete}
               onGroupRename={handleGroupRename}
               onGroupShare={handleGroupShare}
+              onGroupDownload={handleGroupDownload}
               shareMode={shareMode}
               shareSelectedIds={shareSelectedIds}
               onShareToggle={handleToggleShareElement}
@@ -890,6 +905,62 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
                 .catch(() => toast.error('Не удалось загрузить элементы групп'));
             }
           }}
+          onDownloadSelected={() => {
+            const elementOnlyIds = Array.from(selectedIds).filter(
+              id => !groups.some(g => g.id === id)
+            );
+            const selectedGroupIds = Array.from(selectedIds).filter(
+              id => groups.some(g => g.id === id)
+            );
+
+            if (selectedGroupIds.length === 0) {
+              // Only elements — build DownloadableElement from store (COMPLETED only)
+              const els: DownloadableElement[] = getFilteredElements()
+                .filter(e => elementOnlyIds.includes(e.id) && e.status === 'COMPLETED' && e.file_url)
+                .map(e => ({
+                  id: e.id,
+                  element_type: e.element_type,
+                  is_favorite: e.is_favorite,
+                  source_type: e.source_type,
+                  file_url: e.file_url!,
+                  original_filename: e.original_filename || `element-${e.id}`,
+                  file_size: e.file_size ?? null,
+                  scene_id: e.scene ?? null,
+                }));
+              if (els.length === 0) { toast.error('Нет завершённых элементов для скачивания'); return; }
+              setDownloadElements(els);
+              setDownloadGroups([]);
+              setDownloadDialogOpen(true);
+            } else {
+              // Groups selected — fetch via API
+              Promise.all(selectedGroupIds.map(gid => elementsApi.getDownloadMeta({ sceneId: gid })))
+                .then(results => {
+                  const groupEls = results.flatMap(r => r.elements);
+                  const groupMeta = results.flatMap(r => r.groups);
+                  const storeEls: DownloadableElement[] = getFilteredElements()
+                    .filter(e => elementOnlyIds.includes(e.id) && e.status === 'COMPLETED' && e.file_url)
+                    .map(e => ({
+                      id: e.id,
+                      element_type: e.element_type,
+                      is_favorite: e.is_favorite,
+                      source_type: e.source_type,
+                      file_url: e.file_url!,
+                      original_filename: e.original_filename || `element-${e.id}`,
+                      file_size: e.file_size ?? null,
+                      scene_id: e.scene ?? null,
+                    }));
+                  const allEls = [...storeEls, ...groupEls];
+                  // Dedup by id
+                  const seen = new Set<number>();
+                  const deduped = allEls.filter(e => { if (seen.has(e.id)) return false; seen.add(e.id); return true; });
+                  if (deduped.length === 0) { toast.error('Нет элементов для скачивания'); return; }
+                  setDownloadElements(deduped);
+                  setDownloadGroups(groupMeta);
+                  setDownloadDialogOpen(true);
+                })
+                .catch(() => toast.error('Не удалось загрузить данные'));
+            }
+          }}
           onClearSelection={clearSelection}
           onToggleSelectAll={toggleSelectAll}
         />
@@ -914,25 +985,6 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
           elementIds={Array.from(shareSelectedIds)}
           elements={shareElements}
         />
-
-        {/* Share links panel (slide-over) */}
-        {linksPanelOpen && (
-          <div className="fixed inset-y-0 right-0 z-50 w-80 bg-background border-l shadow-xl flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b">
-              <h3 className="text-sm font-medium">Ссылки для просмотра</h3>
-              <button
-                type="button"
-                onClick={() => setLinksPanelOpen(false)}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="flex-1 overflow-auto">
-              <ShareLinksPanel projectId={projectId} refreshKey={linksRefreshKey} />
-            </div>
-          </div>
-        )}
 
         {/* Whole-area drag overlay */}
         {isDragActive && hasContent && (
@@ -1012,6 +1064,15 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
           elements={groupShareElements}
         />
 
+        {/* Batch download dialog */}
+        <BatchDownloadDialog
+          isOpen={downloadDialogOpen}
+          onClose={() => { setDownloadDialogOpen(false); setDownloadElements([]); setDownloadGroups([]); }}
+          projectName={projectName ?? 'Проект'}
+          elements={downloadElements}
+          groups={downloadGroups}
+        />
+
         {/* Group delete confirmation dialog */}
         <Dialog open={groupDeleteDialogOpen} onOpenChange={setGroupDeleteDialogOpen}>
           <DialogContent className="sm:max-w-sm">
@@ -1057,12 +1118,19 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
 
         {/* Reviews Overlay */}
         <ReviewsOverlay
-          projectId={projectId}
           isOpen={reviewsOpen}
           onClose={() => setReviewsOpen(false)}
-          onOpenLightbox={(elementId) => {
+          onOpenLightbox={(elementId, sceneId, elProjectId) => {
             setReviewsOpen(false)
-            openLightbox(elementId)
+            const targetProject = elProjectId || projectId
+            const elementExists = elements.some((e) => e.id === elementId)
+            if (elementExists) {
+              openLightbox(elementId)
+            } else if (sceneId) {
+              router.push(`/projects/${targetProject}/groups/${sceneId}?lightbox=${elementId}`)
+            } else {
+              router.push(`/projects/${targetProject}?lightbox=${elementId}`)
+            }
           }}
         />
 
