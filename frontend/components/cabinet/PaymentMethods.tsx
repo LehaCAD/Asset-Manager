@@ -48,7 +48,7 @@ export function PaymentMethods() {
   const { paymentMethod, setPaymentMethod } = useCreditsStore();
 
   return (
-    <div className="rounded-xl border border-border/50 bg-card p-4">
+    <div className="rounded-lg border border-border/50 bg-card p-4">
       <div className="mb-3 flex items-center gap-2.5">
         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-white">
           2

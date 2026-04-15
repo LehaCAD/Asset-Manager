@@ -1,6 +1,6 @@
 'use client';
 
-import { ChargeIcon } from '@/components/ui/charge-icon';
+import { KadrIcon } from '@/components/ui/kadr-icon';
 import { useCreditsStore } from '@/lib/store/credits';
 import { Loader2, Lock } from 'lucide-react';
 
@@ -25,7 +25,7 @@ export function TopUpSummary() {
 
   return (
     <>
-      <div className="rounded-xl border border-border/50 bg-card p-4">
+      <div className="rounded-lg border border-border/50 bg-card p-4">
         <div className="flex justify-between text-sm py-1">
           <span className="text-muted-foreground">Сумма пополнения</span>
           <span className="font-medium">{formatted} ₽</span>
@@ -33,7 +33,7 @@ export function TopUpSummary() {
         <div className="flex justify-between items-center text-sm py-1">
           <span className="text-muted-foreground">Получите</span>
           <span className="flex items-center gap-1 font-semibold">
-            <ChargeIcon size="md" />
+            <KadrIcon size="md" />
             {formatted}
           </span>
         </div>
