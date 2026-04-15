@@ -8,7 +8,7 @@ export function BalanceCard() {
   const numBalance = parseFloat(balance) || 0;
 
   return (
-    <div className="text-center rounded-lg border border-border/50 bg-gradient-to-br from-[#151530] to-[#1E2545] p-6">
+    <div className="text-center rounded-lg border border-primary/20 bg-gradient-to-br from-primary/10 to-primary/5 p-6">
       <p className="text-xs uppercase tracking-widest text-muted-foreground">
         Текущий баланс
       </p>

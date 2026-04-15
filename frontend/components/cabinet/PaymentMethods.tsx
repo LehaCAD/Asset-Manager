@@ -67,7 +67,7 @@ export function PaymentMethods() {
               <div className="text-sm font-medium">{m.name}</div>
             </div>
             {m.badge && (
-              <span className="rounded-md bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-500">
+              <span className="rounded-md bg-[var(--success-muted)] px-2 py-0.5 text-[10px] font-medium text-[var(--success)]">
                 {m.badge}
               </span>
             )}

@@ -26,7 +26,7 @@ export function AmountPresets() {
             key={p.amount}
             onClick={() => setSelectedAmount(p.amount)}
             className={cn(
-              'rounded-lg border bg-background p-3 text-center transition-colors',
+              'rounded-lg border bg-muted/30 p-3 text-center transition-colors',
               selectedAmount === p.amount && !customAmount
                 ? 'border-primary bg-primary/5'
                 : 'border-border/50 hover:border-border',
@@ -46,7 +46,7 @@ export function AmountPresets() {
         ))}
       </div>
 
-      <div className="mt-2 flex items-center gap-2 rounded-lg border border-border/50 bg-background px-3 py-2.5">
+      <div className="mt-2 flex items-center gap-2 rounded-lg border border-border/50 bg-muted/30 px-3 py-2.5">
         <span className="text-sm text-muted-foreground whitespace-nowrap">
           Другая сумма:
         </span>

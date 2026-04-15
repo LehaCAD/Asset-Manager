@@ -107,7 +107,7 @@ export default function BalancePage() {
           <BalanceCard />
 
           {/* Unified payment form — one card */}
-          <div className="rounded-lg border border-border/50 bg-card p-6 space-y-6">
+          <div className="rounded-lg border border-border bg-[var(--card-bg)] p-6 space-y-6">
             <AmountPresets />
             <hr className="border-border/50" />
             <PaymentMethods />
@@ -155,7 +155,7 @@ export default function BalancePage() {
           ) : (
             <>
               {/* Transactions table — 4 columns (removed "Способ") */}
-              <div className="rounded-lg border border-border bg-card shadow-[var(--shadow-card)] overflow-hidden">
+              <div className="rounded-lg border border-border bg-[var(--card-bg)] shadow-[var(--shadow-card)] overflow-hidden">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-border">
