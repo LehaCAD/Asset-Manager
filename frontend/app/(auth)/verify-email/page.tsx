@@ -51,6 +51,7 @@ function VerifyEmailContent() {
   }
 
   return (
+    <div className="flex min-h-screen items-center justify-center p-4">
     <div className="w-full max-w-sm">
       <div className="rounded-xl border border-border bg-card shadow-sm">
         <div className="px-8 py-10 text-center">
@@ -95,11 +96,13 @@ function VerifyEmailContent() {
         </div>
       </div>
     </div>
+    </div>
   );
 }
 
 export default function VerifyEmailPage() {
   return (
+    <div className="flex min-h-screen items-center justify-center p-4">
     <Suspense fallback={
       <div className="w-full max-w-sm">
         <div className="rounded-xl border border-border bg-card shadow-sm">
@@ -111,5 +114,6 @@ export default function VerifyEmailPage() {
     }>
       <VerifyEmailContent />
     </Suspense>
+    </div>
   );
 }

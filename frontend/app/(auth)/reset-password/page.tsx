@@ -49,6 +49,7 @@ function ResetPasswordContent() {
 
   if (done) {
     return (
+      <div className="flex min-h-screen items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="rounded-xl border border-border bg-card shadow-sm">
           <div className="px-8 py-10 text-center">
@@ -60,11 +61,13 @@ function ResetPasswordContent() {
           </div>
         </div>
       </div>
+      </div>
     );
   }
 
   if (tokenExpired) {
     return (
+      <div className="flex min-h-screen items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="rounded-xl border border-border bg-card shadow-sm">
           <div className="px-8 py-10 text-center">
@@ -76,10 +79,12 @@ function ResetPasswordContent() {
           </div>
         </div>
       </div>
+      </div>
     );
   }
 
   return (
+    <div className="flex min-h-screen items-center justify-center p-4">
     <div className="w-full max-w-sm">
       <div className="rounded-xl border border-border bg-card shadow-sm">
         <div className="px-8 pt-8 pb-6">
@@ -140,11 +145,13 @@ function ResetPasswordContent() {
         </div>
       </div>
     </div>
+    </div>
   );
 }
 
 export default function ResetPasswordPage() {
   return (
+    <div className="flex min-h-screen items-center justify-center p-4">
     <Suspense fallback={
       <div className="w-full max-w-sm">
         <div className="rounded-xl border border-border bg-card shadow-sm">
@@ -156,5 +163,6 @@ export default function ResetPasswordPage() {
     }>
       <ResetPasswordContent />
     </Suspense>
+    </div>
   );
 }

@@ -29,6 +29,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
+    <div className="flex min-h-screen items-center justify-center p-4">
     <div className="w-full max-w-sm">
       <div className="rounded-xl border border-border bg-card shadow-sm">
         <div className="px-8 pt-8 pb-6">
@@ -77,6 +78,7 @@ export default function ForgotPasswordPage() {
           </Link>
         </div>
       </div>
+    </div>
     </div>
   );
 }
