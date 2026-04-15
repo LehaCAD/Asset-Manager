@@ -107,7 +107,7 @@ export default function BalancePage() {
           <BalanceCard />
 
           {/* Unified payment form — one card */}
-          <div className="rounded-lg border border-border bg-[var(--card-bg)] p-6 space-y-6">
+          <div className="rounded-lg border border-border bg-background p-6 space-y-6">
             <AmountPresets />
             <hr className="border-border/50" />
             <PaymentMethods />
