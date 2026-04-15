@@ -175,15 +175,6 @@ class SceneViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Проверяем лимит групп в проекте
-        from apps.subscriptions.services import SubscriptionService
-        if not SubscriptionService.can_create_scene(request.user, project):
-            plan = SubscriptionService.get_active_plan(request.user)
-            return Response(
-                {'detail': f'Достигнут лимит групп в проекте ({plan.max_scenes_per_project}). Перейдите на другой тариф.'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
         return super().create(request, *args, **kwargs)
     
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsProjectOwner])

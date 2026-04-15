@@ -27,13 +27,13 @@ class EnforcementBaseTest(TestCase):
         self.free_plan = Plan.objects.create(
             code='free', name='Free', price=0,
             max_projects=1, max_scenes_per_project=2,
-            max_elements_per_scene=5, storage_limit_gb=1,
+            storage_limit_gb=1,
             is_default=True, display_order=1,
         )
         self.pro_plan = Plan.objects.create(
             code='pro', name='Pro', price=990,
             max_projects=0, max_scenes_per_project=50,
-            max_elements_per_scene=50, storage_limit_gb=100,
+            storage_limit_gb=100,
             is_trial_reference=True, display_order=2,
         )
         self.sharing_feature = Feature.objects.create(
@@ -102,19 +102,19 @@ class SceneCreationLimitTest(EnforcementBaseTest):
         }, format='json')
         self.assertEqual(resp.status_code, 201)
 
-    def test_create_scene_at_limit_denied(self):
+    def test_create_scene_unlimited(self):
+        """Scene limit removed — creation always allowed."""
         user = self._make_user()
         self._set_subscription(user, plan=self.free_plan, status='active')
         self.client.force_authenticate(user=user)
         project = Project.objects.create(user=user, name='P1')
-        # Free plan: max_scenes_per_project=2
-        for i in range(2):
+        for i in range(10):
             Scene.objects.create(project=project, name=f'S{i}', order_index=i)
         resp = self.client.post('/api/scenes/', {
             'project': project.id,
-            'name': 'Third Scene',
+            'name': 'Eleventh Scene',
         }, format='json')
-        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(resp.status_code, 201)
 
 
 class SharingFeatureGateTest(EnforcementBaseTest):

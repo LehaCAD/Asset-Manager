@@ -36,7 +36,6 @@ export interface PlanInfo {
   price: number;
   credits_per_month: number;
   max_projects: number;
-  max_scenes_per_project: number;
   storage_limit_gb: number;
   features: { code: string; title: string; description: string; icon: string }[];
   is_recommended: boolean;
@@ -46,8 +45,6 @@ export interface PlanInfo {
 export interface UserQuota {
   max_projects: number;
   used_projects: number;
-  max_scenes_per_project: number;
-  max_scenes_used: number;
   storage_limit_bytes: number;
   storage_used_bytes: number;
 }

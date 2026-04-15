@@ -29,13 +29,13 @@ class SubscriptionServiceBaseTest(TestCase):
         self.free_plan = Plan.objects.create(
             code='free', name='Free', price=0,
             max_projects=1, max_scenes_per_project=10,
-            max_elements_per_scene=10, storage_limit_gb=1,
+            storage_limit_gb=1,
             is_default=True, display_order=1,
         )
         self.pro_plan = Plan.objects.create(
             code='pro', name='Pro', price=990,
             max_projects=0, max_scenes_per_project=50,
-            max_elements_per_scene=50, storage_limit_gb=100,
+            storage_limit_gb=100,
             is_trial_reference=True, display_order=2,
         )
 
@@ -208,45 +208,21 @@ class CanCreateProjectTest(SubscriptionServiceBaseTest):
 
 
 class CanCreateSceneTest(SubscriptionServiceBaseTest):
-    """Tests for SubscriptionService.can_create_scene."""
+    """Tests for SubscriptionService.can_create_scene — always True (limit removed)."""
 
-    def test_under_limit(self):
+    def test_always_allowed(self):
         user = self._make_user()
         self._set_subscription(user, plan=self.free_plan, status='active')
         project = Project.objects.create(user=user, name='P1')
         self.assertTrue(SubscriptionService.can_create_scene(user, project))
 
-    def test_at_limit(self):
+    def test_allowed_even_with_many_scenes(self):
         user = self._make_user()
         self._set_subscription(user, plan=self.free_plan, status='active')
         project = Project.objects.create(user=user, name='P1')
-        for i in range(10):  # Free plan: max_scenes_per_project=10
-            Scene.objects.create(project=project, name=f'Scene {i}', order_index=i)
-        self.assertFalse(SubscriptionService.can_create_scene(user, project))
-
-    def test_unlimited_plan(self):
-        unlimited_plan = Plan.objects.create(
-            code='unlimited', name='Unlimited', price=0,
-            max_scenes_per_project=0, display_order=10,
-        )
-        user = self._make_user()
-        self._set_subscription(user, plan=unlimited_plan, status='active')
-        project = Project.objects.create(user=user, name='P1')
-        for i in range(20):
+        for i in range(100):
             Scene.objects.create(project=project, name=f'Scene {i}', order_index=i)
         self.assertTrue(SubscriptionService.can_create_scene(user, project))
-
-    def test_different_projects_independent_limits(self):
-        """Scene limit is per-project, not global."""
-        user = self._make_user()
-        self._set_subscription(user, plan=self.free_plan, status='active')
-        p1 = Project.objects.create(user=user, name='P1')
-        p2 = Project.objects.create(user=user, name='P2')
-        for i in range(10):
-            Scene.objects.create(project=p1, name=f'S{i}', order_index=i)
-        # P1 is full, P2 is empty
-        self.assertFalse(SubscriptionService.can_create_scene(user, p1))
-        self.assertTrue(SubscriptionService.can_create_scene(user, p2))
 
 
 class CheckStorageTest(SubscriptionServiceBaseTest):
@@ -344,10 +320,6 @@ class GetLimitsTest(SubscriptionServiceBaseTest):
         expected_keys = {
             'max_projects',
             'used_projects',
-            'max_scenes_per_project',
-            'max_scenes_used',
-            'max_elements_per_scene',
-            'max_elements_used',
             'storage_limit_bytes',
             'storage_used_bytes',
         }
@@ -373,10 +345,6 @@ class GetLimitsTest(SubscriptionServiceBaseTest):
 
         self.assertEqual(limits['max_projects'], 1)
         self.assertEqual(limits['used_projects'], 1)
-        self.assertEqual(limits['max_scenes_per_project'], 10)
-        self.assertEqual(limits['max_scenes_used'], 1)  # 1 scene in this project
-        self.assertEqual(limits['max_elements_per_scene'], 10)
-        self.assertEqual(limits['max_elements_used'], 2)  # 2 elements in the scene
         self.assertEqual(limits['storage_limit_bytes'], 1 * 1024 ** 3)
         self.assertEqual(limits['storage_used_bytes'], 300)
 
@@ -385,8 +353,6 @@ class GetLimitsTest(SubscriptionServiceBaseTest):
         self._set_subscription(user, plan=self.free_plan, status='active')
         limits = SubscriptionService.get_limits(user)
         self.assertEqual(limits['used_projects'], 0)
-        self.assertEqual(limits['max_scenes_used'], 0)
-        self.assertEqual(limits['max_elements_used'], 0)
         self.assertEqual(limits['storage_used_bytes'], 0)
 
     def test_multiple_projects_correct_max(self):
@@ -401,7 +367,6 @@ class GetLimitsTest(SubscriptionServiceBaseTest):
 
         limits = SubscriptionService.get_limits(user)
         self.assertEqual(limits['used_projects'], 2)
-        self.assertEqual(limits['max_scenes_used'], 3)  # max across projects
 
 
 class GetFeatureGateInfoTest(SubscriptionServiceBaseTest):

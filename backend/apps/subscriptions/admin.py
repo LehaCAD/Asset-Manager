@@ -114,7 +114,6 @@ class PlanAdmin(admin.ModelAdmin):
             {
                 'fields': (
                     'max_projects',
-                    'max_scenes_per_project',
                     'storage_limit_gb',
                 ),
                 'description': '0 = безлимит. Эти значения определяют квоты пользователей.',

@@ -1,4 +1,4 @@
-from django.db.models import Sum, Count, Max
+from django.db.models import Sum
 from django.utils import timezone
 
 from apps.subscriptions.models import Feature, Plan, Subscription
@@ -71,12 +71,8 @@ class SubscriptionService:
 
     @staticmethod
     def can_create_scene(user, project) -> bool:
-        """True if project hasn't hit the scene limit. 0 = unlimited."""
-        plan = SubscriptionService.get_active_plan(user)
-        if plan.max_scenes_per_project == 0:
-            return True
-        from apps.scenes.models import Scene  # lazy import
-        return Scene.objects.filter(project=project).count() < plan.max_scenes_per_project
+        """Лимит на группы убран — всегда разрешено."""
+        return True
 
     @staticmethod
     def check_storage(user) -> bool:
@@ -103,28 +99,9 @@ class SubscriptionService:
 
         # Lazy imports
         from apps.projects.models import Project
-        from apps.scenes.models import Scene
         from apps.elements.models import Element
 
         used_projects = Project.objects.filter(user=user).count()
-
-        # Max scenes in any single project
-        max_scenes_used = (
-            Scene.objects
-            .filter(project__user=user)
-            .values('project')
-            .annotate(cnt=Count('id'))
-            .aggregate(max_cnt=Max('cnt'))['max_cnt']
-        ) or 0
-
-        # Max elements in any single scene
-        max_elements_used = (
-            Element.objects
-            .filter(scene__project__user=user)
-            .values('scene')
-            .annotate(cnt=Count('id'))
-            .aggregate(max_cnt=Max('cnt'))['max_cnt']
-        ) or 0
 
         storage_used = (
             Element.objects
@@ -135,10 +112,6 @@ class SubscriptionService:
         return {
             'max_projects': plan.max_projects,
             'used_projects': used_projects,
-            'max_scenes_per_project': plan.max_scenes_per_project,
-            'max_scenes_used': max_scenes_used,
-            'max_elements_per_scene': plan.max_elements_per_scene,
-            'max_elements_used': max_elements_used,
             'storage_limit_bytes': plan.storage_limit_bytes,
             'storage_used_bytes': storage_used,
         }

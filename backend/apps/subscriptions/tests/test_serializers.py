@@ -80,8 +80,8 @@ class PlanListSerializerTest(SerializerBaseTest):
         data = serializer.data
         expected_fields = {
             'code', 'name', 'price', 'credits_per_month',
-            'max_projects', 'max_scenes_per_project',
-            'storage_limit_gb', 'features', 'is_recommended', 'display_order',
+            'max_projects', 'max_scenes_per_project', 'storage_limit_gb',
+            'features', 'is_recommended', 'display_order',
         }
         self.assertEqual(set(data.keys()), expected_fields)
 
@@ -197,7 +197,6 @@ class UserSerializerQuotaTest(SerializerBaseTest):
         quota = serializer.data['quota']
         expected_keys = {
             'max_projects', 'used_projects',
-            'max_scenes_per_project', 'max_scenes_used',
             'storage_limit_bytes', 'storage_used_bytes',
         }
         self.assertEqual(set(quota.keys()), expected_keys)
@@ -225,5 +224,4 @@ class UserSerializerQuotaTest(SerializerBaseTest):
         serializer = UserSerializer(user)
         quota = serializer.data['quota']
         self.assertEqual(quota['max_projects'], 1)
-        self.assertEqual(quota['max_scenes_per_project'], 10)
         self.assertEqual(quota['storage_limit_bytes'], 1 * 1024 ** 3)
