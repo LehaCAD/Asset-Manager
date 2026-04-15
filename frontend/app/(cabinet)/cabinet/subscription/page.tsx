@@ -154,7 +154,13 @@ export default function SubscriptionPage() {
         </p>
       </div>
 
-      <div className="rounded-lg border border-border bg-gradient-to-br from-[var(--bg-elevated)] to-[var(--bg-surface)] p-6 space-y-4">
+      <div className={`rounded-lg border p-6 space-y-4 ${
+        isPaid
+          ? "border-primary/30 bg-gradient-to-br from-[var(--bg-elevated)] to-[var(--bg-surface)] shadow-[0_0_24px_-6px_hsl(var(--primary)/0.15)]"
+          : isTrial
+            ? "border-primary/20 bg-gradient-to-br from-[var(--bg-elevated)] to-primary/[0.03]"
+            : "border-border bg-gradient-to-br from-[var(--bg-elevated)] to-[var(--bg-surface)]"
+      }`}>
         <div className="flex items-center justify-between">
           <div className="space-y-1">
             {isTrial && (
@@ -164,7 +170,7 @@ export default function SubscriptionPage() {
             {isPaid && currentPlanPrice !== null && (
               <div className="flex items-baseline gap-1">
                 <span className="text-2xl font-extrabold font-mono text-foreground">
-                  {currentPlanPrice.toLocaleString("ru-RU")}
+                  {Math.round(currentPlanPrice).toLocaleString("ru-RU")}
                 </span>
                 <span className="text-sm text-muted-foreground">₽ / мес</span>
               </div>
@@ -175,28 +181,28 @@ export default function SubscriptionPage() {
           </div>
 
           {isPaid && (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--success-muted)] text-xs font-semibold text-[var(--success)]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[var(--success)]" />
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--success-muted)] text-xs font-bold text-[var(--success)] shadow-[0_0_12px_-2px_var(--success)]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--success)] animate-pulse" />
               Активна
             </span>
           )}
           {isTrial && trialDaysLeft !== null && (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--primary-muted)] text-xs font-semibold text-primary">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--primary-muted)] text-xs font-bold text-primary shadow-[0_0_12px_-2px_hsl(var(--primary)/0.3)]">
               {trialDaysLeft} {trialDaysLeft === 1 ? "день" : trialDaysLeft < 5 ? "дня" : "дней"} осталось
             </span>
           )}
           {isFree && !isTrial && (
-            <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-muted text-xs font-semibold text-muted-foreground">
+            <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-primary/10 text-xs font-semibold text-primary">
               Бесплатно
             </span>
           )}
           {isExpired && (
-            <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-muted text-xs font-semibold text-muted-foreground">
+            <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-[var(--warning-muted)] text-xs font-semibold text-[var(--warning)]">
               Истекла
             </span>
           )}
           {isCancelled && (
-            <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-muted text-xs font-semibold text-muted-foreground">
+            <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-muted text-xs font-semibold text-muted-foreground">
               Отменена
             </span>
           )}
@@ -231,7 +237,7 @@ export default function SubscriptionPage() {
             <>
               <Link
                 href="/pricing"
-                className="inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-primary to-primary/80 px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition-opacity"
+                className="inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-primary to-primary/80 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_2px_12px_-2px_hsl(var(--primary)/0.4)] hover:opacity-90 transition-opacity"
               >
                 <ArrowRight className="h-3.5 w-3.5" />
                 Сменить тариф
@@ -243,10 +249,10 @@ export default function SubscriptionPage() {
           ) : (
             <Link
               href="/pricing"
-              className="inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-primary to-primary/80 px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 transition-opacity"
+              className="inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-primary to-primary/80 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_2px_12px_-2px_hsl(var(--primary)/0.4)] hover:opacity-90 transition-opacity"
             >
               <ArrowUpRight className="h-3.5 w-3.5" />
-              Подключить тариф
+              {isTrial ? "Выбрать тариф" : "Улучшить тариф"}
             </Link>
           )}
         </div>
@@ -301,18 +307,20 @@ export default function SubscriptionPage() {
           {allFeatures.map((feat) => (
             <div
               key={feat.code}
-              className={`flex items-center justify-between rounded-md border border-border px-3.5 py-2.5 transition-colors ${
-                feat.available ? "bg-[var(--bg-elevated)]" : "bg-[var(--bg-inset)]"
+              className={`flex items-center justify-between rounded-md border px-3.5 py-2.5 transition-all duration-150 ${
+                feat.available
+                  ? "border-border bg-[var(--bg-elevated)]"
+                  : "border-l-2 border-l-primary/30 border-t-border/60 border-r-border/60 border-b-border/60 bg-gradient-to-r from-primary/[0.04] to-[var(--bg-inset)] hover:from-primary/[0.08] hover:border-l-primary/50 cursor-pointer"
               }`}
             >
               <div className="flex items-center gap-2.5">
                 {feat.available ? (
                   <CircleCheck className="h-4 w-4 shrink-0 text-[var(--success)]" />
                 ) : (
-                  <Lock className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <Lock className="h-4 w-4 shrink-0 text-primary/50" />
                 )}
                 <div>
-                  <p className="text-sm font-medium text-foreground">
+                  <p className={`text-sm font-medium ${feat.available ? "text-foreground" : "text-foreground/80"}`}>
                     {feat.title}
                   </p>
                   <p className="text-[11px] text-muted-foreground leading-tight">{feat.description}</p>
@@ -324,16 +332,36 @@ export default function SubscriptionPage() {
         </div>
       )}
 
-      <Link
-        href="/pricing"
-        className="flex items-center justify-between rounded-md border border-border bg-[var(--bg-elevated)] px-4 py-3 hover:border-[var(--border-strong)] transition-colors group"
-      >
-        <div>
-          <p className="text-sm font-medium text-foreground">Сравнить все тарифы</p>
-          <p className="text-[11px] text-muted-foreground">Подробное сравнение возможностей и лимитов</p>
-        </div>
-        <ArrowRight className="h-4 w-4 text-primary group-hover:translate-x-0.5 transition-transform" />
-      </Link>
+      {(() => {
+        const isTopPlan = planCode === "team";
+        const isPro = planCode === "creator_pro";
+        const ctaTitle = isTopPlan
+          ? "Управление тарифом"
+          : isPro
+            ? "Нужно больше? Тариф для команды"
+            : isFree || isTrial
+              ? "Откройте все возможности платформы"
+              : "Получите ещё больше возможностей";
+        const ctaDesc = isTopPlan
+          ? "Просмотрите доступные тарифы и условия"
+          : isPro
+            ? "Безлимитное хранилище, совместная работа, приоритетная поддержка"
+            : isFree || isTrial
+              ? "Расширенные лимиты, эксклюзивные функции и приоритетная поддержка"
+              : "Больше проектов, хранилища и доступ к PRO-функциям";
+        return (
+          <Link
+            href="/pricing"
+            className="flex items-center justify-between rounded-md border border-primary/20 bg-gradient-to-r from-primary/[0.06] to-[var(--bg-elevated)] px-5 py-4 hover:border-primary/40 hover:from-primary/[0.10] transition-all duration-150 group"
+          >
+            <div>
+              <p className="text-sm font-semibold text-foreground">{ctaTitle}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">{ctaDesc}</p>
+            </div>
+            <ArrowRight className="h-4 w-4 text-primary group-hover:translate-x-0.5 transition-transform" />
+          </Link>
+        );
+      })()}
     </div>
   );
 }
