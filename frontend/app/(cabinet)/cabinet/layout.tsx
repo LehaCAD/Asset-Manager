@@ -6,6 +6,7 @@ import {
   TrendingUp,
   History,
   Wallet,
+  CircleCheckBig,
   HardDrive,
   Bell,
   Settings,
@@ -33,6 +34,7 @@ function getNavSections(isStaff: boolean) {
     {
       label: "Оплата",
       items: [
+        { href: "/cabinet/subscription", label: "Подписка", icon: CircleCheckBig },
         { href: "/cabinet/balance", label: "Платежи", icon: Wallet },
       ],
     },
