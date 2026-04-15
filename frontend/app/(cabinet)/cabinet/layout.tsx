@@ -86,7 +86,7 @@ export default function CabinetLayout({
     : "??";
 
   return (
-    <div className="flex flex-1 min-h-0 p-3 gap-3">
+    <div className="flex flex-1 min-h-0 p-3 gap-3 max-w-[1440px] mx-auto w-full">
       {/* Sidebar — floating rounded card */}
       <nav className="w-[260px] shrink-0 rounded-md border border-border bg-sidebar flex flex-col p-3 justify-between">
         <div>
