@@ -13,7 +13,6 @@ import {
   ArrowUpRight,
   Folder,
   HardDrive,
-  Layers,
   AlertCircle,
 } from "lucide-react";
 import { TierBadge } from "@/components/subscription/TierBadge";
@@ -256,7 +255,7 @@ export default function SubscriptionPage() {
       {quota && (
         <>
           <h2 className="text-[15px] font-semibold text-foreground">Использование</h2>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <UsageCard
               label="Проекты"
               icon={Folder}
@@ -268,12 +267,6 @@ export default function SubscriptionPage() {
               icon={HardDrive}
               value={storageDisplay(quota.storage_used_bytes, quota.storage_limit_bytes)}
               percent={usagePercent(quota.storage_used_bytes, quota.storage_limit_bytes)}
-            />
-            <UsageCard
-              label="Группы"
-              icon={Layers}
-              value={limitDisplay(quota.max_scenes_used, quota.max_scenes_per_project)}
-              percent={usagePercent(quota.max_scenes_used, quota.max_scenes_per_project)}
             />
           </div>
         </>
@@ -309,7 +302,7 @@ export default function SubscriptionPage() {
             <div
               key={feat.code}
               className={`flex items-center justify-between rounded-md border border-border px-3.5 py-2.5 transition-colors ${
-                feat.available ? "bg-[var(--bg-elevated)]" : "bg-[var(--bg-inset)] opacity-60"
+                feat.available ? "bg-[var(--bg-elevated)]" : "bg-[var(--bg-inset)]"
               }`}
             >
               <div className="flex items-center gap-2.5">
@@ -319,7 +312,7 @@ export default function SubscriptionPage() {
                   <Lock className="h-4 w-4 shrink-0 text-muted-foreground" />
                 )}
                 <div>
-                  <p className={`text-sm font-medium ${feat.available ? "text-foreground" : "text-muted-foreground"}`}>
+                  <p className="text-sm font-medium text-foreground">
                     {feat.title}
                   </p>
                   <p className="text-[11px] text-muted-foreground leading-tight">{feat.description}</p>
