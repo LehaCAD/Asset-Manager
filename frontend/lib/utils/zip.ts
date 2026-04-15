@@ -94,6 +94,24 @@ function ensureExtension(
 
 const CONCURRENCY = 4
 
+/** Скачать файл: сначала напрямую с S3, при CORS-ошибке — через backend proxy */
+async function fetchFile(
+  el: DownloadableElement,
+  signal: AbortSignal
+): Promise<Blob> {
+  try {
+    const resp = await fetch(el.file_url, { mode: 'cors', signal })
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+    return await resp.blob()
+  } catch (err) {
+    if (signal.aborted) throw err
+    // CORS или другая ошибка — fallback через backend proxy
+    const proxyResp = await fetch(`/api/elements/${el.id}/download/`, { signal })
+    if (!proxyResp.ok) throw new Error(`Proxy HTTP ${proxyResp.status}`)
+    return await proxyResp.blob()
+  }
+}
+
 async function fetchAllFiles(
   elements: DownloadableElement[],
   signal: AbortSignal,
@@ -107,17 +125,11 @@ async function fetchAllFiles(
       signal.throwIfAborted()
       const el = elements[i]
       try {
-        const resp = await fetch(el.file_url, { mode: 'cors', signal })
-        if (!resp.ok) {
-          console.warn(`[batch-download] Пропущен элемент id=${el.id}: HTTP ${resp.status} — ${el.file_url}`)
-          onFileComplete(i, null)
-          continue
-        }
-        const blob = await resp.blob()
+        const blob = await fetchFile(el, signal)
         onFileComplete(i, blob)
       } catch (err) {
         if (signal.aborted) throw err
-        console.warn(`[batch-download] Пропущен элемент id=${el.id}: ${err instanceof Error ? err.message : err} — ${el.file_url}`)
+        console.warn(`[batch-download] Пропущен элемент id=${el.id}: ${err instanceof Error ? err.message : err}`)
         onFileComplete(i, null)
       }
     }
