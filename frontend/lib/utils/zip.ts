@@ -108,10 +108,16 @@ async function fetchAllFiles(
       const el = elements[i]
       try {
         const resp = await fetch(el.file_url, { mode: 'cors', signal })
+        if (!resp.ok) {
+          console.warn(`[batch-download] Пропущен элемент id=${el.id}: HTTP ${resp.status} — ${el.file_url}`)
+          onFileComplete(i, null)
+          continue
+        }
         const blob = await resp.blob()
         onFileComplete(i, blob)
       } catch (err) {
         if (signal.aborted) throw err
+        console.warn(`[batch-download] Пропущен элемент id=${el.id}: ${err instanceof Error ? err.message : err} — ${el.file_url}`)
         onFileComplete(i, null)
       }
     }
