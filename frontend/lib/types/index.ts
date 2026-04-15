@@ -18,6 +18,7 @@ export interface UserSubscription {
   features: string[];
   is_trial: boolean;
   trial_days_left: number | null;
+  trial_total_days: number | null;
 }
 
 export interface FeatureGateInfo {
@@ -406,6 +407,10 @@ export interface PublicProject {
   scenes: PublicScene[]
   ungrouped_elements: PublicElement[]
   general_comments?: Comment[]
+  created_at?: string
+  expires_at?: string | null
+  total_elements?: number
+  link_name?: string
   display_preferences?: {
     size?: string
     aspectRatio?: string

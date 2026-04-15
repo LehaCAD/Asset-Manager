@@ -8,6 +8,7 @@ interface SubscriptionState {
   features: string[];
   isTrial: boolean;
   trialDaysLeft: number | null;
+  trialTotalDays: number | null;
 
   setFromUser: (sub: UserSubscription | undefined) => void;
   hasFeature: (code: string) => boolean;
@@ -20,6 +21,7 @@ export const useSubscriptionStore = create<SubscriptionState>()((set, get) => ({
   features: [],
   isTrial: false,
   trialDaysLeft: null,
+  trialTotalDays: null,
 
   setFromUser: (sub) => {
     if (!sub) return;
@@ -30,6 +32,7 @@ export const useSubscriptionStore = create<SubscriptionState>()((set, get) => ({
       features: sub.features,
       isTrial: sub.is_trial,
       trialDaysLeft: sub.trial_days_left,
+      trialTotalDays: sub.trial_total_days,
     });
   },
 
