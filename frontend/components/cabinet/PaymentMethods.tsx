@@ -44,7 +44,7 @@ export function PaymentMethods() {
             key={m.id}
             onClick={() => setPaymentMethod(m.id)}
             className={cn(
-              'flex items-center gap-2.5 rounded-lg border bg-[var(--card-bg)] p-3 text-left transition-colors',
+              'flex items-center gap-2.5 rounded-md border bg-[var(--bg-inset)] p-3 text-left transition-colors',
               paymentMethod === m.id
                 ? 'border-primary bg-primary/5'
                 : 'border-border/50 hover:border-border',

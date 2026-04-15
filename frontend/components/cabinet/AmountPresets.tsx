@@ -4,12 +4,12 @@ import { useCreditsStore } from '@/lib/store/credits';
 import { cn } from '@/lib/utils';
 
 const PRESETS = [
-  { amount: 100, label: '100 ₽' },
-  { amount: 500, label: '500 ₽' },
-  { amount: 1000, label: '1 000 ₽' },
-  { amount: 2000, label: '2 000 ₽' },
-  { amount: 5000, label: '5 000 ₽' },
-  { amount: 10000, label: '10 000 ₽' },
+  { amount: 100, label: '₽\u2009100' },
+  { amount: 500, label: '₽\u2009500' },
+  { amount: 1000, label: '₽\u20091\u2009000' },
+  { amount: 2000, label: '₽\u20092\u2009000' },
+  { amount: 5000, label: '₽\u20095\u2009000' },
+  { amount: 10000, label: '₽\u200910\u2009000' },
 ];
 
 export function AmountPresets() {
@@ -26,7 +26,7 @@ export function AmountPresets() {
             key={p.amount}
             onClick={() => setSelectedAmount(p.amount)}
             className={cn(
-              'rounded-lg border bg-[var(--card-bg)] p-3 text-center transition-colors',
+              'rounded-md border bg-[var(--bg-inset)] p-3 text-center transition-colors',
               selectedAmount === p.amount && !customAmount
                 ? 'border-primary bg-primary/5'
                 : 'border-border/50 hover:border-border',
@@ -46,7 +46,7 @@ export function AmountPresets() {
         ))}
       </div>
 
-      <div className="mt-2 flex items-center gap-2 rounded-lg border border-border/50 bg-[var(--card-bg)] px-3 py-2.5">
+      <div className="mt-2 flex items-center gap-2 rounded-md border border-border/50 bg-[var(--bg-inset)] px-3 py-2.5">
         <span className="text-sm text-muted-foreground whitespace-nowrap">
           Другая сумма:
         </span>
@@ -59,7 +59,7 @@ export function AmountPresets() {
           className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/40 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         />
         <span className="text-[11px] text-muted-foreground/40 whitespace-nowrap">
-          мин. 100 ₽
+          мин. ₽{'\u2009'}100
         </span>
       </div>
     </div>

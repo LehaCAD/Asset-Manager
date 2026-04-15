@@ -124,6 +124,9 @@
   --base:        oklch(0.985 0.003 265);
   --surface:     oklch(0.945 0.007 265);           /* #EAEBF0 — toolbars/panels, white pills visible on it */
   --card-bg:     oklch(1 0 0);                     /* #FFFFFF — cards separated by border+shadow */
+  --bg-elevated: oklch(1 0 0);                     /* #FFFFFF — alias for card-bg, used in components */
+  --bg-inset:    oklch(0.955 0.006 265);           /* #F0F1F4 — nested areas, inputs, inner buttons */
+  --bg-surface:  oklch(0.94 0.007 265);            /* #EEEEF2 — sidebar, panels */
   --text-accent: oklch(0.541 0.211 281.4);
   --bg-elevated-hover: oklch(0.945 0.005 265);     /* #EDEDF1 — hover on cards */
 
@@ -201,6 +204,9 @@
   --base:        oklch(0.145 0.028 265);           /* ~#111827 — page bg */
   --surface:     oklch(0.16 0.028 265);            /* ~#151D30 — panels */
   --card-bg:     oklch(0.19 0.03 265);             /* ~#1C2640 — cards */
+  --bg-elevated: oklch(0.19 0.03 265);             /* ~#1A1D28 — alias for card-bg */
+  --bg-inset:    oklch(0.13 0.02 265);             /* ~#0F1119 — nested areas, inputs */
+  --bg-surface:  oklch(0.155 0.025 265);           /* ~#13161F — sidebar, panels */
   --text-accent: oklch(0.646 0.204 281.4);         /* #8B7CF7 */
   --bg-elevated-hover: oklch(0.23 0.028 265);      /* ~#242E48 — hover on cards */
 

@@ -2,6 +2,7 @@
 
 import { KadrIcon } from '@/components/ui/kadr-icon';
 import { useCreditsStore } from '@/lib/store/credits';
+import { formatRubles } from '@/lib/utils/format';
 import { Loader2 } from 'lucide-react';
 
 const METHOD_LABELS: Record<string, string> = {
@@ -20,14 +21,14 @@ export function TopUpSummary() {
 
   const amount = customAmount ? parseInt(customAmount, 10) : selectedAmount;
   const isValid = amount >= 100;
-  const formatted = amount ? amount.toLocaleString('ru-RU') : '—';
+  const formatted = amount ? formatRubles(amount) : '—';
 
   return (
     <>
       <div>
         <div className="flex justify-between text-sm py-1">
           <span className="text-muted-foreground">Сумма пополнения</span>
-          <span className="font-medium">{formatted} ₽</span>
+          <span className="font-medium">₽{'\u2009'}{formatted}</span>
         </div>
         <div className="flex justify-between items-center text-sm py-1">
           <span className="text-muted-foreground">Получите</span>
@@ -46,7 +47,7 @@ export function TopUpSummary() {
         <button
           onClick={createTopUp}
           disabled={!isValid || isTopUpProcessing}
-          className="w-full rounded-lg bg-gradient-to-r from-primary to-primary/80 py-3.5 text-center text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="w-full rounded-md bg-gradient-to-r from-primary to-primary/80 py-3.5 text-center text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
         >
           {isTopUpProcessing ? (
             <span className="flex items-center justify-center gap-2">
@@ -54,13 +55,13 @@ export function TopUpSummary() {
               Переход к оплате...
             </span>
           ) : (
-            `Оплатить ${formatted} ₽`
+            `Оплатить ₽\u2009${formatted}`
           )}
         </button>
 
         {!isValid && customAmount && (
           <p className="mt-2 text-center text-xs text-destructive">
-            Минимальная сумма — 100 ₽
+            Минимальная сумма — ₽{'\u2009'}100
           </p>
         )}
       </div>

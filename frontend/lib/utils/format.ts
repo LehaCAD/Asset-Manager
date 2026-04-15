@@ -63,6 +63,11 @@ export function formatCurrency(amount: string | number): string {
   return parseFloat(num.toFixed(2)).toString();
 }
 
+/** Format number for display with thin spaces: 1 990 → "1⁠ 990" */
+export function formatRubles(amount: number): string {
+  return Math.round(amount).toLocaleString("ru-RU").replace(/\s/g, "\u2009");
+}
+
 export function formatRelativeDate(dateStr: string | undefined | null): string {
   if (!dateStr) return '';
   const date = new Date(dateStr);

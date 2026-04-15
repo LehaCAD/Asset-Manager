@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, type ComponentType } from "react";
 import { useSubscriptionStore } from "@/lib/store/subscription";
 import { useAuthStore } from "@/lib/store/auth";
 import { subscriptionsApi } from "@/lib/api/subscriptions";
+import { formatRubles } from "@/lib/utils/format";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   CircleCheck,
@@ -169,9 +170,9 @@ export default function SubscriptionPage() {
             {isPaid && currentPlanPrice !== null && (
               <div className="flex items-baseline gap-1">
                 <span className="text-2xl font-extrabold font-mono text-foreground">
-                  {Math.round(currentPlanPrice).toLocaleString("ru-RU")}
+                  ₽{'\u2009'}{formatRubles(currentPlanPrice)}
                 </span>
-                <span className="text-sm text-muted-foreground">₽ / мес</span>
+                <span className="text-sm text-muted-foreground">/ мес</span>
               </div>
             )}
             {isFree && !isTrial && (

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { format, subDays } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import { getTransactions } from "@/lib/api/cabinet";
-import { formatDateTime, formatCurrency } from "@/lib/utils/format";
+import { formatDateTime, formatCurrency, formatRubles } from "@/lib/utils/format";
 import { useCreditsStore } from "@/lib/store/credits";
 import type { CabinetTransaction, PaginatedResponse } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,7 +12,6 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { ChevronLeft, ChevronRight, CheckCircle2, AlertCircle, Download } from "lucide-react";
 import { KadrIcon } from "@/components/ui/kadr-icon";
 import { toast } from "sonner";
-import { BalanceCard } from "@/components/cabinet/BalanceCard";
 import { AmountPresets } from "@/components/cabinet/AmountPresets";
 import { PaymentMethods } from "@/components/cabinet/PaymentMethods";
 import { TopUpSummary } from "@/components/cabinet/TopUpSummary";
@@ -39,6 +38,7 @@ export default function BalancePage() {
   const [error, setError] = useState(false);
   const [page, setPage] = useState(1);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(defaultRange);
+  const balance = useCreditsStore((s) => s.balance);
   const loadBalance = useCreditsStore((s) => s.loadBalance);
 
   useEffect(() => { loadBalance(); }, [loadBalance]);
@@ -102,18 +102,22 @@ export default function BalancePage() {
 
       {/* Tab: Payment */}
       {activeTab === "payment" && (
-        <div className="space-y-5">
-          {/* Balance hero — standalone */}
-          <BalanceCard />
-
-          {/* Unified payment form — one card */}
-          <div className="rounded-lg border border-border bg-background p-6 space-y-6">
-            <AmountPresets />
-            <hr className="border-border/50" />
-            <PaymentMethods />
-            <hr className="border-border/50" />
-            <TopUpSummary />
+        <div className="rounded-lg border border-border bg-[var(--bg-elevated)] p-6 space-y-6">
+          {/* Balance header */}
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Текущий баланс</span>
+            <span className="flex items-center gap-1.5 text-lg font-bold font-mono text-foreground">
+              <KadrIcon size="md" />
+              {formatRubles(parseFloat(balance) || 0)}
+            </span>
           </div>
+
+          <hr className="border-border/50" />
+          <AmountPresets />
+          <hr className="border-border/50" />
+          <PaymentMethods />
+          <hr className="border-border/50" />
+          <TopUpSummary />
         </div>
       )}
 
@@ -155,7 +159,7 @@ export default function BalancePage() {
           ) : (
             <>
               {/* Transactions table — 4 columns (removed "Способ") */}
-              <div className="rounded-lg border border-border bg-[var(--card-bg)] shadow-[var(--shadow-card)] overflow-hidden">
+              <div className="rounded-lg border border-border bg-[var(--bg-elevated)] shadow-[var(--shadow-card)] overflow-hidden">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-border">
@@ -185,8 +189,7 @@ export default function BalancePage() {
                           </td>
                           <td className="px-4 py-3 text-center">
                             <span className="inline-flex items-center gap-1 font-mono font-medium text-success">
-                              +{formatCurrency(tx.amount)}
-                              <KadrIcon size="xs" />
+                              +<KadrIcon size="xs" />{'\u2009'}{formatRubles(parseFloat(String(tx.amount)))}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-center">
