@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { ReactNode } from "react";
 import type { ShowcaseItemConfig } from "./showcase-items";
 
 /* ─────────────────────────────────────────────
@@ -72,7 +73,7 @@ function ShowcaseElementCard({ content, width }: { content: Record<string, unkno
       />
 
       {/* Badge top-right */}
-      {content.badge && (
+      {!!content.badge && (
         <span className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-sm rounded px-1.5 py-0.5 text-[9px] text-white/85">
           {content.badge as string}
         </span>
@@ -292,7 +293,7 @@ function ShowcaseStatusBadge({ content }: { content: Record<string, unknown> }) 
 function ShowcaseNotification({ content, width }: { content: Record<string, unknown>; width: number }) {
   const iconColor = content.iconColor as string;
 
-  const iconConfig: Record<string, { bg: string; stroke: string; svg: JSX.Element }> = {
+  const iconConfig: Record<string, { bg: string; stroke: string; svg: ReactNode }> = {
     primary: {
       bg: "rgba(139,124,247,0.15)",
       stroke: "#8B7CF7",
