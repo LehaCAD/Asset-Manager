@@ -102,11 +102,18 @@ export default function BalancePage() {
 
       {/* Tab: Payment */}
       {activeTab === "payment" && (
-        <div className="mx-auto max-w-2xl space-y-5">
+        <div className="space-y-5">
+          {/* Balance hero — standalone */}
           <BalanceCard />
-          <AmountPresets />
-          <PaymentMethods />
-          <TopUpSummary />
+
+          {/* Unified payment form — one card */}
+          <div className="rounded-lg border border-border/50 bg-card p-6 space-y-6">
+            <AmountPresets />
+            <hr className="border-border/50" />
+            <PaymentMethods />
+            <hr className="border-border/50" />
+            <TopUpSummary />
+          </div>
         </div>
       )}
 

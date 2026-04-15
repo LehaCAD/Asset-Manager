@@ -25,7 +25,7 @@ export function TopUpSummary() {
 
   return (
     <>
-      <div className="rounded-lg border border-border/50 bg-card p-4">
+      <div>
         <div className="flex justify-between text-sm py-1">
           <span className="text-muted-foreground">Сумма пополнения</span>
           <span className="font-medium">{formatted} ₽</span>
