@@ -258,6 +258,33 @@ export default function SubscriptionPage() {
         </div>
       </div>
 
+      {/* Upgrade CTA — right after plan card, before details */}
+      {planCode !== "team" && (() => {
+        const isProPlan = planCode === "creator_pro";
+        const ctaTitle = isProPlan
+          ? "Нужно больше? Тариф для команды"
+          : isFree || isTrial
+            ? "Откройте все возможности платформы"
+            : "Получите ещё больше возможностей";
+        const ctaDesc = isProPlan
+          ? "Безлимитное хранилище, совместная работа, приоритетная поддержка"
+          : isFree || isTrial
+            ? "Расширенные лимиты, эксклюзивные функции и приоритетная поддержка"
+            : "Больше проектов, хранилища и доступ к PRO-функциям";
+        return (
+          <Link
+            href="/pricing"
+            className="flex items-center justify-between rounded-md border border-primary/20 bg-gradient-to-r from-primary/[0.06] to-[var(--bg-elevated)] px-5 py-4 hover:border-primary/40 hover:from-primary/[0.10] transition-all duration-150 group"
+          >
+            <div>
+              <p className="text-sm font-semibold text-foreground">{ctaTitle}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">{ctaDesc}</p>
+            </div>
+            <ArrowRight className="h-4 w-4 text-primary group-hover:translate-x-0.5 transition-transform" />
+          </Link>
+        );
+      })()}
+
       {quota && (
         <>
           <h2 className="text-[15px] font-semibold text-foreground">Использование</h2>
@@ -332,36 +359,6 @@ export default function SubscriptionPage() {
         </div>
       )}
 
-      {(() => {
-        const isTopPlan = planCode === "team";
-        const isPro = planCode === "creator_pro";
-        const ctaTitle = isTopPlan
-          ? "Управление тарифом"
-          : isPro
-            ? "Нужно больше? Тариф для команды"
-            : isFree || isTrial
-              ? "Откройте все возможности платформы"
-              : "Получите ещё больше возможностей";
-        const ctaDesc = isTopPlan
-          ? "Просмотрите доступные тарифы и условия"
-          : isPro
-            ? "Безлимитное хранилище, совместная работа, приоритетная поддержка"
-            : isFree || isTrial
-              ? "Расширенные лимиты, эксклюзивные функции и приоритетная поддержка"
-              : "Больше проектов, хранилища и доступ к PRO-функциям";
-        return (
-          <Link
-            href="/pricing"
-            className="flex items-center justify-between rounded-md border border-primary/20 bg-gradient-to-r from-primary/[0.06] to-[var(--bg-elevated)] px-5 py-4 hover:border-primary/40 hover:from-primary/[0.10] transition-all duration-150 group"
-          >
-            <div>
-              <p className="text-sm font-semibold text-foreground">{ctaTitle}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">{ctaDesc}</p>
-            </div>
-            <ArrowRight className="h-4 w-4 text-primary group-hover:translate-x-0.5 transition-transform" />
-          </Link>
-        );
-      })()}
     </div>
   );
 }
