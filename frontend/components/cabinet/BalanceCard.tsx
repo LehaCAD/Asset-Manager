@@ -6,8 +6,6 @@ import { useCreditsStore } from '@/lib/store/credits';
 export function BalanceCard() {
   const { balance } = useCreditsStore();
   const numBalance = parseFloat(balance) || 0;
-  const approxImages = Math.floor(numBalance / 5);
-  const approxVideos = Math.floor(numBalance / 10);
 
   return (
     <div className="text-center rounded-lg border border-border/50 bg-gradient-to-br from-[#151530] to-[#1E2545] p-6">
@@ -20,10 +18,6 @@ export function BalanceCard() {
           {numBalance.toLocaleString('ru-RU')}
         </span>
       </div>
-      <p className="mt-2 text-xs text-muted-foreground">
-        ≈ {approxImages.toLocaleString('ru-RU')} изображений или{' '}
-        {approxVideos.toLocaleString('ru-RU')} видео
-      </p>
     </div>
   );
 }

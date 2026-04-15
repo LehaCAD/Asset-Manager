@@ -102,7 +102,7 @@ export default function BalancePage() {
 
       {/* Tab: Payment */}
       {activeTab === "payment" && (
-        <div className="mx-auto max-w-[520px] space-y-5">
+        <div className="mx-auto max-w-2xl space-y-5">
           <BalanceCard />
           <AmountPresets />
           <PaymentMethods />

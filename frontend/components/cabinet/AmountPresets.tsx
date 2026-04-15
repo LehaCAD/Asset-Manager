@@ -4,12 +4,12 @@ import { useCreditsStore } from '@/lib/store/credits';
 import { cn } from '@/lib/utils';
 
 const PRESETS = [
-  { amount: 100, label: '100 ₽', equiv: '~20 изобр.' },
-  { amount: 500, label: '500 ₽', equiv: '~100 изобр.' },
-  { amount: 1000, label: '1 000 ₽', equiv: '~200 изобр.' },
-  { amount: 2000, label: '2 000 ₽', equiv: '~400 изобр.' },
-  { amount: 5000, label: '5 000 ₽', equiv: '~1 000 изобр.' },
-  { amount: 10000, label: '10 000 ₽', equiv: '~2 000 изобр.' },
+  { amount: 100, label: '100 ₽' },
+  { amount: 500, label: '500 ₽' },
+  { amount: 1000, label: '1 000 ₽' },
+  { amount: 2000, label: '2 000 ₽' },
+  { amount: 5000, label: '5 000 ₽' },
+  { amount: 10000, label: '10 000 ₽' },
 ];
 
 export function AmountPresets() {
@@ -47,9 +47,6 @@ export function AmountPresets() {
             >
               {p.label}
             </div>
-            <div className="mt-0.5 text-[11px] text-muted-foreground">
-              {p.equiv}
-            </div>
           </button>
         ))}
       </div>
@@ -64,7 +61,7 @@ export function AmountPresets() {
           placeholder="Введите сумму"
           value={customAmount}
           onChange={(e) => setCustomAmount(e.target.value)}
-          className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/40"
+          className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/40 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         />
         <span className="text-[11px] text-muted-foreground/40 whitespace-nowrap">
           мин. 100 ₽

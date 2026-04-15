@@ -168,7 +168,7 @@ export default function CabinetLayout({
         return (
           <div className={cn(
             "flex-1 rounded-md border border-border bg-background shadow-[var(--shadow-card)]",
-            isFullHeight ? "flex flex-col overflow-hidden" : "overflow-y-auto"
+            isFullHeight ? "flex flex-col overflow-hidden" : "overflow-y-auto scrollbar-thin"
           )}>
             {isFullHeight ? (
               children
