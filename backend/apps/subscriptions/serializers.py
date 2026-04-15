@@ -12,6 +12,7 @@ class FeatureSerializer(serializers.ModelSerializer):
 
 class PlanListSerializer(serializers.ModelSerializer):
     features = FeatureSerializer(many=True, read_only=True)
+    trial_bonus_credits = serializers.FloatField(read_only=True)
 
     class Meta:
         model = Plan
@@ -26,6 +27,9 @@ class PlanListSerializer(serializers.ModelSerializer):
             'features',
             'is_recommended',
             'display_order',
+            'trial_duration_days',
+            'trial_bonus_credits',
+            'is_trial_reference',
         ]
 
 

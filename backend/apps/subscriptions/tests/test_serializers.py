@@ -82,6 +82,7 @@ class PlanListSerializerTest(SerializerBaseTest):
             'code', 'name', 'price', 'credits_per_month',
             'max_projects', 'max_scenes_per_project', 'storage_limit_gb',
             'features', 'is_recommended', 'display_order',
+            'trial_duration_days', 'trial_bonus_credits', 'is_trial_reference',
         }
         self.assertEqual(set(data.keys()), expected_fields)
 

@@ -85,8 +85,9 @@ class PlanListViewTest(ViewsBaseTest):
         plan = resp.data[0]
         expected_fields = {
             'code', 'name', 'price', 'credits_per_month',
-            'max_projects', 'max_scenes_per_project', 'max_elements_per_scene',
+            'max_projects', 'max_scenes_per_project',
             'storage_limit_gb', 'features', 'is_recommended', 'display_order',
+            'trial_duration_days', 'trial_bonus_credits', 'is_trial_reference',
         }
         self.assertEqual(set(plan.keys()), expected_fields)
 
