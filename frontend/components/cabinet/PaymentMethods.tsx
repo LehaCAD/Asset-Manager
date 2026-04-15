@@ -7,14 +7,12 @@ import type { PaymentMethodType } from '@/lib/types';
 const METHODS: {
   id: PaymentMethodType;
   name: string;
-  desc: string;
   icon: React.ReactNode;
   badge?: string;
 }[] = [
   {
     id: 'sbp',
     name: 'Система быстрых платежей',
-    desc: 'Моментальный перевод через банк',
     icon: (
       <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-sky-400">
         <span className="text-[10px] font-bold text-white">СБП</span>
@@ -25,20 +23,9 @@ const METHODS: {
   {
     id: 'bank_card',
     name: 'Банковская карта',
-    desc: 'Visa, Mastercard, МИР',
     icon: (
       <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-slate-700 to-slate-500">
         <span className="text-base">💳</span>
-      </div>
-    ),
-  },
-  {
-    id: 'sberbank',
-    name: 'SberPay',
-    desc: 'Оплата через Сбербанк Онлайн',
-    icon: (
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-green-600 to-green-400">
-        <span className="text-[10px] font-bold text-white">Сбер</span>
       </div>
     ),
   },
@@ -78,7 +65,6 @@ export function PaymentMethods() {
             {m.icon}
             <div className="flex-1">
               <div className="text-sm font-medium">{m.name}</div>
-              <div className="text-[11px] text-muted-foreground">{m.desc}</div>
             </div>
             {m.badge && (
               <span className="rounded-md bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-500">

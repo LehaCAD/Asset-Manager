@@ -2,12 +2,11 @@
 
 import { KadrIcon } from '@/components/ui/kadr-icon';
 import { useCreditsStore } from '@/lib/store/credits';
-import { Loader2, Lock } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 const METHOD_LABELS: Record<string, string> = {
   sbp: 'СБП',
   bank_card: 'Банковская карта',
-  sberbank: 'SberPay',
 };
 
 export function TopUpSummary() {
@@ -66,10 +65,6 @@ export function TopUpSummary() {
         )}
       </div>
 
-      <div className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground/40">
-        <Lock className="h-3 w-3" />
-        <span>Безопасная оплата через ЮKassa</span>
-      </div>
     </>
   );
 }
