@@ -36,13 +36,20 @@ class Plan(models.Model):
     credits_per_month = models.IntegerField(default=0)
     max_projects = models.IntegerField(default=1, help_text='0 = безлимит')
     max_scenes_per_project = models.IntegerField(default=10)
-    max_elements_per_scene = models.IntegerField(default=10)
     storage_limit_gb = models.IntegerField(default=1)
     features = models.ManyToManyField(Feature, blank=True, related_name='plans')
     is_default = models.BooleanField(default=False)
     is_recommended = models.BooleanField(default=False)
     is_trial_reference = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+    trial_duration_days = models.PositiveIntegerField(
+        default=7,
+        help_text='Длительность пробного периода в днях (используется только для плана с is_trial_reference)',
+    )
+    trial_bonus_credits = models.DecimalField(
+        max_digits=10, decimal_places=2, default=50,
+        help_text='Бонусные кадры при регистрации (0 = не начислять)',
+    )
     display_order = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

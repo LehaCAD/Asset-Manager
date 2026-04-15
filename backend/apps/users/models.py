@@ -64,15 +64,21 @@ def create_user_subscription(sender, instance, created, **kwargs):
         from apps.credits.services import CreditsService
         default_plan = Plan.objects.filter(is_default=True).first()
         if default_plan:
+            # Читаем trial-параметры из триал-референс плана
+            trial_ref = Plan.objects.filter(is_trial_reference=True).first()
+            trial_days = trial_ref.trial_duration_days if trial_ref else 7
+            trial_credits = trial_ref.trial_bonus_credits if trial_ref else Decimal('50')
+
             Subscription.objects.create(
                 user=instance,
                 plan=default_plan,
                 status='trial',
-                expires_at=timezone.now() + timedelta(days=7),
+                expires_at=timezone.now() + timedelta(days=trial_days),
             )
-            CreditsService().topup(
-                instance,
-                Decimal('50'),
-                reason='trial_bonus',
-                metadata={'source': 'registration_trial'},
-            )
+            if trial_credits > 0:
+                CreditsService().topup(
+                    instance,
+                    trial_credits,
+                    reason='trial_bonus',
+                    metadata={'source': 'registration_trial'},
+                )

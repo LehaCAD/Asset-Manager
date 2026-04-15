@@ -132,6 +132,14 @@ class PlanAdmin(admin.ModelAdmin):
             },
         ),
         (
+            'Триал',
+            {
+                'fields': ('trial_duration_days', 'trial_bonus_credits'),
+                'classes': ('collapse',),
+                'description': 'Настройки пробного периода. Применяются только к плану с галочкой «Триал-референс».',
+            },
+        ),
+        (
             'Отображение',
             {
                 'fields': (

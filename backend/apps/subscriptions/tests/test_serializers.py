@@ -29,13 +29,13 @@ class SerializerBaseTest(TestCase):
         self.free_plan = Plan.objects.create(
             code='free', name='Free', price=0,
             max_projects=1, max_scenes_per_project=10,
-            max_elements_per_scene=10, storage_limit_gb=1,
+            storage_limit_gb=1,
             is_default=True, display_order=1,
         )
         self.pro_plan = Plan.objects.create(
             code='pro', name='Pro', price=990,
             max_projects=0, max_scenes_per_project=50,
-            max_elements_per_scene=50, storage_limit_gb=100,
+            storage_limit_gb=100,
             is_trial_reference=True, display_order=2,
         )
         self.sharing_feature = Feature.objects.create(
@@ -80,7 +80,7 @@ class PlanListSerializerTest(SerializerBaseTest):
         data = serializer.data
         expected_fields = {
             'code', 'name', 'price', 'credits_per_month',
-            'max_projects', 'max_scenes_per_project', 'max_elements_per_scene',
+            'max_projects', 'max_scenes_per_project',
             'storage_limit_gb', 'features', 'is_recommended', 'display_order',
         }
         self.assertEqual(set(data.keys()), expected_fields)
@@ -108,7 +108,7 @@ class SubscriptionSerializerTest(SerializerBaseTest):
         data = serializer.data
         expected_fields = {
             'plan_code', 'plan_name', 'status', 'expires_at',
-            'features', 'is_trial', 'trial_days_left',
+            'features', 'is_trial', 'trial_days_left', 'trial_total_days',
         }
         self.assertEqual(set(data.keys()), expected_fields)
         self.assertEqual(data['plan_code'], 'pro')
@@ -125,9 +125,8 @@ class SubscriptionSerializerTest(SerializerBaseTest):
         data = serializer.data
         self.assertTrue(data['is_trial'])
         self.assertIsNotNone(data['trial_days_left'])
-        # Features should be from trial_reference plan (pro)
-        feat_codes = [f['code'] for f in data['features']]
-        self.assertIn('sharing', feat_codes)
+        # Features should be from trial_reference plan (pro) — returned as string codes
+        self.assertIn('sharing', data['features'])
 
     def test_free_subscription_no_features(self):
         user = self._make_user()
@@ -199,7 +198,6 @@ class UserSerializerQuotaTest(SerializerBaseTest):
         expected_keys = {
             'max_projects', 'used_projects',
             'max_scenes_per_project', 'max_scenes_used',
-            'max_elements_per_scene', 'max_elements_used',
             'storage_limit_bytes', 'storage_used_bytes',
         }
         self.assertEqual(set(quota.keys()), expected_keys)
@@ -228,5 +226,4 @@ class UserSerializerQuotaTest(SerializerBaseTest):
         quota = serializer.data['quota']
         self.assertEqual(quota['max_projects'], 1)
         self.assertEqual(quota['max_scenes_per_project'], 10)
-        self.assertEqual(quota['max_elements_per_scene'], 10)
         self.assertEqual(quota['storage_limit_bytes'], 1 * 1024 ** 3)

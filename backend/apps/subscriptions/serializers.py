@@ -22,7 +22,6 @@ class PlanListSerializer(serializers.ModelSerializer):
             'credits_per_month',
             'max_projects',
             'max_scenes_per_project',
-            'max_elements_per_scene',
             'storage_limit_gb',
             'features',
             'is_recommended',
@@ -31,11 +30,12 @@ class PlanListSerializer(serializers.ModelSerializer):
 
 
 class SubscriptionSerializer(serializers.ModelSerializer):
-    plan_code = serializers.CharField(source='plan.code', read_only=True)
-    plan_name = serializers.CharField(source='plan.name', read_only=True)
+    plan_code = serializers.SerializerMethodField()
+    plan_name = serializers.SerializerMethodField()
     features = serializers.SerializerMethodField()
     is_trial = serializers.BooleanField(read_only=True)
     trial_days_left = serializers.IntegerField(read_only=True)
+    trial_total_days = serializers.SerializerMethodField()
 
     class Meta:
         model = Subscription
@@ -47,11 +47,30 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             'features',
             'is_trial',
             'trial_days_left',
+            'trial_total_days',
         ]
 
+    def _get_active_plan(self, obj):
+        if not hasattr(self, '_cached_plan') or self._cached_plan_user_id != obj.user_id:
+            self._cached_plan = SubscriptionService.get_active_plan(obj.user)
+            self._cached_plan_user_id = obj.user_id
+        return self._cached_plan
+
+    def get_plan_code(self, obj):
+        return self._get_active_plan(obj).code
+
+    def get_plan_name(self, obj):
+        return self._get_active_plan(obj).name
+
     def get_features(self, obj):
-        plan = SubscriptionService.get_active_plan(obj.user)
-        return FeatureSerializer(plan.features.all(), many=True).data
+        plan = self._get_active_plan(obj)
+        return list(plan.features.values_list('code', flat=True))
+
+    def get_trial_total_days(self, obj):
+        if obj.status != 'trial':
+            return None
+        delta = obj.expires_at - obj.started_at
+        return max(delta.days, 0)
 
 
 class FeatureGateSerializer(serializers.Serializer):
