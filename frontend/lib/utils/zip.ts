@@ -100,7 +100,8 @@ async function fetchFile(
   signal: AbortSignal
 ): Promise<Blob> {
   try {
-    const resp = await fetch(el.file_url, { mode: 'cors', signal })
+    // cache: 'no-store' — обход кеша браузера, где ответ от <img> лежит без CORS-заголовков
+    const resp = await fetch(el.file_url, { mode: 'cors', signal, cache: 'no-store' })
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
     return await resp.blob()
   } catch (err) {
