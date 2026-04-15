@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Download, Check, Loader2 } from 'lucide-react'
+import { Download, Check } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -30,12 +30,12 @@ interface BatchDownloadDialogProps {
   groups: Array<{ id: number; name: string; parent_id?: number | null; parent?: number | null }>
 }
 
-const STAGE_MESSAGES: Record<string, string> = {
-  fetching: 'Скачиваем файлы...',
-  packing: 'Собираем архив...',
-  done: 'Архив сохранён',
-  error: 'Не удалось скачать',
-  cancelled: 'Скачивание отменено',
+function getProgressMessage(stage: string, percent: number): string {
+  if (stage === 'packing') return 'Почти готово, формируем архив...'
+  if (percent < 30) return 'Собираем файлы...'
+  if (percent < 70) return 'Добавляем в архив...'
+  if (percent < 95) return 'Осталось совсем немного...'
+  return 'Завершаем...'
 }
 
 export function BatchDownloadDialog({
@@ -195,46 +195,28 @@ export function BatchDownloadDialog({
           {isActive && (
             <div className="space-y-3">
               <Progress value={stage === 'packing' ? 100 : progressPercent} className="h-2" />
-              <div className="space-y-1">
-                <p className="text-sm font-medium">{STAGE_MESSAGES[stage]}</p>
-                {stage === 'fetching' && (
-                  <>
-                    <p className="text-xs text-muted-foreground tabular-nums">
-                      {progress.current} из {progress.total}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {progress.currentFile}
-                    </p>
-                  </>
-                )}
-                {stage === 'packing' && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    Это может занять несколько секунд
-                  </div>
-                )}
-              </div>
+              <p className="text-sm text-muted-foreground">
+                {getProgressMessage(stage, progressPercent)}
+              </p>
             </div>
           )}
 
           {/* Done */}
-          {stage === 'done' && result && (
+          {stage === 'done' && (
             <div className="flex items-center gap-3 py-2">
               <div className="flex items-center justify-center h-8 w-8 rounded-full bg-primary/10">
                 <Check className="h-4 w-4 text-primary" />
               </div>
-              <div>
-                <p className="text-sm font-medium">{STAGE_MESSAGES.done}</p>
-                <p className="text-xs text-muted-foreground">
-                  {result.downloaded} файл(ов){result.skipped > 0 ? ` · ${result.skipped} пропущено` : ''}
-                </p>
-              </div>
+              <p className="text-sm font-medium">Готово, архив сохранён</p>
             </div>
           )}
 
           {/* Error / Cancelled */}
-          {(stage === 'error' || stage === 'cancelled') && (
-            <p className="text-sm text-muted-foreground">{STAGE_MESSAGES[stage]}</p>
+          {stage === 'error' && (
+            <p className="text-sm text-muted-foreground">Не удалось скачать архив</p>
+          )}
+          {stage === 'cancelled' && (
+            <p className="text-sm text-muted-foreground">Скачивание отменено</p>
           )}
         </div>
 

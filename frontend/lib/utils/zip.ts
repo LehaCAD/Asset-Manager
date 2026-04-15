@@ -74,6 +74,24 @@ export function buildGroupPaths(
   return paths
 }
 
+/** Гарантирует, что имя файла имеет расширение. Берёт из URL или element_type. */
+function ensureExtension(
+  filename: string,
+  fileUrl: string,
+  elementType: 'IMAGE' | 'VIDEO'
+): string {
+  const hasExt = /\.\w{2,5}$/.test(filename)
+  if (hasExt) return filename
+
+  // Попытка извлечь расширение из URL (до ? query params)
+  const urlPath = fileUrl.split('?')[0]
+  const urlExt = urlPath.match(/\.(\w{2,5})$/)?.[1]
+  if (urlExt) return `${filename}.${urlExt}`
+
+  // Fallback по типу элемента
+  return `${filename}.${elementType === 'VIDEO' ? 'mp4' : 'png'}`
+}
+
 const CONCURRENCY = 4
 
 async function fetchAllFiles(
@@ -106,7 +124,7 @@ export async function buildAndDownloadZip(
   elements: DownloadableElement[],
   groupPaths: Record<number, string>,
   projectName: string,
-  onProgress: (current: number, total: number, filename: string) => void,
+  onProgress: (current: number, total: number) => void,
   onStageChange: (stage: DownloadStage) => void,
   signal: AbortSignal
 ): Promise<{ downloaded: number; skipped: number }> {
@@ -127,8 +145,9 @@ export async function buildAndDownloadZip(
     } else {
       const el = elements[index]
       const folder = el.scene_id ? (groupPaths[el.scene_id] ?? '') : ''
+      const rawName = sanitizeFilename(el.original_filename || `element-${el.id}`)
       const filename = deduplicateFilename(
-        sanitizeFilename(el.original_filename || `element-${el.id}`),
+        ensureExtension(rawName, el.file_url, el.element_type),
         folder,
         usedNames
       )
@@ -136,8 +155,7 @@ export async function buildAndDownloadZip(
       blobs[index] = { blob, path }
     }
     completed++
-    const el = elements[index]
-    onProgress(completed, total, el.original_filename || `element-${el.id}`)
+    onProgress(completed, total)
   })
 
   for (const entry of blobs) {

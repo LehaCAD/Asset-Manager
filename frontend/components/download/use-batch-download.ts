@@ -11,7 +11,6 @@ import {
 interface DownloadProgress {
   current: number
   total: number
-  currentFile: string
 }
 
 interface UseBatchDownloadReturn {
@@ -30,7 +29,7 @@ interface UseBatchDownloadReturn {
 export function useBatchDownload(): UseBatchDownloadReturn {
   const [stage, setStage] = useState<DownloadStage>('idle')
   const [progress, setProgress] = useState<DownloadProgress>({
-    current: 0, total: 0, currentFile: '',
+    current: 0, total: 0,
   })
   const [result, setResult] = useState<{ downloaded: number; skipped: number } | null>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -57,23 +56,20 @@ export function useBatchDownload(): UseBatchDownloadReturn {
     abortRef.current = controller
 
     setStage('idle')
-    setProgress({ current: 0, total: elements.length, currentFile: '' })
+    setProgress({ current: 0, total: elements.length })
     setResult(null)
 
     buildAndDownloadZip(
       elements,
       groupPaths,
       projectName,
-      (current, total, filename) => {
-        setProgress({ current, total, currentFile: filename })
+      (current, total) => {
+        setProgress({ current, total })
       },
       setStage,
       controller.signal
     ).then((res) => {
       setResult(res)
-      if (res.skipped > 0) {
-        toast.warning(`${res.skipped} файл(ов) пропущено`)
-      }
     }).catch((err) => {
       if (controller.signal.aborted) {
         setStage('cancelled')
@@ -95,7 +91,7 @@ export function useBatchDownload(): UseBatchDownloadReturn {
     abortRef.current?.abort()
     abortRef.current = null
     setStage('idle')
-    setProgress({ current: 0, total: 0, currentFile: '' })
+    setProgress({ current: 0, total: 0 })
     setResult(null)
   }, [])
 
