@@ -10,7 +10,6 @@ import {
   Lock,
   ArrowRight,
   Calendar,
-  ArrowUpRight,
   Folder,
   HardDrive,
   AlertCircle,
@@ -230,11 +229,10 @@ export default function SubscriptionPage() {
           </div>
         )}
 
-        <hr className="border-border" />
-
-        <div className="flex items-center gap-3">
-          {isPaid ? (
-            <>
+        {isPaid && (
+          <>
+            <hr className="border-border" />
+            <div className="flex items-center gap-3">
               <Link
                 href="/pricing"
                 className="inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-primary to-primary/80 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_2px_12px_-2px_hsl(var(--primary)/0.4)] hover:opacity-90 transition-opacity"
@@ -245,42 +243,58 @@ export default function SubscriptionPage() {
               <button className="rounded-md border border-border px-5 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-[var(--border-strong)] transition-colors">
                 Отменить подписку
               </button>
-            </>
-          ) : (
-            <Link
-              href="/pricing"
-              className="inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-primary to-primary/80 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_2px_12px_-2px_hsl(var(--primary)/0.4)] hover:opacity-90 transition-opacity"
-            >
-              <ArrowUpRight className="h-3.5 w-3.5" />
-              {isTrial ? "Выбрать тариф" : "Улучшить тариф"}
-            </Link>
-          )}
-        </div>
+            </div>
+          </>
+        )}
       </div>
 
-      {/* Upgrade CTA — right after plan card, before details */}
+      {/* Upgrade CTA banner — adaptive per plan state */}
       {planCode !== "team" && (() => {
-        const isProPlan = planCode === "creator_pro";
-        const ctaTitle = isProPlan
-          ? "Нужно больше? Тариф для команды"
-          : isFree || isTrial
-            ? "Откройте все возможности платформы"
-            : "Получите ещё больше возможностей";
-        const ctaDesc = isProPlan
-          ? "Безлимитное хранилище, совместная работа, приоритетная поддержка"
-          : isFree || isTrial
-            ? "Расширенные лимиты, эксклюзивные функции и приоритетная поддержка"
-            : "Больше проектов, хранилища и доступ к PRO-функциям";
+        const isProPlan = planCode === "creator_pro" && !isTrial;
+
+        // Trial: user already has PRO features, risk of losing them
+        // Free: user has nothing, sell the dream
+        // Paid (not PRO): upsell to PRO
+        // PRO paid: soft upsell to Team
+        // Expired/Cancelled: recovery urgency
+        let ctaTitle: string;
+        let ctaDesc: string;
+
+        if (isExpired) {
+          ctaTitle = "Возобновите подписку";
+          ctaDesc = "Восстановите доступ к расширенным функциям и лимитам";
+        } else if (isCancelled) {
+          ctaTitle = "Подключите тариф заново";
+          ctaDesc = "Верните доступ к проектам и инструментам платформы";
+        } else if (isTrial) {
+          ctaTitle = "Оформите подписку";
+          ctaDesc = "Сохраните доступ к PRO-функциям после окончания пробного периода";
+        } else if (isProPlan) {
+          ctaTitle = "Нужно больше? Тариф для команды";
+          ctaDesc = "Безлимитное хранилище, совместная работа, приоритетная поддержка";
+        } else if (isFree) {
+          ctaTitle = "Откройте все возможности платформы";
+          ctaDesc = "Расширенные лимиты, эксклюзивные функции и приоритетная поддержка";
+        } else {
+          ctaTitle = "Получите ещё больше возможностей";
+          ctaDesc = "Больше проектов, хранилища и доступ к PRO-функциям";
+        }
+
         return (
           <Link
             href="/pricing"
-            className="flex items-center justify-between rounded-md border border-primary/20 bg-gradient-to-r from-primary/[0.06] to-[var(--bg-elevated)] px-5 py-4 hover:border-primary/40 hover:from-primary/[0.10] transition-all duration-150 group"
+            className="block rounded-lg bg-gradient-to-r from-primary/15 via-primary/10 to-primary/5 border border-primary/25 px-5 py-4 hover:from-primary/20 hover:via-primary/15 hover:to-primary/10 hover:border-primary/40 hover:shadow-[0_0_20px_-4px_hsl(var(--primary)/0.2)] transition-all duration-150 group"
           >
-            <div>
-              <p className="text-sm font-semibold text-foreground">{ctaTitle}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">{ctaDesc}</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-foreground">{ctaTitle}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{ctaDesc}</p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 ml-4">
+                <span className="text-xs font-semibold text-primary hidden sm:inline">Смотреть тарифы</span>
+                <ArrowRight className="h-4 w-4 text-primary group-hover:translate-x-0.5 transition-transform" />
+              </div>
             </div>
-            <ArrowRight className="h-4 w-4 text-primary group-hover:translate-x-0.5 transition-transform" />
           </Link>
         );
       })()}
