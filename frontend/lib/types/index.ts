@@ -40,6 +40,9 @@ export interface PlanInfo {
   features: { code: string; title: string; description: string; icon: string }[];
   is_recommended: boolean;
   display_order: number;
+  trial_duration_days: number;
+  trial_bonus_credits: number;
+  is_trial_reference: boolean;
 }
 
 export interface UserQuota {
