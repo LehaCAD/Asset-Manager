@@ -7,18 +7,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import {
   Check,
-  X,
   Star,
   Clock,
-  FolderOpen,
-  HardDrive,
-  Coins,
-  Sparkles,
-  Zap,
   Building2,
 } from "lucide-react";
+import { KadrIcon } from "@/components/ui/kadr-icon";
 import type { PlanInfo } from "@/lib/types";
-import type { LucideIcon } from "lucide-react";
 
 // ─── Static helpers ────────────────────────────────────────────────────────
 
@@ -31,29 +25,25 @@ const PLAN_DESCRIPTIONS: Record<string, string> = {
 
 function formatPrice(price: number): { main: string; suffix: string } {
   if (price === 0) return { main: "Бесплатно", suffix: "" };
-  return { main: price.toLocaleString("ru-RU"), suffix: "₽/мес" };
+  return { main: Math.round(price).toLocaleString("ru-RU"), suffix: "₽/мес" };
 }
 
-function getLimitLines(
-  plan: PlanInfo
-): { icon: LucideIcon; text: string }[] {
+function getLimitLines(plan: PlanInfo): { text: string; isKadr?: boolean }[] {
   return [
     {
-      icon: FolderOpen,
       text:
         plan.max_projects === 0
           ? "Безлимит проектов"
           : `До ${plan.max_projects} проектов`,
     },
     {
-      icon: HardDrive,
       text:
         plan.storage_limit_gb === 0
           ? "Безлимит хранилища"
           : `${plan.storage_limit_gb} ГБ хранилища`,
     },
     {
-      icon: Coins,
+      isKadr: true,
       text:
         plan.credits_per_month === 0
           ? "Кадры не начисляются"
@@ -199,14 +189,14 @@ function PlanCard({
   return (
     <div
       className={[
-        "rounded-xl border bg-card p-6 flex flex-col relative",
+        "rounded-lg border bg-card p-6 flex flex-col relative transition-all duration-150",
         isRecommended
-          ? "border-primary/60 shadow-[0_0_0_1px_hsl(var(--primary)/0.3)]"
-          : "border-border",
+          ? "border-primary/40 shadow-[0_0_20px_-4px_hsl(var(--primary)/0.25)]"
+          : "border-border hover:border-[var(--border-strong)]",
       ].join(" ")}
     >
       {isRecommended && (
-        <div className="absolute inset-0 rounded-xl bg-primary/5 pointer-events-none" />
+        <div className="absolute inset-0 rounded-lg bg-primary/5 pointer-events-none" />
       )}
 
       {/* Badge area */}
@@ -243,7 +233,7 @@ function PlanCard({
         className={[
           "w-full h-11",
           cta.gradient
-            ? "bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground"
+            ? "bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-[0_2px_12px_-2px_hsl(var(--primary)/0.4)]"
             : "",
           cta.disabled ? "cursor-not-allowed opacity-50" : "",
         ]
@@ -258,9 +248,13 @@ function PlanCard({
 
       {/* Limits */}
       <div className="space-y-2.5 flex-1">
-        {limits.map(({ icon: Icon, text }, i) => (
+        {limits.map(({ text, isKadr }, i) => (
           <div key={i} className="flex items-start gap-2.5 text-sm">
-            <Icon className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+            {isKadr ? (
+              <KadrIcon size="md" className="shrink-0 mt-0.5" />
+            ) : (
+              <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+            )}
             <span className="text-foreground">{text}</span>
           </div>
         ))}
@@ -291,7 +285,7 @@ function ComparisonTable({ plans }: { plans: PlanInfo[] }) {
       <h2 className="text-xl font-bold text-foreground text-center mb-8">
         Сравнение тарифов
       </h2>
-      <div className="rounded-xl border border-border overflow-hidden">
+      <div className="rounded-lg border border-border overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-card/50">
@@ -331,7 +325,7 @@ function ComparisonTable({ plans }: { plans: PlanInfo[] }) {
                         value ? (
                           <Check className="h-4 w-4 text-primary mx-auto" />
                         ) : (
-                          <X className="h-4 w-4 text-muted-foreground/40 mx-auto" />
+                          <span className="text-muted-foreground/40">—</span>
                         )
                       ) : (
                         value
@@ -354,7 +348,7 @@ function LoadingSkeleton() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       {[...Array(4)].map((_, i) => (
-        <div key={i} className="rounded-xl border border-border bg-card p-6 space-y-4">
+        <div key={i} className="rounded-lg border border-border bg-card p-6 space-y-4">
           <Skeleton className="h-7 w-24" />
           <Skeleton className="h-6 w-28" />
           <Skeleton className="h-10 w-32" />
@@ -422,16 +416,26 @@ export default function PricingPage() {
           <p className="text-base text-muted-foreground mt-3">
             Выберите тариф, который подходит вашему объёму работы
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 mt-5">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Sparkles className="h-4 w-4 text-primary shrink-0" />
-              <span>Все модели генерации доступны на любом тарифе</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Zap className="h-4 w-4 text-amber-400 shrink-0" />
-              <span>7 дней полного доступа + 50 Кадров новым пользователям</span>
-            </div>
-          </div>
+          {!loading && !error && plans.length > 0 && (() => {
+            const trialPlan = plans.find((p) => p.is_trial_reference);
+            return (
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 mt-5 text-sm text-muted-foreground">
+                <span>Все модели генерации доступны на любом тарифе</span>
+                {trialPlan && trialPlan.trial_duration_days > 0 && (
+                  <>
+                    <span className="hidden sm:inline text-border">·</span>
+                    <span>
+                      {trialPlan.trial_duration_days} дней полного доступа
+                      {trialPlan.trial_bonus_credits > 0 && (
+                        <> + {Math.round(trialPlan.trial_bonus_credits)} Кадров</>
+                      )}{" "}
+                      новым пользователям
+                    </span>
+                  </>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Error state */}
@@ -480,7 +484,7 @@ export default function PricingPage() {
 
         {/* Enterprise banner */}
         {!loading && !error && plans.length > 0 && (
-          <div className="mt-6 rounded-xl border border-border bg-card p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="mt-6 rounded-lg border border-border bg-card p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-start gap-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 shrink-0">
                 <Building2 className="h-5 w-5 text-primary" />
