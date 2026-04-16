@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
+import { Clapperboard, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,6 +31,12 @@ export default function ForgotPasswordPage() {
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
     <div className="w-full max-w-sm">
+      {/* Logo */}
+      <div className="mb-8 flex items-center justify-center gap-2">
+        <Clapperboard className="h-6 w-6 text-primary" />
+        <span className="text-lg font-semibold tracking-tight">Раскадровка</span>
+      </div>
+
       <div className="rounded-xl border border-border bg-card shadow-sm">
         <div className="px-8 pt-8 pb-6">
           <div className="mb-7 text-center">
