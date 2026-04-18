@@ -184,19 +184,24 @@ export function normalizeError(error: unknown): Error {
 
     const timeoutLike =
       error.code === "ECONNABORTED" || error.message.toLowerCase().includes("timeout");
+    const gatewayLike =
+      status !== undefined && (status === 502 || status === 503 || status === 504);
+    const isJsonObject = data !== null && typeof data === "object" && !Array.isArray(data);
     let message: string;
     if (timeoutLike) {
       message = "Превышено время ожидания ответа сервера";
-    } else if (data) {
-      if (typeof data.error === "string") {
-        message = data.error as string;
-      } else if (typeof data.detail === "string") {
-        message = data.detail as string;
-      } else if (typeof data.message === "string") {
-        message = data.message as string;
+    } else if (gatewayLike) {
+      message = "Сервер недоступен, попробуйте ещё раз";
+    } else if (isJsonObject) {
+      if (typeof data!.error === "string") {
+        message = data!.error as string;
+      } else if (typeof data!.detail === "string") {
+        message = data!.detail as string;
+      } else if (typeof data!.message === "string") {
+        message = data!.message as string;
       } else {
         const parts: string[] = [];
-        for (const [field, val] of Object.entries(data)) {
+        for (const [field, val] of Object.entries(data!)) {
           if (field === "error_id") continue;
           if (typeof val === "string") parts.push(val);
           else if (Array.isArray(val)) {
@@ -205,6 +210,8 @@ export function normalizeError(error: unknown): Error {
         }
         message = parts.length ? parts.join(" ") : error.message || "Произошла ошибка";
       }
+    } else if (status && status >= 500) {
+      message = "Сервер вернул ошибку, попробуйте ещё раз";
     } else {
       message = error.message || "Произошла ошибка";
     }
