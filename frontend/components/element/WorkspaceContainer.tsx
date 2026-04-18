@@ -1004,6 +1004,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
 
         {/* Bulk actions bar */}
         <ElementBulkBar
+          mobileBottomOffset={promptBarHeight}
           selectedCount={selectedIds.size}
           totalCount={getFilteredElements().length + groups.length}
           onDeleteSelected={() => openDeleteDialog(Array.from(selectedIds))}

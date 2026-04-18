@@ -275,7 +275,7 @@ export function CommentThread({
           onKeyDown={handleKeyDown}
           maxLength={2000}
           disabled={submitting || isLoading}
-          className="flex-1 text-sm bg-muted/10 border border-border rounded-md px-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none disabled:opacity-50 leading-snug"
+          className="flex-1 min-w-0 text-sm bg-muted/10 border border-border rounded-md px-3 py-2 text-foreground placeholder:text-muted-foreground placeholder:text-xs focus:outline-none focus:ring-1 focus:ring-ring resize-none disabled:opacity-50 leading-snug"
         />
         <button
           onClick={handleSubmit}

@@ -23,8 +23,10 @@ export function LightboxNavigation({
         variant="ghost"
         size="icon"
         className={cn(
-          "absolute left-4 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full",
-          "bg-background/80 hover:bg-background shadow-lg backdrop-blur-sm",
+          "absolute left-2 md:left-4 top-1/2 -translate-y-1/2 rounded-full",
+          "h-8 w-8 md:h-12 md:w-12",
+          "bg-background border border-border shadow-md",
+          "md:bg-background/80 md:border-transparent md:backdrop-blur-sm md:shadow-lg md:hover:bg-background",
           "transition-all duration-200",
           !hasPrev && "opacity-30 cursor-not-allowed"
         )}
@@ -32,14 +34,16 @@ export function LightboxNavigation({
         disabled={!hasPrev}
         aria-label="Предыдущий элемент"
       >
-        <ChevronLeft className="h-6 w-6" />
+        <ChevronLeft className="h-4 w-4 md:h-6 md:w-6" />
       </Button>
       <Button
         variant="ghost"
         size="icon"
         className={cn(
-          "absolute right-4 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full",
-          "bg-background/80 hover:bg-background shadow-lg backdrop-blur-sm",
+          "absolute right-2 md:right-4 top-1/2 -translate-y-1/2 rounded-full",
+          "h-8 w-8 md:h-12 md:w-12",
+          "bg-background border border-border shadow-md",
+          "md:bg-background/80 md:border-transparent md:backdrop-blur-sm md:shadow-lg md:hover:bg-background",
           "transition-all duration-200",
           !hasNext && "opacity-30 cursor-not-allowed"
         )}
@@ -47,7 +51,7 @@ export function LightboxNavigation({
         disabled={!hasNext}
         aria-label="Следующий элемент"
       >
-        <ChevronRight className="h-6 w-6" />
+        <ChevronRight className="h-4 w-4 md:h-6 md:w-6" />
       </Button>
     </>
   );

@@ -15,7 +15,7 @@ export function WelcomeModal() {
     <Dialog open={true} onOpenChange={() => markWelcomeSeen()}>
       <DialogContent
         showCloseButton={false}
-        className="max-w-md p-0 overflow-hidden border border-border bg-card rounded-2xl shadow-[0_0_60px_rgba(139,124,247,0.2)]"
+        className="w-[calc(100vw-2rem)] max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto p-0 border border-border bg-card rounded-2xl shadow-[0_0_60px_rgba(139,124,247,0.2)]"
       >
         {/* Accent top bar */}
         <div className="h-1 bg-gradient-to-r from-primary to-[oklch(0.72_0.17_281)]" />

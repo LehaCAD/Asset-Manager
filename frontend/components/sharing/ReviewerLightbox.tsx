@@ -2,7 +2,7 @@
 
 import { useEffect, useCallback, useState, useRef } from 'react'
 import { X, Download, ExternalLink, MessageSquare, Video, Image, ThumbsUp, ThumbsDown, Check, RotateCcw } from 'lucide-react'
-import { Sheet, SheetContent } from '@/components/ui/sheet'
+import { MobileSlideOutPanel } from '@/components/ui/mobile-slide-out-panel'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { LightboxNavigation } from '@/components/lightbox/LightboxNavigation'
@@ -322,14 +322,6 @@ export function ReviewerLightbox({
                 </>
               )}
 
-              {/* Mobile comments button */}
-              <button
-                className="md:hidden rounded-md bg-muted px-3 py-1.5 text-xs text-muted-foreground"
-                onClick={() => setMobileCommentsOpen(true)}
-              >
-                <MessageSquare className="w-4 h-4 inline mr-1" />
-                Комменты
-              </button>
             </div>
 
             {/* Row 2: Review actions — neutral by default, active when clicked, mutually exclusive */}
@@ -452,34 +444,39 @@ export function ReviewerLightbox({
           <ScrollBar orientation="horizontal" />
         </ScrollArea>
       </div>
-      {/* Mobile comments sheet */}
-      <Sheet open={mobileCommentsOpen} onOpenChange={setMobileCommentsOpen}>
-        <SheetContent side="bottom" className="h-[70vh] p-0">
-          <div className="flex flex-col h-full">
-            <div className="px-4 py-3 border-b flex items-center gap-2 shrink-0">
-              <MessageSquare className="w-4 h-4 text-muted-foreground" />
-              <h3 className="text-sm font-medium text-foreground">Комментарии</h3>
-              {comments.length > 0 && (
-                <span className="text-xs text-muted-foreground bg-muted rounded px-2 py-0.5">
-                  {comments.length}
-                </span>
-              )}
-            </div>
-            {!hasIdentity ? (
-              <div className="flex-1 overflow-y-auto px-4 py-3">
-                <ReviewerNameInput onSave={handleNameSave} />
-              </div>
-            ) : (
-              <CommentThread
-                comments={comments}
-                onSubmit={handleCommentSubmit}
-                isAuthenticated={true}
-                pinInputBottom
-              />
+      {/* Mobile comments — right slide-out (same pattern as creator DetailPanel) */}
+      <div className="md:hidden">
+        <MobileSlideOutPanel
+          open={mobileCommentsOpen}
+          onOpenChange={setMobileCommentsOpen}
+          title="Комментарии"
+          triggerAriaLabel="Открыть комментарии"
+          closeAriaLabel="Закрыть комментарии"
+          triggerBadge={comments.length > 0 ? comments.length : undefined}
+        >
+          <div className="px-4 py-3 border-b flex items-center gap-2 shrink-0">
+            <MessageSquare className="w-4 h-4 text-muted-foreground" />
+            <h3 className="text-sm font-medium text-foreground">Комментарии</h3>
+            {comments.length > 0 && (
+              <span className="text-xs text-muted-foreground bg-muted rounded px-2 py-0.5">
+                {comments.length}
+              </span>
             )}
           </div>
-        </SheetContent>
-      </Sheet>
+          {!hasIdentity ? (
+            <div className="flex-1 overflow-y-auto px-4 py-3">
+              <ReviewerNameInput onSave={handleNameSave} />
+            </div>
+          ) : (
+            <CommentThread
+              comments={comments}
+              onSubmit={handleCommentSubmit}
+              isAuthenticated={true}
+              pinInputBottom
+            />
+          )}
+        </MobileSlideOutPanel>
+      </div>
     </div>
   )
 }

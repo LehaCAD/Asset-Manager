@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LightboxNavigation } from "@/components/lightbox/LightboxNavigation";
 import { Filmstrip } from "@/components/lightbox/Filmstrip";
 import { Button } from "@/components/ui/button";
+import { MobileSlideOutPanel } from "@/components/ui/mobile-slide-out-panel";
 import { ElementFilters } from "@/components/element/ElementFilters";
 import { cn } from "@/lib/utils";
 import {
@@ -254,6 +255,15 @@ export function LightboxModal({
 }: LightboxModalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { bounds, mediaRef, updateBounds } = useMediaBounds(containerRef, currentElementId);
+  const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
+
+  // Close the mobile panel whenever the lightbox closes or the element changes.
+  useEffect(() => {
+    if (!isOpen) setMobilePanelOpen(false);
+  }, [isOpen]);
+  useEffect(() => {
+    setMobilePanelOpen(false);
+  }, [currentElementId]);
 
   // Current element
   const currentElement = useMemo(() => {
@@ -625,10 +635,25 @@ export function LightboxModal({
           )}
         </div>
 
-        {/* Detail panel slot */}
+        {/* Detail panel slot — desktop sidebar */}
         {children && (
           <div className="w-80 border-l overflow-auto bg-background shrink-0 hidden md:block">
             {children}
+          </div>
+        )}
+
+        {/* Detail panel slot — mobile slide-out (edge-attached tab) */}
+        {children && !isEmpty && (
+          <div className="md:hidden">
+            <MobileSlideOutPanel
+              open={mobilePanelOpen}
+              onOpenChange={setMobilePanelOpen}
+              title="Детали элемента"
+              triggerAriaLabel="Открыть детали"
+              closeAriaLabel="Закрыть детали"
+            >
+              <div className="overflow-y-auto min-h-0 flex-1">{children}</div>
+            </MobileSlideOutPanel>
           </div>
         )}
       </div>
