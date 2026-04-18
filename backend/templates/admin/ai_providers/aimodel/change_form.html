@@ -29,6 +29,46 @@
 
     <section class="workflow-panel">
       <div class="workflow-panel__head">
+        <div class="wf-step-badge">0</div>
+        <div>
+          <h2>Семейство</h2>
+          <p>Привяжите модель к семейству для группировки вариантов.</p>
+        </div>
+      </div>
+
+      <div class="wf-grid wf-grid--2">
+        <div class="wf-field">
+          {{ adminform.form.family.errors }}
+          <label for="{{ adminform.form.family.id_for_label }}">Семейство</label>
+          {{ adminform.form.family }}
+          <p class="wf-help">Пусто = standalone модель, без группировки.</p>
+        </div>
+        <div id="variant-fields-container">
+          <div class="wf-grid wf-grid--2" style="gap:12px">
+            <div class="wf-field">
+              {{ adminform.form.variant_label.errors }}
+              <label for="{{ adminform.form.variant_label.id_for_label }}">Название варианта</label>
+              {{ adminform.form.variant_label }}
+              <p class="wf-help">Fast, Quality, Pro, v2</p>
+            </div>
+            <div class="wf-field">
+              {{ adminform.form.variant_sort_order.errors }}
+              <label for="{{ adminform.form.variant_sort_order.id_for_label }}">Порядок</label>
+              {{ adminform.form.variant_sort_order }}
+            </div>
+          </div>
+          <div class="wf-field wf-field--center" style="margin-top:8px">
+            <label class="wf-checkbox-label">
+              {{ adminform.form.is_default_variant }}
+              <span>Вариант по умолчанию</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="workflow-panel">
+      <div class="workflow-panel__head">
         <div class="wf-step-badge">1</div>
         <div>
           <h2>Модель</h2>
@@ -196,6 +236,16 @@
         </div>
       </details>
     </section>
+    {% if original %}
+    <div style="text-align: right; padding: 16px 24px;">
+        <a href="{% url 'admin:ai_providers_aimodel_clone_variant' original.pk %}"
+           class="btn-clone-variant"
+           onclick="return confirm('Клонировать модель как новый вариант?');"
+           style="display:inline-block;padding:8px 16px;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none;font-size:13px;">
+            ⊕ Клонировать как вариант
+        </a>
+    </div>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

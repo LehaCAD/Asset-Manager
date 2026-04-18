@@ -3,6 +3,7 @@ import { scenesApi } from "@/lib/api/scenes";
 import { elementsApi } from "@/lib/api/elements";
 import { projectsApi } from "@/lib/api/projects";
 import { clientUploadFile, PresignOrphanError, preloadImage } from "@/lib/utils/client-upload";
+import { logger } from "@/lib/utils/logger";
 import { toast } from "sonner";
 import type {
   Scene,
@@ -200,9 +201,11 @@ async function processOneUpload(item: QueuedUpload, controller: AbortController)
         throw error;
       }
       if (error instanceof PresignOrphanError) {
-        elementsApi.delete(error.elementId).catch(() => {});
+        elementsApi.delete(error.elementId).catch((delErr) =>
+          logger.warn("scene_workspace.orphan_cleanup_failed", { elementId: error.elementId, cause: delErr })
+        );
       }
-      console.warn("Client upload failed, falling back to server upload:", error);
+      logger.warn("scene_workspace.client_upload_fallback", { cause: error });
       const fallbackProgress = (pct: number) => {
         useSceneWorkspaceStore.getState().updateElement(trackingId, {
           client_upload_phase: "upload_full",
@@ -297,6 +300,7 @@ interface SceneWorkspaceState {
   loadScene: (sceneId: number) => Promise<void>;
   addElement: (element: WorkspaceElement) => void;
   updateElement: (id: number, updates: Partial<WorkspaceElement>) => void;
+  incrementCommentCount: (elementId: number) => void;
   removeElement: (id: number) => void;
   createOptimisticGeneration: (input: CreateOptimisticGenerationInput) => number;
   resolveOptimisticGeneration: (tempId: number, real: Element) => void;
@@ -453,6 +457,16 @@ export const useSceneWorkspaceStore = create<SceneWorkspaceState>()((set, get) =
         if (e.id !== id) return e;
         return { ...e, ...updates };
       }),
+    }));
+  },
+
+  incrementCommentCount: (elementId: number) => {
+    set((state) => ({
+      elements: state.elements.map((el) =>
+        el.id === elementId
+          ? { ...el, comment_count: (el.comment_count ?? 0) + 1 }
+          : el
+      ),
     }));
   },
 

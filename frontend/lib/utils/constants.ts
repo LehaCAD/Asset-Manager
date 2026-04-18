@@ -80,34 +80,34 @@ export const DEFAULT_PROJECT_DISPLAY_PREFERENCES = DEFAULT_DISPLAY_PREFERENCES;
 // Portrait: ширина × высота (3:4)
 
 // Площади примерно:
-// Compact: ~36-38k px² (как был medium - чтобы текст влезал)
-// Medium: ~58-60k px² (как был large)
-// Large: ~80-85k px² (новый большой размер)
+// Compact: ~76k px² (крупные карточки, текст хорошо читается)
+// Medium: ~115k px² (основной рабочий размер)
+// Large: ~180k px² (детальный просмотр)
 
 export const CARD_SIZES = {
   compact: {
-    landscape: { width: 260, height: 146 },  // 16:9, площадь: 37,960
-    square:    { width: 190, height: 190 },  // 1:1,  площадь: 36,100
-    portrait:  { width: 165, height: 220 },  // 3:4,  площадь: 36,300
+    landscape: { width: 360, height: 202 },  // 16:9, площадь: 72,720
+    square:    { width: 270, height: 270 },  // 1:1,  площадь: 72,900
+    portrait:  { width: 235, height: 313 },  // 3:4,  площадь: 73,555
   },
   medium: {
-    landscape: { width: 320, height: 180 },  // 16:9, площадь: 57,600
-    square:    { width: 240, height: 240 },  // 1:1,  площадь: 57,600
-    portrait:  { width: 210, height: 280 },  // 3:4,  площадь: 58,800
+    landscape: { width: 440, height: 248 },  // 16:9, площадь: 109,120
+    square:    { width: 330, height: 330 },  // 1:1,  площадь: 108,900
+    portrait:  { width: 290, height: 387 },  // 3:4,  площадь: 112,230
   },
   large: {
-    landscape: { width: 380, height: 214 },  // 16:9, площадь: 81,320
-    square:    { width: 290, height: 290 },  // 1:1,  площадь: 84,100
-    portrait:  { width: 250, height: 334 },  // 3:4,  площадь: 83,500
+    landscape: { width: 560, height: 315 },  // 16:9, площадь: 176,400
+    square:    { width: 420, height: 420 },  // 1:1,  площадь: 176,400
+    portrait:  { width: 365, height: 487 },  // 3:4,  площадь: 177,755
   },
 } as const;
 
 // GroupCard sizes — proportions ~5:4, pixel area ≈ CARD_SIZES landscape.
 // stackStep = offset per layer (same in X and Y). 2 layers → stackWidth = width + step*2.
 export const GROUP_CARD_SIZES = {
-  compact: { width: 220, height: 175, stackStep: 5, stackWidth: 230 },  // 220+5*2
-  medium:  { width: 270, height: 215, stackStep: 6, stackWidth: 282 },  // 270+6*2
-  large:   { width: 320, height: 255, stackStep: 7, stackWidth: 334 },  // 320+7*2
+  compact: { width: 300, height: 240, stackStep: 5, stackWidth: 310 },  // 300+5*2
+  medium:  { width: 380, height: 304, stackStep: 6, stackWidth: 392 },  // 380+6*2
+  large:   { width: 480, height: 384, stackStep: 7, stackWidth: 494 },  // 480+7*2
 } as const;
 
 // ── Badge System (фиксированные, НЕ зависят от view mode) ──
@@ -123,50 +123,35 @@ export const BADGE_MD = {
   padding: "p-1.5",
 } as const;
 
-// CSS классы для grid с auto-fit
+// ── Grid minWidth per aspect ratio ──
+// Разный minmax для разных AR обеспечивает примерно равную площадь карточек.
+// Portrait получает меньший minWidth → больше колонок → каждая уже → площадь не раздувается.
+// Формула: для равной площади при AR r=w/h, ширина ∝ sqrt(r).
+// landscape(16:9) : square(1:1) : portrait(3:4) ≈ 1.0 : 0.75 : 0.65
 export const DISPLAY_GRID_CONFIG = {
   compact: {
-    landscape: {
-      gridStyle: "grid-template-columns: repeat(auto-fill, minmax(180px, 1fr))",
-      gap: "gap-2"
-    },
-    square:    {
-      gridStyle: "grid-template-columns: repeat(auto-fill, minmax(180px, 1fr))",
-      gap: "gap-2"
-    },
-    portrait:  {
-      gridStyle: "grid-template-columns: repeat(auto-fill, minmax(180px, 1fr))",
-      gap: "gap-2"
-    },
+    landscape: { minWidth: 260, gap: "gap-2.5" },
+    square:    { minWidth: 195, gap: "gap-2.5" },
+    portrait:  { minWidth: 170, gap: "gap-2.5" },
   },
   medium: {
-    landscape: {
-      gridStyle: "grid-template-columns: repeat(auto-fill, minmax(220px, 1fr))",
-      gap: "gap-2.5"
-    },
-    square:    {
-      gridStyle: "grid-template-columns: repeat(auto-fill, minmax(220px, 1fr))",
-      gap: "gap-2.5"
-    },
-    portrait:  {
-      gridStyle: "grid-template-columns: repeat(auto-fill, minmax(220px, 1fr))",
-      gap: "gap-2.5"
-    },
+    landscape: { minWidth: 320, gap: "gap-3" },
+    square:    { minWidth: 240, gap: "gap-3" },
+    portrait:  { minWidth: 210, gap: "gap-3" },
   },
   large: {
-    landscape: {
-      gridStyle: "grid-template-columns: repeat(auto-fill, minmax(280px, 1fr))",
-      gap: "gap-3"
-    },
-    square:    {
-      gridStyle: "grid-template-columns: repeat(auto-fill, minmax(280px, 1fr))",
-      gap: "gap-3"
-    },
-    portrait:  {
-      gridStyle: "grid-template-columns: repeat(auto-fill, minmax(280px, 1fr))",
-      gap: "gap-3"
-    },
+    landscape: { minWidth: 400, gap: "gap-4" },
+    square:    { minWidth: 300, gap: "gap-4" },
+    portrait:  { minWidth: 260, gap: "gap-4" },
   },
+} as const;
+
+// minWidth для грида групп — зависит только от size, не от aspect ratio.
+// Группы всегда одного соотношения сторон (~5:4), меняется только масштаб.
+export const GROUP_GRID_MIN_WIDTH = {
+  compact: 260,
+  medium: 320,
+  large: 400,
 } as const;
 
 // Aspect ratio classes - только aspect, без max-width!

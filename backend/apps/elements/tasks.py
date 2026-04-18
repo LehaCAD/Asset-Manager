@@ -81,11 +81,15 @@ def start_generation(self, element_id: int) -> dict:
             if settings.KIE_CALLBACK_TOKEN:
                 callback_url = f"{callback_url}?token={settings.KIE_CALLBACK_TOKEN}"
         
+        # Use enhanced prompt if available, otherwise original
+        config = element.generation_config or {}
+        prompt_for_provider = config.get("_enhanced_prompt", element.prompt_text) or ""
+
         # Добавляем параметры из generation_config (единственный источник input_urls и др.)
         validate_model_admin_config(ai_model)
         context = build_generation_context(
             ai_model,
-            prompt=element.prompt_text or '',
+            prompt=prompt_for_provider,
             generation_config=element.generation_config,
             callback_url=callback_url,
         )
@@ -197,7 +201,8 @@ def start_generation(self, element_id: int) -> dict:
             finalize_generation_failure(element_id=element_id, error_message=str(e))
             notify_element_status(element, 'FAILED', error_message=str(e))
         except Element.DoesNotExist:
-            pass
+            # Element was deleted before failure handling — nothing to refund/notify.
+            logger.warning("element gone during failure handling", extra={"element_id": element_id})
 
         raise
 
@@ -296,7 +301,10 @@ def check_generation_status(self, element_id: int, has_callback: bool = False) -
                 element = Element.objects.select_related('project').get(id=element_id)
                 _refund_for_failure(element, reason=fail_msg)
             except Element.DoesNotExist:
-                pass
+                logger.warning(
+                    "element gone before refund on failed state",
+                    extra={"element_id": element_id},
+                )
 
             applied = finalize_generation_failure(element_id=element_id, error_message=fail_msg)
             if applied:
@@ -354,8 +362,11 @@ def check_generation_status(self, element_id: int, has_callback: bool = False) -
                 element = Element.objects.get(id=element_id)
                 notify_element_status(element, 'FAILED', error_message=str(e))
         except Element.DoesNotExist:
-            pass
-        
+            logger.warning(
+                "element gone during critical failure handling",
+                extra={"element_id": element_id},
+            )
+
         raise
 
 
@@ -409,6 +420,16 @@ def process_uploaded_file(self, element_id: int, staging_path: str) -> dict:
         except Exception as e:
             logger.warning('Failed to create upload notification: %s', e)
 
+        # Onboarding: mark first upload
+        try:
+            from apps.onboarding.services import OnboardingService
+            OnboardingService().try_complete(element.scene.project.user, 'element.upload_success')
+        except Exception:
+            logger.exception(
+                "onboarding trigger failed for element.upload_success",
+                extra={"element_id": element_id},
+            )
+
         return {'element_id': element_id, 'status': 'completed', 'file_url': file_url}
 
     except Retry:
@@ -422,7 +443,10 @@ def process_uploaded_file(self, element_id: int, staging_path: str) -> dict:
             element.save(update_fields=['status', 'error_message', 'updated_at'])
             notify_element_status(element, 'FAILED', error_message=str(e))
         except Element.DoesNotExist:
-            pass
+            logger.warning(
+                "element gone during upload failure handling",
+                extra={"element_id": element_id},
+            )
 
         # Retry only transient I/O errors; skip permanent S3 errors
         # (UserSuspended, AccessDenied, etc.)
@@ -438,8 +462,13 @@ def process_uploaded_file(self, element_id: int, staging_path: str) -> dict:
         try:
             if staging_path and os.path.exists(staging_path):
                 os.unlink(staging_path)
-        except Exception:
-            pass
+        except OSError:
+            # Staging cleanup is best-effort — periodic cleanup job handles stragglers.
+            logger.warning(
+                "staging unlink failed",
+                extra={"staging_path": staging_path, "element_id": element_id},
+                exc_info=True,
+            )
 
 
 

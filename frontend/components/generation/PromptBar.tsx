@@ -16,9 +16,14 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/utils/format";
-import { Sparkles, Loader2, ImagePlus } from "lucide-react";
+import { PromptEnhanceToggle } from "./PromptEnhanceToggle";
+import { KadrIcon } from "@/components/ui/kadr-icon";
+import { Loader2, ImagePlus, ClipboardCopy, ArrowUp } from "lucide-react";
 import type { Element, ModalSelectionByScene } from "@/lib/types";
 import { isGroupsSchema } from "@/lib/types";
+import { useOnboardingStore } from "@/lib/store/onboarding";
+import { useHintDismissal } from "@/lib/hooks/useHintDismissal";
+import { HintBubble } from "@/components/onboarding/HintBubble";
 
 interface PromptBarProps {
   projectId: number;
@@ -48,6 +53,9 @@ export function PromptBar({ projectId, sceneId, groupId, className }: PromptBarP
   const canAfford = useCreditsStore((s) => s.canAfford);
   const estimateError = useCreditsStore((s) => s.estimateError);
   const isEstimateLoading = useCreditsStore((s) => s.isEstimateLoading);
+  // Subscribed separately so the button price only re-renders when estimateCost changes
+  // — not on every unrelated credits-store field update.
+  const estimateCost = useCreditsStore((s) => s.estimateCost);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -245,13 +253,71 @@ export function PromptBar({ projectId, sceneId, groupId, className }: PromptBarP
     return targetId > 0 ? { [targetId]: elementIds } : {};
   }, [activeInput, effectiveGroupId]);
 
+  // Onboarding hint: "write a prompt" with a clickable example.
+  // Disappears once first_generation is completed or user dismisses it.
+  const onboardingTasks = useOnboardingStore((s) => s.tasks);
+  const onboardingLoaded = useOnboardingStore((s) => s.isLoaded);
+  const firstGenDone = onboardingTasks.find((t) => t.code === "first_generation")?.completed;
+  const hintDismissal = useHintDismissal("prompt-bar");
+  const [hintClosing, setHintClosing] = useState(false);
+  // Gate on `isLoaded` so we don't flash the hint for old accounts while tasks hydrate.
+  const showPromptHint =
+    onboardingLoaded && !firstGenDone && hintDismissal.hydrated && !hintDismissal.dismissed;
+  const EXAMPLE_PROMPT = "кот-космонавт в неоновом лесу";
+
+  const dismissHint = useCallback(() => {
+    if (hintClosing || hintDismissal.dismissed) return;
+    setHintClosing(true);
+    setTimeout(() => hintDismissal.dismiss(), 260);
+  }, [hintClosing, hintDismissal]);
+
+  const applyExample = () => {
+    setPrompt(EXAMPLE_PROMPT);
+    textareaRef.current?.focus();
+    dismissHint();
+  };
+
   return (
-    <div
-      className={cn(
-        "relative flex items-start gap-3 rounded-xl bg-card p-3 px-4 m-4 shadow-lg shadow-black/20 border border-border",
-        className
+    <div className={cn("relative mb-2 mx-2 mt-0 sm:m-4", className)}>
+      {/* Onboarding hint — floats just above the bar, arrow points down at it */}
+      {showPromptHint && (
+        <HintBubble
+          arrow="bottom"
+          positionClassName="left-1/2 -translate-x-1/2"
+          positionStyle={{ bottom: "calc(100% + 6px)" }}
+          width={320}
+          closing={hintClosing}
+          onDismiss={dismissHint}
+        >
+          <div className="font-semibold mb-1">Опишите идею</div>
+          <div className="text-[12px] text-white/80 mb-2">
+            Попробуйте — нажмите, чтобы подставить:
+          </div>
+          <button
+            type="button"
+            onClick={applyExample}
+            title="Вставить в поле промпта"
+            className="inline-flex items-center gap-2 text-[12.5px] leading-snug text-left px-2.5 py-1.5 rounded-md font-mono transition-colors text-white"
+            style={{
+              background: "rgba(255, 255, 255, 0.18)",
+              border: "1px solid rgba(255, 255, 255, 0.25)",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(255, 255, 255, 0.28)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "rgba(255, 255, 255, 0.18)";
+            }}
+          >
+            <span>{EXAMPLE_PROMPT}</span>
+            <ClipboardCopy className="w-3.5 h-3.5 shrink-0 opacity-80" />
+          </button>
+        </HintBubble>
       )}
-    >
+
+      {/* PromptBar */}
+      <div className="relative flex flex-col rounded-b-xl sm:rounded-xl bg-card shadow-lg shadow-black/20 border border-border">
+        <div className="flex items-start gap-3 p-3 px-4">
           {/* Add-кнопка */}
           {canSelectImages ? (
             groupsSchema ? (
@@ -340,7 +406,7 @@ export function PromptBar({ projectId, sceneId, groupId, className }: PromptBarP
               value={prompt}
               onChange={handlePromptChange}
               onKeyDown={handleKeyDown}
-              placeholder="Опишите, что хотите сгенерировать..."
+              placeholder="Опишите идею..."
               disabled={isGenerating}
               className={cn(
                 "w-full resize-none border-0 bg-transparent px-0 pt-0 pb-2 text-sm text-foreground",
@@ -371,28 +437,45 @@ export function PromptBar({ projectId, sceneId, groupId, className }: PromptBarP
             )}
           </div>
 
-          {/* Кнопка Создать */}
+          {/* Кнопка Создать.
+              Desktop — «Создать │ К 4.5». Mobile — компакт: «↑ К 4.5» без слова,
+              чтобы освободить ширину под textarea. */}
           <div className="flex items-center shrink-0">
             <button
               type="button"
               onClick={handleGenerate}
               disabled={!canGenerate() || isGenerating || isEstimateLoading || !!estimateError || !canAfford}
               className={cn(
-                "flex items-center gap-2 h-10 px-5 rounded-lg text-sm font-semibold text-white",
+                "inline-flex items-center gap-1.5 sm:gap-2 h-9 sm:h-10 rounded-lg text-sm font-semibold text-white",
+                "px-3 sm:px-5",
                 "bg-gradient-to-r from-primary to-[oklch(0.72_0.17_281)] shadow-md shadow-primary/30",
                 "hover:shadow-lg hover:shadow-primary/40 hover:brightness-110",
                 "transition-all duration-200",
                 "disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:brightness-100"
               )}
+              aria-label="Создать"
             >
               {isGenerating ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Sparkles className="h-4 w-4" />
+                <ArrowUp className="h-4 w-4 sm:hidden" strokeWidth={2.5} />
               )}
-              Создать
+              <span className="hidden sm:inline">Создать</span>
+              {!isGenerating && estimateCost && parseFloat(estimateCost) > 0 && (
+                <span className="inline-flex items-center gap-1 sm:pl-2 sm:border-l sm:border-white/25 text-xs font-medium">
+                  <KadrIcon size="sm" />
+                  {formatCurrency(estimateCost)}
+                </span>
+              )}
             </button>
           </div>
+        </div>
+
+        {/* Footer — prompt-enhance toggle */}
+        <div className="flex items-center gap-3 border-t border-border/50 px-4 py-2">
+          <PromptEnhanceToggle variant="inline" />
+        </div>
+      </div>
 
       {/* Element Selection Modal */}
       {activeInput && (

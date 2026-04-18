@@ -4,15 +4,18 @@ import requests
 from django.http import StreamingHttpResponse
 from django.db.models import Count, Q, Sum, Subquery, OuterRef, DecimalField
 from django.db.models.functions import Abs
+from collections import deque
+
 from rest_framework import viewsets, permissions, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from .models import Element
 from .serializers import ElementSerializer, ReorderSerializer
 from .services import reorder_elements
 from apps.storage.services import delete_file_from_s3
 from apps.credits.models import CreditsTransaction
+from apps.subscriptions.permissions import feature_required
 
 logger = logging.getLogger(__name__)
 
@@ -219,3 +222,94 @@ class ElementViewSet(viewsets.ModelViewSet):
             groups.update(parent_id=target_scene_id)
 
         return Response({'status': 'ok'})
+
+
+# ---------------------------------------------------------------------------
+# Download-meta: lightweight metadata for batch download
+# ---------------------------------------------------------------------------
+
+DOWNLOAD_META_ELEMENT_FIELDS = (
+    'id', 'element_type', 'is_favorite', 'source_type',
+    'file_url', 'original_filename', 'file_size', 'scene_id',
+)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, feature_required('batch_download')])
+def download_meta(request):
+    """
+    GET /api/elements/download-meta/?project_id=X  or  ?scene_id=X
+
+    Returns lightweight element metadata + group tree for client-side
+    ZIP assembly (batch download).
+    """
+    from apps.scenes.models import Scene
+
+    project_id = request.query_params.get('project_id')
+    scene_id = request.query_params.get('scene_id')
+
+    if not project_id and not scene_id:
+        return Response(
+            {'error': 'Укажите project_id или scene_id'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if project_id:
+        elements = list(
+            Element.objects.filter(
+                project_id=project_id,
+                project__user=request.user,
+                status='COMPLETED',
+            ).values(*DOWNLOAD_META_ELEMENT_FIELDS)
+        )
+        groups = list(
+            Scene.objects.filter(
+                project_id=project_id,
+                project__user=request.user,
+            ).values('id', 'name', 'parent_id')
+        )
+    else:
+        # scene_id provided — BFS to collect all descendant scenes
+        try:
+            scene = Scene.objects.get(id=scene_id, project__user=request.user)
+        except Scene.DoesNotExist:
+            return Response({'elements': [], 'groups': []})
+
+        all_scenes = list(
+            Scene.objects.filter(project=scene.project).values_list('id', 'parent_id')
+        )
+        children_map = {}
+        for sid, pid in all_scenes:
+            children_map.setdefault(pid, []).append(sid)
+
+        # BFS from target scene
+        scene_ids = []
+        queue = deque([scene.id])
+        while queue:
+            current = queue.popleft()
+            scene_ids.append(current)
+            queue.extend(children_map.get(current, []))
+
+        elements = list(
+            Element.objects.filter(
+                scene_id__in=scene_ids,
+                project__user=request.user,
+                status='COMPLETED',
+            ).values(*DOWNLOAD_META_ELEMENT_FIELDS)
+        )
+        groups = list(
+            Scene.objects.filter(id__in=scene_ids).values('id', 'name', 'parent_id')
+        )
+
+    # Onboarding: engaging with batch download counts as discovery.
+    if elements:
+        try:
+            from apps.onboarding.services import OnboardingService
+            OnboardingService().try_complete(request.user, 'element.batch_download')
+        except Exception:
+            logger.exception(
+                "onboarding trigger failed for element.batch_download",
+                extra={"user_id": request.user.id},
+            )
+
+    return Response({'elements': elements, 'groups': groups})

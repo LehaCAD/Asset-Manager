@@ -4,17 +4,50 @@ export interface User {
   id: number;
   username: string;
   email: string;
+  is_staff?: boolean;
   is_email_verified?: boolean;
   quota?: UserQuota;
+  subscription?: UserSubscription;
+}
+
+export interface UserSubscription {
+  plan_code: string;
+  plan_name: string;
+  status: 'active' | 'trial' | 'expired' | 'cancelled';
+  expires_at: string | null;
+  features: string[];
+  is_trial: boolean;
+  trial_days_left: number | null;
+  trial_total_days: number | null;
+}
+
+export interface FeatureGateInfo {
+  code: string;
+  title: string;
+  description: string;
+  icon: string;
+  min_plan_name: string;
+  min_plan_price: number;
+}
+
+export interface PlanInfo {
+  code: string;
+  name: string;
+  price: number;
+  credits_per_month: number;
+  max_projects: number;
+  storage_limit_gb: number;
+  features: { code: string; title: string; description: string; icon: string }[];
+  is_recommended: boolean;
+  display_order: number;
+  trial_duration_days: number;
+  trial_bonus_credits: number;
+  is_trial_reference: boolean;
 }
 
 export interface UserQuota {
   max_projects: number;
   used_projects: number;
-  max_scenes_per_project: number;
-  max_scenes_used: number;
-  max_elements_per_scene: number;
-  max_elements_used: number;
   storage_limit_bytes: number;
   storage_used_bytes: number;
 }
@@ -314,6 +347,15 @@ export function isGroupsSchema(schema: ImageInputsSchema): schema is ImageInputG
   return !Array.isArray(schema) && typeof schema === 'object' && schema?.mode === 'groups';
 }
 
+export interface ModelFamilyBrief {
+  id: number;
+  name: string;
+  preview_url: string;
+  description: string;
+  tags: string[];
+  variant_ui_control: 'pills' | 'select';
+}
+
 export interface AIModel {
   id: number;
   name: string;
@@ -325,6 +367,10 @@ export interface AIModel {
   tags: string[];
   image_inputs_schema: ImageInputsSchema;
   is_active: boolean;
+  family: ModelFamilyBrief | null;
+  variant_label: string;
+  is_default_variant: boolean;
+  variant_sort_order: number;
 }
 
 /* ── Sharing ──────────────────────────────────────────────── */
@@ -360,6 +406,11 @@ export interface PublicProject {
   name: string
   scenes: PublicScene[]
   ungrouped_elements: PublicElement[]
+  general_comments?: Comment[]
+  created_at?: string
+  expires_at?: string | null
+  total_elements?: number
+  link_name?: string
   display_preferences?: {
     size?: string
     aspectRatio?: string
@@ -429,6 +480,45 @@ export interface CreateCommentPayload {
   parent_id?: number
 }
 
+/* ── Project Feedback (Reviews Overlay) ───────────────────── */
+
+export interface ProjectFeedbackElement {
+  id: number
+  scene_id: number | null
+  original_filename: string
+  thumbnail_url: string
+  element_type: ElementType
+  review_summary: { action: string; author_name: string } | null
+  reviews: { session_id: string; author_name: string; action: string }[]
+  likes: number
+  dislikes: number
+  comments: Comment[]
+}
+
+export interface ProjectFeedbackLink {
+  id: number
+  name: string
+  token: string
+  project_id?: number
+  project_name?: string
+  created_at?: string
+  expires_at: string | null
+  is_expired: boolean
+  unread_count: number
+  stats: {
+    approved: number
+    changes_requested: number
+    rejected: number
+    total_elements: number
+  }
+  elements: ProjectFeedbackElement[]
+  general_comments: Comment[]
+}
+
+export interface ProjectFeedbackResponse {
+  links: ProjectFeedbackLink[]
+}
+
 /* ── WebSocket events ─────────────────────────────────────── */
 
 export interface WSElementStatusChangedEvent {
@@ -444,6 +534,7 @@ export interface WSElementStatusChangedEvent {
 }
 
 export type NotificationType = 'comment_new' | 'reaction_new' | 'review_new' | 'generation_completed' | 'generation_failed' | 'upload_completed'
+  | 'feedback_new' | 'feedback_reply' | 'feedback_reward'
 
 export interface Notification {
   id: number
@@ -473,7 +564,53 @@ export interface WSNewNotificationEvent {
   notification: Notification
 }
 
-export type WSEvent = WSElementStatusChangedEvent | WSNewCommentEvent
+export interface WSReactionUpdatedEvent {
+  type: 'reaction_updated'
+  element_id: number
+  likes: number
+  dislikes: number
+}
+
+export interface WSReviewUpdatedEvent {
+  type: 'review_updated'
+  element_id: number
+  action: string | null
+  author_name: string
+}
+
+export type WSEvent = WSElementStatusChangedEvent | WSNewCommentEvent | WSReactionUpdatedEvent | WSReviewUpdatedEvent
+
+// --- Share page WebSocket events ---
+
+export interface WSShareNewCommentEvent {
+  type: 'new_comment'
+  comment_id: number
+  element_id: number | null
+  scene_id: number | null
+  author_name: string
+  text: string
+  created_at: string
+  session_id: string
+}
+
+export interface WSShareReactionUpdatedEvent {
+  type: 'reaction_updated'
+  element_id: number
+  likes: number
+  dislikes: number
+  session_id: string
+  value: 'like' | 'dislike' | null
+}
+
+export interface WSShareReviewUpdatedEvent {
+  type: 'review_updated'
+  element_id: number
+  session_id: string
+  author_name: string
+  action: 'approved' | 'changes_requested' | 'rejected' | null
+}
+
+export type WSShareEvent = WSShareNewCommentEvent | WSShareReactionUpdatedEvent | WSShareReviewUpdatedEvent
 
 /* ── UI Types ─────────────────────────────────────────────── */
 
@@ -536,6 +673,27 @@ export interface CreditsEstimateResponse {
   balance: string;
   can_afford: boolean;
   error: string | null;
+}
+
+// ── Top-Up ──
+export type PaymentMethodType = 'sbp' | 'bank_card' | 'sberbank';
+
+export interface TopUpCreateRequest {
+  amount: number;
+  payment_method_type: PaymentMethodType;
+}
+
+export interface TopUpCreateResponse {
+  payment_id: string;
+  confirmation_url: string;
+  amount: string;
+  status: string;
+}
+
+export interface TopUpStatusResponse {
+  status: 'pending' | 'succeeded' | 'canceled' | 'expired';
+  amount: string;
+  balance?: string;
 }
 
 /* ── Cabinet ─────────────────────────────────────────────── */
@@ -620,4 +778,116 @@ export interface SceneStats {
   elements_count: number;
   storage_bytes: number;
   storage_display: string;
+}
+
+// ─── Feedback ─────────────────────────────────────────
+
+export interface FeedbackAttachment {
+  id: number
+  file_name: string
+  file_size: number
+  content_type: string
+  url: string | null
+  is_expired: boolean
+  created_at: string
+}
+
+export interface FeedbackMessage {
+  id: number
+  sender_name: string
+  is_admin: boolean
+  text: string
+  attachments: FeedbackAttachment[]
+  created_at: string
+  edited_at: string | null
+  conversation_id?: number
+}
+
+export interface FeedbackConversation {
+  id: number
+  status: 'open' | 'closed'
+  tag: '' | 'bug' | 'question' | 'idea'
+  created_at: string
+  updated_at: string
+  last_message_preview: { text: string; is_admin: boolean; created_at: string } | null
+  unread_count: number
+  can_reply: boolean
+}
+
+export interface AdminConversationUser {
+  id: number
+  username: string
+  email: string
+  date_joined: string
+  balance: string
+}
+
+export interface AdminConversation {
+  id: number
+  user: AdminConversationUser
+  status: 'open' | 'closed'
+  tag: '' | 'bug' | 'question' | 'idea'
+  created_at: string
+  updated_at: string
+  last_message_preview: { text: string; is_admin: boolean; created_at: string } | null
+  unread_by_admin: number
+  rewards_total: string
+}
+
+// Onboarding
+export interface OnboardingTaskEmptyState {
+  title: string;
+  description: string;
+  cta: string;
+  page: string;
+}
+
+export interface OnboardingTaskDTO {
+  code: string;
+  title: string;
+  description: string;
+  icon: string;
+  reward: number;
+  order: number;
+  completed: boolean;
+  completed_at: string | null;
+  empty_state: OnboardingTaskEmptyState | null;
+}
+
+export interface OnboardingStateResponse {
+  welcome_seen: boolean;
+  tasks: OnboardingTaskDTO[];
+  total_earned: number;
+  total_possible: number;
+  completed_count: number;
+  total_count: number;
+}
+
+// WebSocket event
+export interface WSOnboardingTaskCompletedEvent {
+  type: 'onboarding_task_completed';
+  task_code: string;
+  task_title: string;
+  reward: string;
+  new_balance: string;
+  completed_count: number;
+  total_count: number;
+}
+
+/* ── Batch Download ──────────────────────────────────────── */
+
+export interface DownloadableElement {
+  id: number
+  element_type: ElementType
+  is_favorite: boolean
+  source_type: ElementSource
+  file_url: string
+  original_filename: string
+  file_size: number | null
+  scene_id: number | null
+}
+
+export interface DownloadMetaResponse {
+  elements: DownloadableElement[]
+  groups: Array<{ id: number; name: string; parent_id: number | null }>
 }

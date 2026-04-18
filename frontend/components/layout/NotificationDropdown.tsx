@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { NotificationIcon } from '@/components/ui/notification-icon'
 import { useNotificationStore } from '@/lib/store/notifications'
+import { logger } from '@/lib/utils/logger'
 import type { Notification } from '@/lib/types'
 
 function relativeTime(dateStr: string): string {
@@ -34,7 +35,11 @@ function NotificationItem({
   const router = useRouter()
 
   function handleClick() {
-    if (!notification.is_read) markRead(notification.id).catch(() => {})
+    if (!notification.is_read) {
+      markRead(notification.id).catch((err) =>
+        logger.warn('notification_dropdown.mark_read_failed', { notificationId: notification.id, cause: err })
+      )
+    }
     if (notification.project) {
       let url = `/projects/${notification.project}`
       if (notification.scene) url += `/groups/${notification.scene}`
@@ -76,14 +81,19 @@ interface NotificationDropdownProps {
 export function NotificationDropdown({ children }: NotificationDropdownProps) {
   const [open, setOpen] = useState(false)
   const notifications = useNotificationStore((s) => s.notifications)
-  const unreadCount = useNotificationStore((s) => s.unreadCount)
   const markAllRead = useNotificationStore((s) => s.markAllRead)
   const fetchNotifications = useNotificationStore((s) => s.fetchNotifications)
 
+  const FEEDBACK_TYPES = ['comment_new', 'reaction_new', 'review_new']
+  const bellNotifications = notifications.filter((n) => !FEEDBACK_TYPES.includes(n.type))
+  const bellUnreadCount = bellNotifications.filter((n) => !n.is_read).length
+
   function handleOpenChange(next: boolean) {
     setOpen(next)
-    if (next && notifications.length === 0) {
-      fetchNotifications(0).catch(() => {})
+    if (next && bellNotifications.length === 0) {
+      fetchNotifications(0).catch((err) =>
+        logger.warn('notification_dropdown.fetch_failed', { cause: err })
+      )
     }
   }
 
@@ -94,12 +104,12 @@ export function NotificationDropdown({ children }: NotificationDropdownProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
           <span className="text-sm font-semibold">Уведомления</span>
-          {unreadCount > 0 && (
+          {bellUnreadCount > 0 && (
             <Button
               variant="ghost"
               size="sm"
               className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
-              onClick={() => markAllRead().catch(() => {})}
+              onClick={() => markAllRead().catch((err) => logger.warn('notification_dropdown.mark_all_failed', { cause: err }))}
             >
               Прочитать все
             </Button>
@@ -108,13 +118,13 @@ export function NotificationDropdown({ children }: NotificationDropdownProps) {
 
         {/* List */}
         <div className="max-h-[360px] overflow-y-auto px-1">
-          {notifications.length === 0 ? (
+          {bellNotifications.length === 0 ? (
             <div className="py-8 text-center">
               <p className="text-sm text-muted-foreground">Уведомлений пока нет</p>
             </div>
           ) : (
             <div className="flex flex-col gap-0.5 py-1">
-              {notifications.slice(0, 10).map((n) => (
+              {bellNotifications.slice(0, 10).map((n) => (
                 <NotificationItem key={n.id} notification={n} onClose={() => setOpen(false)} />
               ))}
             </div>

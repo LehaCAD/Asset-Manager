@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from apps.elements.url_helpers import build_element_url, build_best_preview_url
 from .models import Scene
 
 
@@ -76,15 +77,15 @@ class SceneSerializer(serializers.ModelSerializer):
         return obj.project.name
 
     def get_headliner_url(self, obj: Scene) -> str:
-        """URL файла лучшего элемента для обложки сцены."""
+        """Public redirect URL to the headliner's original file."""
         if obj.headliner:
-            return obj.headliner.file_url
+            return build_element_url(obj.headliner, 'file', self.context.get('request'))
         return ''
 
     def get_headliner_thumbnail_url(self, obj: Scene) -> str:
-        """URL превью лучшего элемента (800px preview)."""
+        """Best available preview (preview -> thumb -> file) via branded redirect."""
         if obj.headliner:
-            return obj.headliner.preview_url or obj.headliner.thumbnail_url or obj.headliner.file_url
+            return build_best_preview_url(obj.headliner, self.context.get('request'))
         return ''
 
     def get_headliner_type(self, obj: Scene) -> str:
@@ -105,7 +106,7 @@ class SceneSerializer(serializers.ModelSerializer):
         return getattr(obj, '_storage_bytes', None) or 0
 
     def get_preview_thumbnails(self, obj) -> list[str]:
-        """First 4 element preview URLs (800px) for preview grid."""
+        """First 4 element preview URLs (800px) for preview grid, via branded redirect."""
         if hasattr(obj, '_preview_elements'):
             elements = obj._preview_elements[:4]
         else:
@@ -114,11 +115,9 @@ class SceneSerializer(serializers.ModelSerializer):
             ).exclude(
                 file_url=''
             ).order_by('-created_at')[:4]
-        return [
-            e.preview_url or e.thumbnail_url or e.file_url
-            for e in elements
-            if e.file_url
-        ]
+        request = self.context.get('request')
+        urls = [build_best_preview_url(e, request) for e in elements if e.file_url]
+        return [u for u in urls if u]
 
 
 class SceneStatsSerializer(serializers.Serializer):

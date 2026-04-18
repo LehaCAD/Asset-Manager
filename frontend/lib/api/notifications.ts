@@ -13,8 +13,8 @@ export const notificationsApi = {
       .then(r => r.data),
 
   unreadCount: () =>
-    apiClient.get<{ count: number }>('/api/notifications/unread-count/')
-      .then(r => r.data.count),
+    apiClient.get<{ count: number; feedback_count: number }>('/api/notifications/unread-count/')
+      .then(r => r.data),
 
   markRead: (id: number) =>
     apiClient.patch(`/api/notifications/${id}/read/`),

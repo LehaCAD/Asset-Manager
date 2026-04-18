@@ -38,9 +38,9 @@ class CreateCommentPublicSerializer(serializers.Serializer):
     def validate(self, data):
         has_element = data.get('element_id') is not None
         has_scene = data.get('scene_id') is not None
-        if has_element == has_scene:
+        if has_element and has_scene:
             raise serializers.ValidationError(
-                'Exactly one of element_id or scene_id is required.'
+                'Cannot specify both element_id and scene_id.'
             )
         return data
 

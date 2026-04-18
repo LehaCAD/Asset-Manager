@@ -104,12 +104,15 @@ def normalize_provider_response(payload: dict[str, Any], response_mapping: dict[
                 parsed = json.loads(result_url)
                 result_url = parsed[0] if parsed else None
             except (json.JSONDecodeError, IndexError):
-                pass
+                # result_url_path pointed at a stringified JSON array —
+                # fall back to extract_result_url below.
+                logger.debug("result_url parse failed, falling back", exc_info=True)
         if not result_url:
             try:
                 result_url = extract_result_url(payload)
             except ValueError:
-                pass
+                # No result URL found — downstream will treat as failure.
+                logger.debug("extract_result_url found no URL", exc_info=True)
 
     error_path = mapping.get('error_path', 'data.failMsg')
     error = _resolve_path(payload, error_path)
@@ -171,7 +174,8 @@ def finalize_generation_success(element_id: int, source_url: str) -> tuple[bool,
             try:
                 os.unlink(tmp_path)
             except OSError:
-                pass
+                # Temp cleanup is best-effort — periodic cleanup handles stragglers.
+                logger.warning("tmp unlink failed", extra={"tmp_path": tmp_path}, exc_info=True)
 
     update_payload: dict[str, Any] = {
         "status": Element.STATUS_COMPLETED,
@@ -203,7 +207,21 @@ def finalize_generation_success(element_id: int, source_url: str) -> tuple[bool,
             scene=el.scene,
         )
     except Exception:
-        pass  # Don't break generation flow if notification fails
+        logger.exception(
+            "notification create failed on generation success",
+            extra={"element_id": element_id},
+        )
+
+    # Onboarding: mark first generation
+    try:
+        from apps.onboarding.services import OnboardingService
+        el = Element.objects.select_related('scene__project__user').get(id=element_id)
+        OnboardingService().try_complete(el.scene.project.user, 'element.generation_success')
+    except Exception:
+        logger.exception(
+            "onboarding trigger failed for element.generation_success",
+            extra={"element_id": element_id},
+        )
 
     return updated > 0, file_url
 
@@ -233,7 +251,10 @@ def finalize_generation_failure(element_id: int, error_message: str) -> bool:
             scene=el.scene,
         )
     except Exception:
-        pass
+        logger.exception(
+            "notification create failed on generation failure",
+            extra={"element_id": element_id},
+        )
 
     return updated > 0
 

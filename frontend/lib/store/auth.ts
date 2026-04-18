@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { User } from "@/lib/types";
+import { useSubscriptionStore } from "./subscription";
 
 interface AuthState {
   user: User | null;
@@ -57,7 +58,10 @@ export const useAuthStore = create<AuthState>()(
         set({ accessToken: access, refreshToken: refresh, isAuthenticated: true });
       },
 
-      setUser: (user) => set({ user }),
+      setUser: (user) => {
+        set({ user });
+        useSubscriptionStore.getState().setFromUser(user?.subscription);
+      },
 
       syncFromCookies: () => {
         const accessFromCookie = readCookie("access_token");
@@ -102,6 +106,9 @@ export const useAuthStore = create<AuthState>()(
           }
           if (state?.refreshToken) {
             syncRefreshCookie(state.refreshToken);
+          }
+          if (state?.user?.subscription) {
+            useSubscriptionStore.getState().setFromUser(state.user.subscription);
           }
         };
       },

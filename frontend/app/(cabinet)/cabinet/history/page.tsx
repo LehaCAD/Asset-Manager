@@ -121,7 +121,7 @@ export default function HistoryPage() {
       <h1 className="text-xl font-bold text-foreground">Журнал</h1>
 
       {/* Filters */}
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:flex-wrap">
         <SelectDropdown options={SOURCES} value={sourceType} onChange={setSourceType} />
         {showModelFilter && (
           <SelectDropdown
@@ -142,7 +142,7 @@ export default function HistoryPage() {
           value={projectId !== undefined ? String(projectId) : ""}
           onChange={(v) => setProjectId(v ? Number(v) : undefined)}
         />
-        <div className="ml-auto">
+        <div className="col-span-2 sm:ml-auto">
           <DateRangePicker value={dateRange} onChange={setDateRange} />
         </div>
       </div>
@@ -163,8 +163,8 @@ export default function HistoryPage() {
           </button>
         </div>
       ) : <>
-      <div className="rounded-md border border-border bg-card shadow-[var(--shadow-card)] overflow-hidden">
-        <table className="w-full text-xs">
+      <div className="rounded-md border border-border bg-card shadow-[var(--shadow-card)] overflow-x-auto">
+        <table className="w-full text-xs min-w-[640px]">
           <thead>
             <tr className="border-b border-border">
               <th className="text-left px-3 py-3 font-medium text-muted-foreground text-[11px] uppercase tracking-wider">Дата</th>

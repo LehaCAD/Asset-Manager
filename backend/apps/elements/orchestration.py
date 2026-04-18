@@ -38,11 +38,30 @@ def create_generation(project, scene, prompt, ai_model_id, generation_config, us
     except AIModel.DoesNotExist:
         return {'error': 'AI model not found or inactive'}, http_status.HTTP_400_BAD_REQUEST
 
+    # Storage limit check
+    from apps.subscriptions.services import SubscriptionService
+    if not SubscriptionService.check_storage(user):
+        return {'error': 'Хранилище заполнено. Перейдите на более высокий тариф для увеличения объёма.'}, http_status.HTTP_403_FORBIDDEN
+
     element_type = ai_model.model_type
 
     generation_config = generation_config or {}
     input_urls = generation_config.get('input_urls')
     source_type = Element.SOURCE_GENERATED
+
+    # --- Prompt enhancement ---
+    enhance_requested = generation_config.pop("enhance_prompt", False)
+    if enhance_requested:
+        try:
+            from apps.ai_services.services.prompt_enhance import enhance_prompt as _enhance
+            result = _enhance(prompt, user)
+            if result.was_enhanced:
+                generation_config["_enhanced_prompt"] = result.prompt
+                generation_config["_prompt_enhanced"] = True
+                generation_config["_enhance_cost"] = str(result.cost)
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception("Prompt enhancement failed, using original")
 
     try:
         operation_key = uuid4().hex
@@ -129,6 +148,11 @@ def create_upload(project, scene, file, prompt_text='', is_favorite=False, ai_mo
     Save file to staging and create Element with PROCESSING status.
     Returns: tuple (data_dict, http_status_code)
     """
+    # Storage limit check (user derived from project)
+    from apps.subscriptions.services import SubscriptionService
+    if not SubscriptionService.check_storage(project.user):
+        return {'error': 'Хранилище заполнено. Перейдите на более высокий тариф для увеличения объёма.'}, http_status.HTTP_403_FORBIDDEN
+
     if not validate_file_type(file.name):
         return (
             {'error': 'Неподдерживаемый формат файла. Допустимые форматы: JPG, PNG, MP4'},

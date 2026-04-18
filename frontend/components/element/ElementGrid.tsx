@@ -33,14 +33,9 @@ import { toDndId, parseDndId } from "@/lib/utils/dnd";
 import { elementsApi } from "@/lib/api/elements";
 import { scenesApi } from "@/lib/api/scenes";
 import { cn } from "@/lib/utils";
-import { DISPLAY_GRID_CONFIG, CARD_SIZES, GROUP_CARD_SIZES } from "@/lib/utils/constants";
+import { DISPLAY_GRID_CONFIG, CARD_SIZES, GROUP_CARD_SIZES, GROUP_GRID_MIN_WIDTH } from "@/lib/utils/constants";
 import type { DragItem, DisplayCardSize, DisplayAspectRatio, Scene } from "@/lib/types";
 import { toast } from "sonner";
-
-// Helper для получения минимальной ширины карточки
-function getMinCardWidth(size: DisplayCardSize, aspectRatio: DisplayAspectRatio): number {
-  return CARD_SIZES[size][aspectRatio].width;
-}
 
 // Sortable wrapper for GroupCard
 function SortableGroupCard({
@@ -54,6 +49,7 @@ function SortableGroupCard({
   onDelete,
   onRename,
   onShare,
+  onDownload,
   size,
 }: {
   dndId: string;
@@ -66,6 +62,7 @@ function SortableGroupCard({
   onDelete: (id: number) => void;
   onRename?: (id: number) => void;
   onShare?: (id: number) => void;
+  onDownload?: (id: number) => void;
   size: DisplayCardSize;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: dndId });
@@ -87,6 +84,7 @@ function SortableGroupCard({
         onDelete={onDelete}
         onRename={onRename}
         onShare={onShare}
+        onDownload={onDownload}
         size={size}
       />
     </div>
@@ -131,6 +129,7 @@ interface ElementGridProps {
   onGroupDelete?: (id: number) => void;
   onGroupRename?: (id: number) => void;
   onGroupShare?: (id: number) => void;
+  onGroupDownload?: (id: number) => void;
   shareMode?: boolean;
   shareSelectedIds?: Set<number>;
   onShareToggle?: (id: number) => void;
@@ -138,7 +137,7 @@ interface ElementGridProps {
   onMove?: (id: number) => void;
 }
 
-export function ElementGrid({ className, onRequestDelete, groups = [], onGroupClick, onGroupDelete, onGroupRename, onGroupShare, shareMode, shareSelectedIds, onShareToggle, onRename, onMove }: ElementGridProps) {
+export function ElementGrid({ className, onRequestDelete, groups = [], onGroupClick, onGroupDelete, onGroupRename, onGroupShare, onGroupDownload, shareMode, shareSelectedIds, onShareToggle, onRename, onMove }: ElementGridProps) {
   const {
     getFilteredElements,
     selectedIds,
@@ -329,16 +328,22 @@ export function ElementGrid({ className, onRequestDelete, groups = [], onGroupCl
     [selectElement, openLightbox, toggleFavorite, onRequestDelete, retryFromElement, getFilteredElements, updateApprovalStatus, onRename, onMove]
   );
 
+  // On mobile, element grid density is derived from aspect ratio instead of user-set size:
+  //   landscape/square → 1 col full width (labels read well)
+  //   portrait         → 2 cols (tall cards pack densely)
+  const elementMobileGridClass =
+    preferences.aspectRatio === "portrait" ? "grid-mobile-2" : "grid-mobile-1";
+
   // Loading state
   if (isLoading) {
     return (
       <div className={cn("element-grid", className)}>
         <div
-          className={cn("grid", gridConfig.gap)}
-          style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${getMinCardWidth(preferences.size, preferences.aspectRatio)}px, 1fr))` }}
+          className={cn("grid", elementMobileGridClass, gridConfig.gap)}
+          style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${gridConfig.minWidth}px, 1fr))` }}
         >
           {Array.from({ length: 12 }).map((_, i) => (
-            <ElementCardSkeleton key={i} />
+            <ElementCardSkeleton key={i} aspectRatio={preferences.aspectRatio} />
           ))}
         </div>
       </div>
@@ -356,7 +361,7 @@ export function ElementGrid({ className, onRequestDelete, groups = [], onGroupCl
     );
   }
 
-  const gridStyle = { gridTemplateColumns: `repeat(auto-fill, minmax(${getMinCardWidth(preferences.size, preferences.aspectRatio)}px, 1fr))` };
+  const gridStyle = { gridTemplateColumns: `repeat(auto-fill, minmax(${gridConfig.minWidth}px, 1fr))` };
   const hasGroups = sortedGroups.length > 0;
   const hasElements = filteredElements.length > 0;
 
@@ -384,8 +389,8 @@ export function ElementGrid({ className, onRequestDelete, groups = [], onGroupCl
             {!collapsedSections.groups && (
               <SortableContext items={prefixedGroupIds} strategy={rectSortingStrategy}>
                 <div
-                  className={cn("grid py-1", gridConfig.gap)}
-                  style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${getMinCardWidth(preferences.size, preferences.aspectRatio)}px, 1fr))` }}
+                  className={cn("grid grid-mobile-1 py-1", gridConfig.gap)}
+                  style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${GROUP_GRID_MIN_WIDTH[preferences.size]}px, 1fr))` }}
                 >
                   {sortedGroups.map((group) => {
                     const dndId = toDndId('group', group.id);
@@ -404,6 +409,7 @@ export function ElementGrid({ className, onRequestDelete, groups = [], onGroupCl
                         onDelete={onGroupDelete ?? (() => {})}
                         onRename={onGroupRename}
                         onShare={onGroupShare}
+                        onDownload={onGroupDownload}
                         size={preferences.size}
                       />
                     );
@@ -433,7 +439,7 @@ export function ElementGrid({ className, onRequestDelete, groups = [], onGroupCl
             />
             {!collapsedSections.elements && (
               <SortableContext items={prefixedElementIds} strategy={rectSortingStrategy}>
-                <div className={cn("grid", gridConfig.gap)} style={gridStyle}>
+                <div className={cn("grid", elementMobileGridClass, gridConfig.gap)} style={gridStyle}>
                   {filteredElements.map((element, index) => (
                     <SortableElementCard
                       key={element.id}

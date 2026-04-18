@@ -1,10 +1,11 @@
 from rest_framework import serializers
 from .models import Element
+from .url_helpers import build_element_url
 
 
 class ElementSerializer(serializers.ModelSerializer):
     """Сериализатор для модели Element."""
-    
+
     scene_name = serializers.SerializerMethodField()
     project_name = serializers.SerializerMethodField()
     group_name = serializers.SerializerMethodField()
@@ -15,6 +16,18 @@ class ElementSerializer(serializers.ModelSerializer):
     generation_cost = serializers.SerializerMethodField()
     review_summary = serializers.SerializerMethodField()
     comment_count = serializers.SerializerMethodField()
+    file_url = serializers.SerializerMethodField()
+    thumbnail_url = serializers.SerializerMethodField()
+    preview_url = serializers.SerializerMethodField()
+
+    def get_file_url(self, obj) -> str:
+        return build_element_url(obj, 'file', self.context.get('request'))
+
+    def get_thumbnail_url(self, obj) -> str:
+        return build_element_url(obj, 'thumb', self.context.get('request'))
+
+    def get_preview_url(self, obj) -> str:
+        return build_element_url(obj, 'preview', self.context.get('request'))
 
     class Meta:
         model = Element

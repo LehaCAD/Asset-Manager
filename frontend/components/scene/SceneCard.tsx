@@ -13,7 +13,7 @@ import {
   FolderOpen,
 } from "lucide-react";
 import { toast } from "sonner";
-import { ChargeIcon } from "@/components/ui/charge-icon";
+import { KadrIcon } from "@/components/ui/kadr-icon";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
@@ -271,7 +271,7 @@ export function SceneCard({ scene, projectId, index, aspectClass = "aspect-video
             </span>
             {scene.total_spent && parseFloat(scene.total_spent) > 0 && (
               <span className="flex items-center gap-1">
-                <ChargeIcon size="sm" />
+                <KadrIcon size="sm" />
                 {formatCurrency(scene.total_spent)}
               </span>
             )}

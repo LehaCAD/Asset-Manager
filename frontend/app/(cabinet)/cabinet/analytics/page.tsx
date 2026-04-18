@@ -151,7 +151,7 @@ export default function AnalyticsPage() {
           <Skeleton className="h-7 w-36" />
           <Skeleton className="h-8 w-52 rounded-md" />
         </div>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
           {[...Array(3)].map((_, i) => (
             <Skeleton key={i} className="h-24 rounded-md" />
           ))}
@@ -182,9 +182,9 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-6">
       {/* Header + controls */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h1 className="text-xl font-bold text-foreground">Аналитика</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <SelectDropdown
             options={[
               { value: "", label: "Все модели" },
@@ -205,8 +205,8 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      {/* Summary Cards — 3 columns */}
-      <div className="grid grid-cols-3 gap-4">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         {/* Balance */}
         <div className="rounded-md border border-border bg-card shadow-[var(--shadow-card)] p-3 flex items-center gap-3">
           <div className="h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
@@ -312,7 +312,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Two columns: by model + by project */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <BreakdownCard
           title="По моделям"
           items={spending_by_model.map((m) => ({

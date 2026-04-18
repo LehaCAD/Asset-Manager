@@ -49,14 +49,21 @@ export function ElementFilters({
       <PopoverTrigger asChild>
         <button
           className={cn(
-            "flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium transition-colors",
+            "relative flex items-center justify-center gap-1.5 h-9 w-9 sm:w-auto sm:h-7 sm:px-3 rounded-md sm:rounded text-xs font-medium transition-colors",
             isFiltered
               ? "bg-primary text-primary-foreground"
               : "bg-card text-muted-foreground hover:text-foreground"
           )}
+          aria-label="Фильтры"
+          title="Фильтры"
         >
-          <Filter className="h-3.5 w-3.5" />
-          {isFiltered ? `${activeTab?.label} (${getCount(filter)})` : "Фильтры"}
+          <Filter className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+          <span className="hidden sm:inline">
+            {isFiltered ? `${activeTab?.label} (${getCount(filter)})` : "Фильтры"}
+          </span>
+          {isFiltered && (
+            <span className="sm:hidden absolute -top-1 -right-1 w-2 h-2 rounded-full bg-primary border border-background" />
+          )}
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-1.5" align="start" sideOffset={4}>

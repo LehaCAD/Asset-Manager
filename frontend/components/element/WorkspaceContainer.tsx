@@ -1,13 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useDropzone } from 'react-dropzone';
 import { useSceneWorkspaceStore, getActiveUploadCount } from '@/lib/store/scene-workspace';
 import { preloadImage } from '@/lib/utils/client-upload';
 import { useCreditsStore } from '@/lib/store/credits';
 import { useGenerationStore } from '@/lib/store/generation';
 import { useUIStore } from '@/lib/store/ui';
+import { useNotificationStore } from '@/lib/store/notifications';
 import { useProjectsStore } from '@/lib/store/projects';
 import { wsManager } from '@/lib/api/websocket';
 import { ElementGrid } from '@/components/element/ElementGrid';
@@ -24,11 +25,20 @@ import { scenesApi } from '@/lib/api/scenes';
 import { elementsApi } from '@/lib/api/elements';
 import { MoveToGroupDialog } from '@/components/element/MoveToGroupDialog';
 import { RenameDialog } from '@/components/element/RenameDialog';
-import { Upload, ChevronLeft, ChevronRight, FolderPlus, Share2, Plus } from 'lucide-react';
+import { Upload, ChevronLeft, ChevronRight, FolderPlus, Share2, Plus, MessageSquare, Sliders, X, Menu, ChevronDown } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
+import { ReviewsOverlay } from '@/components/sharing/ReviewsOverlay';
 import { ShareSelectionMode } from '@/components/sharing/ShareSelectionMode';
 import { CreateLinkDialog } from '@/components/sharing/CreateLinkDialog';
-import { ShareLinksPanel } from '@/components/sharing/ShareLinksPanel';
+import { BatchDownloadDialog } from '@/components/download/BatchDownloadDialog';
 import { sharingApi } from '@/lib/api/sharing';
 import { CreateSceneDialog } from '@/components/scene/CreateSceneDialog';
 import {
@@ -43,7 +53,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { MAX_FILE_SIZE_MB } from '@/lib/utils/constants';
-import type { WSEvent, WorkspaceElement } from '@/lib/types';
+import type { WSEvent, WorkspaceElement, DownloadableElement } from '@/lib/types';
 
 interface WorkspaceContainerProps {
   projectId: number;
@@ -52,6 +62,7 @@ interface WorkspaceContainerProps {
 
 export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const {
     elements,
@@ -99,12 +110,18 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   } | null>(null);
   const [isGroupDeleting, setIsGroupDeleting] = useState(false);
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
+  const [configMobileOpen, setConfigMobileOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<{ id: number; name: string } | null>(null);
   const [moveElementId, setMoveElementId] = useState<number | null>(null);
   const [groupRenameTarget, setGroupRenameTarget] = useState<{ id: number; name: string } | null>(null);
   const [groupShareOpen, setGroupShareOpen] = useState(false);
   const [groupShareProjectId, setGroupShareProjectId] = useState<number>(0);
   const [groupShareElements, setGroupShareElements] = useState<Array<{ id: number; element_type: string; is_favorite: boolean; source_type: string }>>([]);
+
+  // Download state
+  const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
+  const [downloadElements, setDownloadElements] = useState<DownloadableElement[]>([]);
+  const [downloadGroups, setDownloadGroups] = useState<Array<{ id: number; name: string; parent_id: number | null }>>([]);
 
 
   // Share mode persisted in sessionStorage to survive group navigation
@@ -138,8 +155,8 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   }, []);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [shareElements, setShareElements] = useState<Array<{ id: number; element_type: string; is_favorite: boolean; source_type: string }>>([]);
-  const [linksPanelOpen, setLinksPanelOpen] = useState(false);
-  const [linksRefreshKey, setLinksRefreshKey] = useState(0);
+  const [reviewsOpen, setReviewsOpen] = useState(false);
+  const feedbackUnread = useNotificationStore((s) => s.feedbackUnreadCount);
   const [promptBarHeight, setPromptBarHeight] = useState(0);
   const promptBarRef = useRef<HTMLDivElement>(null);
   const fallbackRefetchIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -183,24 +200,24 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   }, [elements]);
 
   // Handle lightbox deep-link from URL (?lightbox=elementId)
+  const lightboxParam = searchParams.get('lightbox');
   useEffect(() => {
-    if (isLoading || elements.length === 0) return;
-    const params = new URLSearchParams(window.location.search);
-    const lightboxId = params.get('lightbox');
-    if (lightboxId) {
-      const elementId = parseInt(lightboxId, 10);
-      if (!isNaN(elementId)) {
-        const exists = elements.some((e) => e.id === elementId);
-        if (exists) {
-          openLightbox(elementId);
-        }
-        // Clean URL regardless — avoid re-triggering
-        const url = new URL(window.location.href);
-        url.searchParams.delete('lightbox');
-        window.history.replaceState({}, '', url.toString());
+    if (isLoading || !lightboxParam) return;
+    const elementId = parseInt(lightboxParam, 10);
+    if (isNaN(elementId)) return;
+
+    // Wait for elements to load, then open
+    if (elements.length > 0) {
+      const exists = elements.some((e) => e.id === elementId);
+      if (exists) {
+        openLightbox(elementId);
       }
     }
-  }, [isLoading, elements, openLightbox]);
+    // Clean URL
+    const url = new URL(window.location.href);
+    url.searchParams.delete('lightbox');
+    router.replace(url.pathname, { scroll: false });
+  }, [isLoading, elements, lightboxParam, openLightbox, router]);
 
   // Load models for generation
   useEffect(() => {
@@ -297,6 +314,23 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
               : event.upload_progress; // generation: 0-100
           }
           updateElement(event.element_id, updates);
+        }
+      } else if (event.type === 'new_comment') {
+        if (event.element_id) {
+          useSceneWorkspaceStore.getState().incrementCommentCount(event.element_id);
+        }
+        toast.info(`Новый комментарий от ${event.author_name}`);
+      } else if (event.type === 'reaction_updated') {
+        // Пока нет reaction counts в WorkspaceElement, просто логируем
+        // В будущем: updateElement(event.element_id, { likes: event.likes, dislikes: event.dislikes })
+      } else if (event.type === 'review_updated') {
+        // Обновить review_summary на элементе (полоска ревью на карточке)
+        if (event.element_id) {
+          updateElement(event.element_id, {
+            review_summary: event.action
+              ? { action: event.action, author_name: event.author_name }
+              : null,
+          } as Partial<WorkspaceElement>);
         }
       }
     });
@@ -547,6 +581,17 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
     } catch { toast.error('Не удалось загрузить элементы'); }
   }, [projectId]);
 
+  // Group download (from three-dots menu on GroupCard)
+  const handleGroupDownload = useCallback(async (groupIdToDownload: number) => {
+    try {
+      const data = await elementsApi.getDownloadMeta({ sceneId: groupIdToDownload });
+      if (data.elements.length === 0) { toast.error('В группе нет элементов'); return; }
+      setDownloadElements(data.elements);
+      setDownloadGroups(data.groups);
+      setDownloadDialogOpen(true);
+    } catch { toast.error('Не удалось загрузить данные'); }
+  }, []);
+
   // Handle group delete with confirmation (fetches counts first)
   const handleRequestGroupDelete = useCallback(
     async (groupIdToDelete: number) => {
@@ -660,8 +705,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   }, [setShareMode, setShareSelectedIds]);
 
   const handleLinkCreated = useCallback(() => {
-    setLinksRefreshKey((k) => k + 1);
-    setLinksPanelOpen(true);
+    toast.success('Ссылка создана');
   }, []);
 
   // Measure PromptBar height dynamically
@@ -705,10 +749,35 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
 
   return (
     <div className="flex h-full overflow-hidden">
-      {/* Zone 1: Config Panel (left sidebar) */}
+      {/* Zone 1: Config Panel (left sidebar on md+, bottom sheet on mobile) */}
       <div className="hidden md:block">
         <ConfigPanel />
       </div>
+
+      {/* Mobile: Config Panel as TOP sheet, toggled from toolbar button */}
+      {configMobileOpen && (
+        <div className="md:hidden fixed inset-0 z-[60] bg-black/60" onClick={() => setConfigMobileOpen(false)}>
+          <div
+            className="absolute inset-x-0 top-0 max-h-[92vh] overflow-y-auto rounded-b-xl border-b border-border bg-surface shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-surface px-4 py-3">
+              <span className="text-sm font-semibold">Модель и параметры</span>
+              <button
+                type="button"
+                onClick={() => setConfigMobileOpen(false)}
+                className="p-1 text-muted-foreground hover:text-foreground"
+                aria-label="Закрыть"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="px-1 pb-4">
+              <ConfigPanel className="!w-full !border-none" forceOpen hideCollapseButton />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main content area */}
       <div
@@ -720,16 +789,69 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
       >
         <input {...getInputProps()} />
 
-        {/* Breadcrumbs + Filters toolbar — single row */}
-        <div className="flex items-center justify-between border-b px-4 py-2 shrink-0 bg-surface">
-          {/* Left: breadcrumbs + create group */}
+        {/* Toolbar. Desktop: single row. Mobile: two rows — navigation dropdown on row 1,
+            action buttons on row 2 (Создать группу + Отзывы left; Фильтры + Вид right).
+            `z-30` so that Lightbox (z-55) / ReviewsOverlay (z-60) / ModelSelector (z-70) all cleanly overlay. */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b px-3 sm:px-4 py-2 shrink-0 bg-surface relative z-30">
+          {/* Row 1 — navigation */}
           <div className="flex items-center gap-1 min-w-0">
+            {/* Mobile nav dropdown — unified path with click-to-navigate items */}
             {breadcrumbs.length > 0 && (
-              <>
+              <div className="sm:hidden flex-1 min-w-0">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex items-center gap-2 w-full h-9 rounded-md px-3 text-sm font-medium text-foreground bg-card hover:bg-card/80 transition-colors"
+                      aria-label="Навигация"
+                    >
+                      <Menu className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span className="truncate text-left flex-1">
+                        {breadcrumbs[breadcrumbs.length - 1].label}
+                      </span>
+                      <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-[calc(100vw-1.5rem)] max-w-xs">
+                    <DropdownMenuLabel className="text-[11px] font-normal text-muted-foreground uppercase tracking-wider">
+                      Навигация
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleBack} className="cursor-pointer">
+                      <ChevronLeft className="w-4 h-4 mr-2" />
+                      Назад
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    {breadcrumbs.map((crumb, i) => {
+                      const isCurrent = i === breadcrumbs.length - 1;
+                      return (
+                        <DropdownMenuItem
+                          key={i}
+                          onClick={() => crumb.href && router.push(crumb.href)}
+                          disabled={isCurrent || !crumb.href}
+                          className={cn(
+                            "cursor-pointer",
+                            isCurrent && "font-semibold text-primary"
+                          )}
+                        >
+                          <span className="truncate">{crumb.label}</span>
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )}
+
+            {/* Desktop back + breadcrumbs */}
+            {breadcrumbs.length > 0 && (
+              <div className="hidden sm:flex items-center gap-1 min-w-0">
                 <button
                   type="button"
                   onClick={handleBack}
                   className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                  aria-label="Назад"
+                  title="Назад"
                 >
                   <ChevronLeft className="w-4 h-4" />
                   <span>Назад</span>
@@ -751,33 +873,81 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
                     )}
                   </span>
                 ))}
-              </>
+                <button
+                  type="button"
+                  onClick={() => setCreateGroupOpen(true)}
+                  className="flex items-center gap-1.5 h-7 rounded text-xs font-medium text-primary bg-card hover:bg-card/80 transition-colors shrink-0 px-3 ml-2"
+                >
+                  <FolderPlus className="h-4 w-4" />
+                  Создать группу
+                </button>
+              </div>
             )}
-            <button
-              type="button"
-              onClick={() => setCreateGroupOpen(true)}
-              className="flex items-center gap-1.5 h-7 px-3 ml-2 rounded text-xs font-medium text-primary bg-card hover:bg-card/80 transition-colors shrink-0"
-            >
-              <FolderPlus className="h-4 w-4" />
-              Создать группу
-            </button>
           </div>
 
-          {/* Right: active links + filters + view */}
-          <div className="flex items-center gap-1.5 shrink-0">
+          {/* Row 2 (mobile) / trailing actions (desktop) */}
+          <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-1.5 shrink-0">
+            {/* Mobile-only: labeled CTA + Reviews on the left */}
+            <div className="flex items-center gap-2 sm:hidden">
+              <button
+                type="button"
+                onClick={() => setCreateGroupOpen(true)}
+                className="flex items-center gap-1.5 h-9 rounded-md text-xs font-medium text-primary bg-card hover:bg-card/80 transition-colors shrink-0 px-3"
+                aria-label="Создать группу"
+              >
+                <FolderPlus className="h-4 w-4" />
+                Группа
+              </button>
+              <button
+                type="button"
+                onClick={() => setReviewsOpen(!reviewsOpen)}
+                className={cn(
+                  "relative flex items-center gap-1.5 h-9 rounded-md text-xs font-medium transition-colors shrink-0 px-3",
+                  reviewsOpen
+                    ? "bg-primary/20 text-primary"
+                    : "text-muted-foreground bg-card hover:text-foreground"
+                )}
+                aria-label="Отзывы"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                Отзывы
+                {feedbackUnread > 0 && !reviewsOpen && (
+                  <span className="bg-primary text-white text-[10px] font-bold rounded px-1.5 py-0.5 min-w-[18px] text-center leading-none">
+                    {feedbackUnread}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* Desktop-only: Reviews button with label */}
             <button
               type="button"
-              onClick={() => setLinksPanelOpen(true)}
-              className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-muted-foreground bg-card hover:text-foreground transition-colors shrink-0"
+              onClick={() => setReviewsOpen(!reviewsOpen)}
+              className={cn(
+                "hidden sm:flex relative items-center gap-1.5 h-7 rounded text-xs font-medium transition-colors shrink-0 px-3",
+                reviewsOpen
+                  ? "bg-primary/20 text-primary"
+                  : "text-muted-foreground bg-card hover:text-foreground"
+              )}
             >
-              Активные ссылки
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>Отзывы</span>
+              {feedbackUnread > 0 && !reviewsOpen && (
+                <span className="bg-primary text-white text-[10px] font-bold rounded px-1.5 py-0.5 min-w-[18px] text-center">
+                  {feedbackUnread}
+                </span>
+              )}
             </button>
-            <ElementFilters
-              filter={filter}
-              onFilterChange={setFilter}
-              counts={filterCounts}
-            />
-            <DisplaySettingsPopover />
+
+            {/* Icon-only filters + view — always icon-only on mobile */}
+            <div className="flex items-center gap-1 sm:gap-1.5">
+              <ElementFilters
+                filter={filter}
+                onFilterChange={setFilter}
+                counts={filterCounts}
+              />
+              <DisplaySettingsPopover />
+            </div>
           </div>
         </div>
 
@@ -798,6 +968,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
               onGroupDelete={handleRequestGroupDelete}
               onGroupRename={handleGroupRename}
               onGroupShare={handleGroupShare}
+              onGroupDownload={handleGroupDownload}
               shareMode={shareMode}
               shareSelectedIds={shareSelectedIds}
               onShareToggle={handleToggleShareElement}
@@ -809,12 +980,26 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
           )}
         </div>
 
-        {/* Zone 2: Prompt Bar (floating bottom) */}
+        {/* Zone 2: Prompt Bar (floating bottom) + mobile ConfigPanel trigger sitting right above it */}
         <div ref={promptBarRef} className="absolute bottom-0 left-0 right-0 z-40 pointer-events-none">
+          {/* Mobile-only: labeled trigger for ConfigPanel sheet.
+              Placed directly above PromptBar so «Выбрать модель» reads naturally with «Опишите идею». */}
+          <button
+            type="button"
+            onClick={() => setConfigMobileOpen(true)}
+            className="md:hidden pointer-events-auto flex items-center justify-between gap-2 w-[calc(100%-1rem)] mx-2 -mb-px rounded-t-xl border border-b-0 border-border bg-card/80 backdrop-blur hover:bg-card transition-colors px-4 py-2 text-[13px] font-medium text-foreground"
+          >
+            <span className="flex items-center gap-2">
+              <Sliders className="h-4 w-4 text-primary" strokeWidth={2} />
+              Выбрать модель и параметры
+            </span>
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          </button>
           <div className="pointer-events-auto">
             <PromptBar projectId={projectId} groupId={groupId} />
           </div>
         </div>
+
 
         {/* Bulk actions bar */}
         <ElementBulkBar
@@ -858,6 +1043,62 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
                 .catch(() => toast.error('Не удалось загрузить элементы групп'));
             }
           }}
+          onDownloadSelected={() => {
+            const elementOnlyIds = Array.from(selectedIds).filter(
+              id => !groups.some(g => g.id === id)
+            );
+            const selectedGroupIds = Array.from(selectedIds).filter(
+              id => groups.some(g => g.id === id)
+            );
+
+            if (selectedGroupIds.length === 0) {
+              // Only elements — build DownloadableElement from store (COMPLETED only)
+              const els: DownloadableElement[] = getFilteredElements()
+                .filter(e => elementOnlyIds.includes(e.id) && e.status === 'COMPLETED' && e.file_url)
+                .map(e => ({
+                  id: e.id,
+                  element_type: e.element_type,
+                  is_favorite: e.is_favorite,
+                  source_type: e.source_type,
+                  file_url: e.file_url!,
+                  original_filename: e.original_filename || `element-${e.id}`,
+                  file_size: e.file_size ?? null,
+                  scene_id: e.scene ?? null,
+                }));
+              if (els.length === 0) { toast.error('Нет завершённых элементов для скачивания'); return; }
+              setDownloadElements(els);
+              setDownloadGroups([]);
+              setDownloadDialogOpen(true);
+            } else {
+              // Groups selected — fetch via API
+              Promise.all(selectedGroupIds.map(gid => elementsApi.getDownloadMeta({ sceneId: gid })))
+                .then(results => {
+                  const groupEls = results.flatMap(r => r.elements);
+                  const groupMeta = results.flatMap(r => r.groups);
+                  const storeEls: DownloadableElement[] = getFilteredElements()
+                    .filter(e => elementOnlyIds.includes(e.id) && e.status === 'COMPLETED' && e.file_url)
+                    .map(e => ({
+                      id: e.id,
+                      element_type: e.element_type,
+                      is_favorite: e.is_favorite,
+                      source_type: e.source_type,
+                      file_url: e.file_url!,
+                      original_filename: e.original_filename || `element-${e.id}`,
+                      file_size: e.file_size ?? null,
+                      scene_id: e.scene ?? null,
+                    }));
+                  const allEls = [...storeEls, ...groupEls];
+                  // Dedup by id
+                  const seen = new Set<number>();
+                  const deduped = allEls.filter(e => { if (seen.has(e.id)) return false; seen.add(e.id); return true; });
+                  if (deduped.length === 0) { toast.error('Нет элементов для скачивания'); return; }
+                  setDownloadElements(deduped);
+                  setDownloadGroups(groupMeta);
+                  setDownloadDialogOpen(true);
+                })
+                .catch(() => toast.error('Не удалось загрузить данные'));
+            }
+          }}
           onClearSelection={clearSelection}
           onToggleSelectAll={toggleSelectAll}
         />
@@ -882,25 +1123,6 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
           elementIds={Array.from(shareSelectedIds)}
           elements={shareElements}
         />
-
-        {/* Share links panel (slide-over) */}
-        {linksPanelOpen && (
-          <div className="fixed inset-y-0 right-0 z-50 w-80 bg-background border-l shadow-xl flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b">
-              <h3 className="text-sm font-medium">Ссылки для просмотра</h3>
-              <button
-                type="button"
-                onClick={() => setLinksPanelOpen(false)}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="flex-1 overflow-auto">
-              <ShareLinksPanel projectId={projectId} refreshKey={linksRefreshKey} />
-            </div>
-          </div>
-        )}
 
         {/* Whole-area drag overlay */}
         {isDragActive && hasContent && (
@@ -980,6 +1202,15 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
           elements={groupShareElements}
         />
 
+        {/* Batch download dialog */}
+        <BatchDownloadDialog
+          isOpen={downloadDialogOpen}
+          onClose={() => { setDownloadDialogOpen(false); setDownloadElements([]); setDownloadGroups([]); }}
+          projectName={projectName ?? 'Проект'}
+          elements={downloadElements}
+          groups={downloadGroups}
+        />
+
         {/* Group delete confirmation dialog */}
         <Dialog open={groupDeleteDialogOpen} onOpenChange={setGroupDeleteDialogOpen}>
           <DialogContent className="sm:max-w-sm">
@@ -1020,6 +1251,24 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
           onOpenChange={(open) => {
             setCreateGroupOpen(open);
             if (!open) loadWorkspace(projectId, groupId);
+          }}
+        />
+
+        {/* Reviews Overlay */}
+        <ReviewsOverlay
+          isOpen={reviewsOpen}
+          onClose={() => setReviewsOpen(false)}
+          onOpenLightbox={(elementId, sceneId, elProjectId) => {
+            setReviewsOpen(false)
+            const targetProject = elProjectId || projectId
+            const elementExists = elements.some((e) => e.id === elementId)
+            if (elementExists) {
+              openLightbox(elementId)
+            } else if (sceneId) {
+              router.push(`/projects/${targetProject}/groups/${sceneId}?lightbox=${elementId}`)
+            } else {
+              router.push(`/projects/${targetProject}?lightbox=${elementId}`)
+            }
           }}
         />
 

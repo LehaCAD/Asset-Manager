@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { Clapperboard } from "lucide-react";
+import { AuthShowcase } from "@/components/auth/AuthShowcase";
 
 export default function AuthLayout({
   children,
@@ -7,16 +6,25 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen flex-col bg-muted/30">
-      <div className="flex h-14 items-center px-6">
-        <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-          <Clapperboard className="h-5 w-5 text-primary" />
-          <span className="font-semibold text-sm tracking-tight">Раскадровка</span>
-        </Link>
+    <div className="dark flex min-h-screen bg-[#0A0A12] text-foreground">
+      {/* Left — form panel, fixed 520px on desktop */}
+      <div className="relative flex w-full flex-col items-center lg:items-stretch lg:w-[520px] shrink-0">
+        <div className="flex w-full max-w-[520px] flex-1 flex-col lg:max-w-none">
+          {children}
+        </div>
+
+        {/* Accent line — right edge, desktop only */}
+        <div
+          className="absolute right-0 top-[60px] bottom-[60px] hidden w-[3px] rounded-full lg:block"
+          style={{
+            background:
+              "linear-gradient(180deg, transparent 0%, rgba(124,58,237,0.35) 30%, rgba(91,33,182,0.35) 70%, transparent 100%)",
+          }}
+        />
       </div>
-      <main className="flex flex-1 items-center justify-center p-4">
-        {children}
-      </main>
+
+      {/* Right — showcase panel */}
+      <AuthShowcase />
     </div>
   );
 }

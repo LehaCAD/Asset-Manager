@@ -1,3 +1,5 @@
+"use client";
+
 import { Upload, ImagePlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -8,6 +10,7 @@ export interface EmptyStateProps {
 
 export function EmptyState({ onUploadClick, isDragActive = false }: EmptyStateProps) {
   return (
+    <div className="flex flex-col gap-4 w-full h-full">
     <button
       type="button"
       onClick={onUploadClick}
@@ -80,5 +83,6 @@ export function EmptyState({ onUploadClick, isDragActive = false }: EmptyStatePr
         </div>
       )}
     </button>
+    </div>
   );
 }

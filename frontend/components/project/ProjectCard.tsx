@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, Pencil, Trash2, Film, Layers, HardDrive, Folder, Share2 } from "lucide-react";
-import { ChargeIcon } from "@/components/ui/charge-icon";
+import { MoreHorizontal, Pencil, Trash2, Film, Layers, HardDrive, Folder, Share2, Download } from "lucide-react";
+import { KadrIcon } from "@/components/ui/kadr-icon";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,18 +23,24 @@ import {
 } from "@/components/ui/dialog";
 import { ProjectSettingsDialog } from "./ProjectSettingsDialog";
 import { CreateLinkDialog } from "@/components/sharing/CreateLinkDialog";
+import { BatchDownloadDialog } from "@/components/download/BatchDownloadDialog";
 import { sharingApi } from "@/lib/api/sharing";
+import { elementsApi } from "@/lib/api/elements";
 import { useProjectsStore } from "@/lib/store/projects";
+import { useFeatureGate } from "@/lib/hooks/useFeatureGate";
+import { TierBadge } from "@/components/subscription/TierBadge";
+import { UpgradeModal } from "@/components/subscription/UpgradeModal";
 import { PROJECT_STATUSES } from "@/lib/utils/constants";
 import { formatStorage, formatCurrency, formatRelativeDate } from "@/lib/utils/format";
-import type { Project } from "@/lib/types";
+import type { Project, DownloadableElement } from "@/lib/types";
 
 interface ProjectCardProps {
   project: Project;
+  highlight?: boolean;
 }
 
 
-export function ProjectCard({ project }: ProjectCardProps) {
+export function ProjectCard({ project, highlight = false }: ProjectCardProps) {
   const router = useRouter();
   const deleteProject = useProjectsStore((s) => s.deleteProject);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -43,6 +49,12 @@ export function ProjectCard({ project }: ProjectCardProps) {
   const [shareLoading, setShareLoading] = useState(false);
   const [shareElements, setShareElements] = useState<Array<{ id: number; element_type: string; is_favorite: boolean; source_type: string }>>([]);
   const [isDeleting, setIsDeleting] = useState(false);
+  const sharing = useFeatureGate("sharing");
+  const batchDownload = useFeatureGate("batch_download");
+  const [downloadOpen, setDownloadOpen] = useState(false);
+  const [downloadElements, setDownloadElements] = useState<DownloadableElement[]>([]);
+  const [downloadGroups, setDownloadGroups] = useState<Array<{ id: number; name: string; parent_id: number | null }>>([]);
+  const [downloadLoading, setDownloadLoading] = useState(false);
 
   const statusConfig = PROJECT_STATUSES.find((s) => s.value === project.status);
 
@@ -71,10 +83,49 @@ export function ProjectCard({ project }: ProjectCardProps) {
 
   return (
     <>
-      <div
-        onClick={handleCardClick}
-        className="group relative bg-card border border-border rounded-md overflow-hidden cursor-pointer hover:border-primary/40 hover:shadow-md hover:shadow-primary/5 transition-all duration-150"
-      >
+      <div className="relative">
+        {highlight && (
+          <>
+            {/* Pulsing purple ring */}
+            <div
+              aria-hidden
+              className="absolute -inset-1 rounded-lg pointer-events-none animate-project-highlight"
+              style={{
+                boxShadow:
+                  "0 0 0 2px rgba(139, 124, 247, 0.9), 0 0 28px rgba(139, 124, 247, 0.45)",
+              }}
+            />
+            {/* Floating label below card */}
+            <div
+              className="absolute -bottom-11 left-1/2 -translate-x-1/2 pointer-events-none z-10 animate-float-hint-down"
+              style={{
+                background: "linear-gradient(135deg, #8B7CF7, #6B5CE7)",
+                padding: "6px 14px",
+                borderRadius: "10px",
+                fontSize: "12px",
+                fontWeight: 600,
+                color: "white",
+                whiteSpace: "nowrap",
+                boxShadow: "0 6px 20px rgba(139, 124, 247, 0.4)",
+              }}
+            >
+              Откройте проект
+              <div
+                className="absolute left-1/2 -translate-x-1/2 w-0 h-0"
+                style={{
+                  top: "-5px",
+                  borderLeft: "6px solid transparent",
+                  borderRight: "6px solid transparent",
+                  borderBottom: "6px solid #8B7CF7",
+                }}
+              />
+            </div>
+          </>
+        )}
+        <div
+          onClick={handleCardClick}
+          className="group relative bg-card border border-border rounded-md overflow-hidden cursor-pointer hover:border-primary/40 hover:shadow-md hover:shadow-primary/5 transition-all duration-150"
+        >
         {/* Preview area */}
         <div className="aspect-video bg-muted relative overflow-hidden">
           {(() => {
@@ -153,6 +204,10 @@ export function ProjectCard({ project }: ProjectCardProps) {
                   <DropdownMenuItem
                     className="cursor-pointer"
                     onSelect={async () => {
+                      if (sharing.isLocked) {
+                        sharing.openUpgrade();
+                        return;
+                      }
                       setShareLoading(true);
                       try {
                         const els = await sharingApi.getProjectElements(project.id);
@@ -165,6 +220,29 @@ export function ProjectCard({ project }: ProjectCardProps) {
                   >
                     <Share2 className="mr-2 h-3.5 w-3.5" />
                     {shareLoading ? 'Загрузка...' : 'Поделиться'}
+                    {sharing.isLocked && <TierBadge tier={sharing.tier} className="ml-auto" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="cursor-pointer"
+                    onSelect={async () => {
+                      if (batchDownload.isLocked) {
+                        batchDownload.openUpgrade();
+                        return;
+                      }
+                      setDownloadLoading(true);
+                      try {
+                        const data = await elementsApi.getDownloadMeta({ projectId: project.id });
+                        if (data.elements.length === 0) { toast.error('В проекте нет элементов'); return; }
+                        setDownloadElements(data.elements);
+                        setDownloadGroups(data.groups);
+                        setDownloadOpen(true);
+                      } catch { toast.error('Не удалось загрузить данные'); }
+                      finally { setDownloadLoading(false); }
+                    }}
+                  >
+                    <Download className="mr-2 h-3.5 w-3.5" />
+                    {downloadLoading ? 'Загрузка...' : 'Скачать'}
+                    {batchDownload.isLocked && <TierBadge tier={batchDownload.tier} className="ml-auto" />}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
@@ -203,7 +281,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
               <>
                 <span className="text-muted-foreground/40">&middot;</span>
                 <span className="flex items-center gap-0.5">
-                  <ChargeIcon size="xs" />
+                  <KadrIcon size="xs" />
                   {formatCurrency(project.total_spent)}
                 </span>
               </>
@@ -222,6 +300,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
             {formatRelativeDate(project.updated_at)}
           </div>
         </div>
+        </div>
       </div>
 
       <ProjectSettingsDialog
@@ -236,6 +315,26 @@ export function ProjectCard({ project }: ProjectCardProps) {
         projectId={project.id}
         elementIds={shareElements.map(e => e.id)}
         elements={shareElements}
+      />
+
+      <UpgradeModal
+        open={sharing.upgradeOpen}
+        onOpenChange={sharing.setUpgradeOpen}
+        featureCode="sharing"
+      />
+
+      <BatchDownloadDialog
+        isOpen={downloadOpen}
+        onClose={() => { setDownloadOpen(false); setDownloadElements([]); setDownloadGroups([]); }}
+        projectName={project.name}
+        elements={downloadElements}
+        groups={downloadGroups}
+      />
+
+      <UpgradeModal
+        open={batchDownload.upgradeOpen}
+        onOpenChange={batchDownload.setUpgradeOpen}
+        featureCode="batch_download"
       />
 
       {/* Delete confirmation */}

@@ -161,6 +161,22 @@ export function SceneWorkspace({ projectId, sceneId }: SceneWorkspaceProps) {
             ...(event.preview_url && { preview_url: event.preview_url }),
           });
         }
+      } else if (event.type === 'new_comment') {
+        if (event.element_id) {
+          useSceneWorkspaceStore.getState().incrementCommentCount(event.element_id);
+        }
+        toast.info(`Новый комментарий от ${event.author_name}`);
+      } else if (event.type === 'reaction_updated') {
+        // Пока нет reaction counts в WorkspaceElement, просто логируем
+        // В будущем: updateElement(event.element_id, { likes: event.likes, dislikes: event.dislikes })
+      } else if (event.type === 'review_updated') {
+        if (event.element_id) {
+          updateElement(event.element_id, {
+            review_summary: event.action
+              ? { action: event.action, author_name: event.author_name }
+              : null,
+          } as any);
+        }
       }
     });
     const unsubscribeConnect = wsManager.onConnect(() => {

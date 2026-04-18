@@ -26,15 +26,12 @@ import { CreateSceneDialog } from "./CreateSceneDialog";
 import { DisplaySettingsPopover } from "@/components/display/DisplaySettingsPopover";
 import { useScenesStore } from "@/lib/store/scenes";
 import { useDisplayStore } from "@/lib/store/project-display";
+import { useOnboardingStore } from "@/lib/store/onboarding";
+import { OnboardingEmptyState } from "@/components/onboarding/OnboardingEmptyState";
 import { projectsApi } from "@/lib/api/projects";
+import { logger } from "@/lib/utils/logger";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
-import { DISPLAY_GRID_CONFIG, ASPECT_RATIO_CLASSES, FIT_MODE_CLASSES, CARD_SIZES } from "@/lib/utils/constants";
-import type { DisplayCardSize, DisplayAspectRatio } from "@/lib/types";
-
-// Helper для получения минимальной ширины карточки
-function getMinCardWidth(size: DisplayCardSize, aspectRatio: DisplayAspectRatio): number {
-  return CARD_SIZES[size][aspectRatio].width;
-}
+import { DISPLAY_GRID_CONFIG, ASPECT_RATIO_CLASSES, FIT_MODE_CLASSES, GROUP_GRID_MIN_WIDTH } from "@/lib/utils/constants";
 import type { Project } from "@/lib/types";
 
 interface ScenarioTableClientProps {
@@ -50,12 +47,15 @@ function pluralizeScenes(count: number): string {
 export function ScenarioTableClient({ projectId }: ScenarioTableClientProps) {
   const { scenes, isLoading, loadScenes, reorderScenes, setScenes } = useScenesStore();
   const { preferences, hydratePreferences } = useDisplayStore();
+  const getAnyTaskForPage = useOnboardingStore((s) => s.getAnyTaskForPage);
   const [createOpen, setCreateOpen] = useState(false);
   const [project, setProject] = useState<Project | null>(null);
 
   useEffect(() => {
     loadScenes(projectId);
-    projectsApi.getById(projectId).then(setProject).catch(() => null);
+    projectsApi.getById(projectId).then(setProject).catch((err) =>
+      logger.warn("scenario_table.load_project_failed", { projectId, cause: err })
+    );
     hydratePreferences();
   }, [projectId, loadScenes, hydratePreferences]);
 
@@ -121,20 +121,22 @@ export function ScenarioTableClient({ projectId }: ScenarioTableClientProps) {
         {isLoading ? (
           <div 
             className={cn("grid", gridConfig.gap)}
-            style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${getMinCardWidth(preferences.size, preferences.aspectRatio)}px, 1fr))` }}
+            style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${GROUP_GRID_MIN_WIDTH[preferences.size]}px, 1fr))` }}
           >
             {Array.from({ length: 6 }).map((_, i) => (
               <SceneCardSkeleton key={i} aspectClass={aspectClass} />
             ))}
           </div>
         ) : scenes.length === 0 ? (
-          <EmptyState onCreateClick={() => setCreateOpen(true)} />
+          getAnyTaskForPage('scenes')
+            ? <OnboardingEmptyState task={getAnyTaskForPage('scenes')!} onAction={() => setCreateOpen(true)} />
+            : <EmptyState onCreateClick={() => setCreateOpen(true)} />
         ) : (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={scenes.map((s) => s.id)} strategy={rectSortingStrategy}>
               <div 
                 className={cn("grid", gridConfig.gap)}
-                style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${getMinCardWidth(preferences.size, preferences.aspectRatio)}px, 1fr))` }}
+                style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${GROUP_GRID_MIN_WIDTH[preferences.size]}px, 1fr))` }}
               >
                 {scenes.map((scene, index) => (
                   <SceneCard 

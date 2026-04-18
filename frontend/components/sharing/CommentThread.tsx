@@ -1,10 +1,20 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { MessageCircle, Send, X } from 'lucide-react'
+import { MessageSquare, SendHorizontal, X } from 'lucide-react'
 import { Comment } from '@/lib/types'
+import { cn } from '@/lib/utils'
 
 // ── Helpers ──────────────────────────────────────────────────
+
+function pluralize(n: number, one: string, few: string, many: string): string {
+  const abs = Math.abs(n) % 100
+  const lastDigit = abs % 10
+  if (abs > 10 && abs < 20) return many
+  if (lastDigit === 1) return one
+  if (lastDigit >= 2 && lastDigit <= 4) return few
+  return many
+}
 
 function sessionIdToColor(sessionId: string): string {
   if (!sessionId) return 'hsl(0, 0%, 50%)'
@@ -58,8 +68,6 @@ interface CommentItemProps {
 }
 
 function CommentItem({ comment, onReply, isReply = false }: CommentItemProps) {
-  const parentSnippet = isReply && comment.parent !== null ? null : null
-
   return (
     <div className={`flex gap-2.5 ${isReply ? 'pl-8' : ''}`}>
       <Avatar name={comment.author_name} sessionId={comment.session_id} />
@@ -85,7 +93,7 @@ function CommentItem({ comment, onReply, isReply = false }: CommentItemProps) {
             onClick={() => onReply(comment)}
             className="mt-1 text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
           >
-            <MessageCircle className="w-3 h-3" />
+            <MessageSquare className="w-3 h-3" />
             Ответить
           </button>
         )}
@@ -101,6 +109,8 @@ export interface CommentThreadProps {
   onSubmit: (text: string, parentId?: number) => Promise<void>
   isAuthenticated: boolean
   isLoading?: boolean
+  pinInputBottom?: boolean
+  collapsedLimit?: number
 }
 
 export function CommentThread({
@@ -108,11 +118,14 @@ export function CommentThread({
   onSubmit,
   isAuthenticated,
   isLoading = false,
+  pinInputBottom = false,
+  collapsedLimit,
 }: CommentThreadProps) {
   const [text, setText] = useState('')
   const [authorName, setAuthorName] = useState('')
   const [replyTo, setReplyTo] = useState<Comment | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [showCount, setShowCount] = useState(collapsedLimit ?? Infinity)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const handleReply = (comment: Comment) => {
@@ -140,25 +153,34 @@ export function CommentThread({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSubmit()
     }
   }
 
   const isEmpty = comments.length === 0
+  const visibleComments = comments.length > showCount ? comments.slice(-showCount) : comments
+  const hiddenCount = comments.length - visibleComments.length
 
-  return (
-    <div className="flex flex-col gap-3">
-      {/* Comment list */}
+  const commentList = (
+    <>
       {isEmpty ? (
         <div className="flex flex-col items-center gap-1.5 py-6 text-muted-foreground">
-          <MessageCircle className="w-5 h-5 opacity-40" />
+          <MessageSquare className="w-5 h-5 opacity-40" />
           <span className="text-xs">Комментариев пока нет</span>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          {comments.map((comment) => (
+          {hiddenCount > 0 && (
+            <button
+              onClick={() => setShowCount((prev) => prev + 10)}
+              className="text-xs text-primary hover:text-primary/80 transition-colors text-center py-1"
+            >
+              Показать ещё {Math.min(hiddenCount, 10)} из {hiddenCount} {pluralize(hiddenCount, 'комментарий', 'комментария', 'комментариев')}
+            </button>
+          )}
+          {visibleComments.map((comment) => (
             <div key={comment.id} className="flex flex-col gap-2">
               <CommentItem comment={comment} onReply={handleReply} />
 
@@ -203,68 +225,90 @@ export function CommentThread({
           ))}
         </div>
       )}
+    </>
+  )
 
-      {/* Input area */}
-      <div className="border-t border-border pt-3 flex flex-col gap-2">
-        {/* Anonymous name input */}
-        {!isAuthenticated && (
-          <input
-            type="text"
-            placeholder="Ваше имя"
-            value={authorName}
-            onChange={(e) => setAuthorName(e.target.value)}
-            disabled={submitting || isLoading}
-            className="w-full text-sm bg-muted/10 border border-border rounded-md px-3 py-1.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
-          />
-        )}
+  const inputArea = (
+    <div className={cn(
+      "border-t border-border pt-3 flex flex-col gap-2",
+      pinInputBottom && "px-4 pb-3"
+    )}>
+      {/* Anonymous name input */}
+      {!isAuthenticated && (
+        <input
+          type="text"
+          placeholder="Ваше имя"
+          value={authorName}
+          onChange={(e) => setAuthorName(e.target.value)}
+          disabled={submitting || isLoading}
+          className="w-full text-sm bg-muted/10 border border-border rounded-md px-3 py-1.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+        />
+      )}
 
-        {/* Reply indicator */}
-        {replyTo && (
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/10 rounded-md px-2.5 py-1.5">
-            <span className="flex-1 truncate">
-              ↩ Ответ для{' '}
-              <span className="font-medium text-foreground">
-                {replyTo.author_name || 'Аноним'}
-              </span>
+      {/* Reply indicator */}
+      {replyTo && (
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/10 rounded-md px-2.5 py-1.5">
+          <span className="flex-1 truncate">
+            ↩ Ответ для{' '}
+            <span className="font-medium text-foreground">
+              {replyTo.author_name || 'Аноним'}
             </span>
-            <button
-              onClick={handleCancelReply}
-              className="flex-shrink-0 hover:text-foreground transition-colors"
-              aria-label="Отменить ответ"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
-
-        {/* Textarea + send */}
-        <div className="flex gap-2 items-end">
-          <textarea
-            ref={textareaRef}
-            rows={2}
-            placeholder={`Написать комментарий… (${typeof navigator !== 'undefined' && /Mac/.test(navigator.userAgent) ? '⌘+Enter' : 'Ctrl+Enter'})`}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={handleKeyDown}
-            maxLength={2000}
-            disabled={submitting || isLoading}
-            className="flex-1 text-sm bg-muted/10 border border-border rounded-md px-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none disabled:opacity-50 leading-snug"
-          />
+          </span>
           <button
-            onClick={handleSubmit}
-            disabled={
-              submitting ||
-              isLoading ||
-              !text.trim() ||
-              (!isAuthenticated && !authorName.trim())
-            }
-            className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            aria-label="Отправить"
+            onClick={handleCancelReply}
+            className="flex-shrink-0 hover:text-foreground transition-colors"
+            aria-label="Отменить ответ"
           >
-            <Send className="w-4 h-4" />
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
+      )}
+
+      {/* Input + send */}
+      <div className="flex gap-2 items-end">
+        <textarea
+          ref={textareaRef}
+          rows={1}
+          placeholder="Написать комментарий…"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={handleKeyDown}
+          maxLength={2000}
+          disabled={submitting || isLoading}
+          className="flex-1 text-sm bg-muted/10 border border-border rounded-md px-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none disabled:opacity-50 leading-snug"
+        />
+        <button
+          onClick={handleSubmit}
+          disabled={
+            submitting ||
+            isLoading ||
+            !text.trim() ||
+            (!isAuthenticated && !authorName.trim())
+          }
+          className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          aria-label="Отправить"
+        >
+          <SendHorizontal className="w-4 h-4" />
+        </button>
       </div>
+    </div>
+  )
+
+  if (pinInputBottom) {
+    return (
+      <div className="flex flex-col flex-1 min-h-0">
+        <div className="flex-1 overflow-y-auto px-4 py-3">
+          {commentList}
+        </div>
+        {inputArea}
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {commentList}
+      {inputArea}
     </div>
   )
 }

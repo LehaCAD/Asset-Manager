@@ -40,8 +40,14 @@ def notification_list(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def unread_count(request):
-    count = Notification.objects.filter(user=request.user, is_read=False).count()
-    return Response({'count': count})
+    qs = Notification.objects.filter(user=request.user, is_read=False)
+    feedback_types = ['comment_new', 'reaction_new', 'review_new']
+    total = qs.count()
+    feedback = qs.filter(type__in=feedback_types).count()
+    return Response({
+        'count': total - feedback,  # bell badge (non-feedback)
+        'feedback_count': feedback,  # feedback badge
+    })
 
 
 @api_view(['PATCH'])

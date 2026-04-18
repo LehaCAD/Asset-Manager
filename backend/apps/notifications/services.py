@@ -135,3 +135,45 @@ def notify_new_comment(comment, project):
             )
     except Exception as e:
         logger.warning(f'Failed to send WS comment: {e}')
+
+
+def notify_reaction_updated(element, likes, dislikes):
+    """Broadcast reaction update to project owner via project group."""
+    try:
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            async_to_sync(channel_layer.group_send)(
+                f'project_{element.project_id}',
+                {
+                    'type': 'reaction_updated',
+                    'data': {
+                        'type': 'reaction_updated',
+                        'element_id': element.id,
+                        'likes': likes,
+                        'dislikes': dislikes,
+                    },
+                },
+            )
+    except Exception as e:
+        logger.warning(f'Failed to send reaction update: {e}')
+
+
+def notify_review_updated(element, action, author_name):
+    """Broadcast review update to project owner via project group."""
+    try:
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            async_to_sync(channel_layer.group_send)(
+                f'project_{element.project_id}',
+                {
+                    'type': 'review_updated',
+                    'data': {
+                        'type': 'review_updated',
+                        'element_id': element.id,
+                        'action': action,
+                        'author_name': author_name,
+                    },
+                },
+            )
+    except Exception as e:
+        logger.warning(f'Failed to send review update: {e}')

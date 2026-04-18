@@ -9,6 +9,7 @@ import { useNotificationStore } from "@/lib/store/notifications";
 import type { NotificationTab } from "@/lib/store/notifications";
 import { projectsApi } from "@/lib/api/projects";
 import { cn } from "@/lib/utils";
+import { logger } from "@/lib/utils/logger";
 import type { Notification } from "@/lib/types";
 
 /* ── Tabs config ───────────────────────────────────────── */
@@ -111,7 +112,7 @@ export default function NotificationsPage() {
   useEffect(() => {
     projectsApi.getAll().then(data => {
       setProjects(data.map(p => ({ id: p.id, name: p.name })));
-    }).catch(() => {});
+    }).catch((err) => logger.warn("cabinet_notifications.load_projects_failed", { cause: err }));
   }, []);
 
   const handleRead = async (n: Notification) => {

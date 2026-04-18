@@ -124,6 +124,9 @@
   --base:        oklch(0.985 0.003 265);
   --surface:     oklch(0.945 0.007 265);           /* #EAEBF0 — toolbars/panels, white pills visible on it */
   --card-bg:     oklch(1 0 0);                     /* #FFFFFF — cards separated by border+shadow */
+  --bg-elevated: oklch(1 0 0);                     /* #FFFFFF — alias for card-bg, used in components */
+  --bg-inset:    oklch(0.955 0.006 265);           /* #F0F1F4 — nested areas, inputs, inner buttons */
+  --bg-surface:  oklch(0.94 0.007 265);            /* #EEEEF2 — sidebar, panels */
   --text-accent: oklch(0.541 0.211 281.4);
   --bg-elevated-hover: oklch(0.945 0.005 265);     /* #EDEDF1 — hover on cards */
 
@@ -201,6 +204,9 @@
   --base:        oklch(0.145 0.028 265);           /* ~#111827 — page bg */
   --surface:     oklch(0.16 0.028 265);            /* ~#151D30 — panels */
   --card-bg:     oklch(0.19 0.03 265);             /* ~#1C2640 — cards */
+  --bg-elevated: oklch(0.19 0.03 265);             /* ~#1A1D28 — alias for card-bg */
+  --bg-inset:    oklch(0.13 0.02 265);             /* ~#0F1119 — nested areas, inputs */
+  --bg-surface:  oklch(0.155 0.025 265);           /* ~#13161F — sidebar, panels */
   --text-accent: oklch(0.646 0.204 281.4);         /* #8B7CF7 */
   --bg-elevated-hover: oklch(0.23 0.028 265);      /* ~#242E48 — hover on cards */
 
@@ -280,5 +286,138 @@
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background-color: var(--border);
     border-radius: 3px;
+  }
+}
+
+/* Slow ambient pulse for onboarding CTA */
+@keyframes pulse-slow {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+.animate-pulse-slow {
+  animation: pulse-slow 3.5s ease-in-out infinite;
+}
+
+/* Achievement toast entrance — bouncy pop from bottom */
+@keyframes achievement-in-bottom {
+  0% {
+    opacity: 0;
+    transform: translateY(40px) scale(0.9);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-6px) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Project "click me" highlight — pulsing purple ring */
+@keyframes project-highlight {
+  0%, 100% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.015);
+  }
+}
+.animate-project-highlight {
+  animation: project-highlight 2s ease-in-out infinite;
+}
+
+/* Floating label bob — below card (gently drops toward it) */
+@keyframes float-hint-down {
+  0%, 100% { transform: translate3d(-50%, 0, 0); }
+  50% { transform: translate3d(-50%, 4px, 0); }
+}
+.animate-float-hint-down {
+  will-change: transform;
+  backface-visibility: hidden;
+  animation: float-hint-down 2s ease-in-out infinite;
+}
+
+/* Workspace hint bubble fade-in */
+@keyframes hint-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-hint-fade-in {
+  animation: hint-fade-in 320ms ease-out both;
+}
+
+/* Bob animations: bubble gently nudges TOWARD its target.
+   translate3d + will-change promote to GPU layer → no text jitter / sub-pixel shimmer. */
+@keyframes hint-bob-down {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, 3px, 0); }
+}
+@keyframes hint-bob-up {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -3px, 0); }
+}
+@keyframes hint-bob-left {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(-3px, 0, 0); }
+}
+@keyframes hint-bob-right {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(3px, 0, 0); }
+}
+
+/* Entrance = fade-in, then bob starts after entrance finishes */
+.animate-hint-enter-down,
+.animate-hint-enter-up,
+.animate-hint-enter-left,
+.animate-hint-enter-right {
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+}
+.animate-hint-enter-down {
+  animation:
+    hint-fade-in 320ms ease-out both,
+    hint-bob-down 2.8s ease-in-out 400ms infinite;
+}
+.animate-hint-enter-up {
+  animation:
+    hint-fade-in 320ms ease-out both,
+    hint-bob-up 2.8s ease-in-out 400ms infinite;
+}
+.animate-hint-enter-left {
+  animation:
+    hint-fade-in 320ms ease-out both,
+    hint-bob-left 2.8s ease-in-out 400ms infinite;
+}
+.animate-hint-enter-right {
+  animation:
+    hint-fade-in 320ms ease-out both,
+    hint-bob-right 2.8s ease-in-out 400ms infinite;
+}
+
+/* Exit — soft fade-down */
+@keyframes hint-fade-out {
+  from { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  to { opacity: 0; transform: translate3d(0, 4px, 0) scale(0.96); }
+}
+.animate-hint-exit {
+  will-change: transform, opacity;
+  animation: hint-fade-out 260ms ease-in both;
+}
+
+/* Mobile grid density overrides.
+   Desktop uses `gridTemplateColumns: repeat(auto-fill, minmax(Npx, 1fr))` via inline style.
+   On <sm we need to override that with explicit column counts. */
+@media (max-width: 639px) {
+  /* Two columns (e.g. portrait element grid) */
+  .grid-mobile-2 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  /* Single column, full width (e.g. ProjectCard, GroupCard, landscape/square elements).
+     Подписи под карточками читаются лучше, чем в узком двухкол. гриде. */
+  .grid-mobile-1 {
+    grid-template-columns: 1fr !important;
   }
 }

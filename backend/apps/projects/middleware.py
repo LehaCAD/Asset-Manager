@@ -2,6 +2,7 @@
 JWT-аутентификация для WebSocket-соединений.
 Токен передается в query string: ws://host/ws/projects/1/?token=<jwt_access_token>
 """
+import logging
 from urllib.parse import parse_qs
 from channels.db import database_sync_to_async
 from channels.middleware import BaseMiddleware
@@ -9,6 +10,7 @@ from django.contrib.auth.models import AnonymousUser
 from rest_framework_simplejwt.tokens import AccessToken
 from django.contrib.auth import get_user_model
 
+logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
@@ -20,15 +22,50 @@ def get_user_from_token(token_str: str):
         user_id = token['user_id']
         return User.objects.get(id=user_id)
     except Exception:
+        # Invalid/expired tokens are common (tokens rotate every 30 minutes) —
+        # use DEBUG to avoid log spam, but never silent.
+        logger.debug("WS JWT auth failed", exc_info=True)
         return AnonymousUser()
+
+
+@database_sync_to_async
+def get_user_from_session(scope):
+    """Получить пользователя из Django session (для admin WebSocket)."""
+    try:
+        from django.contrib.sessions.models import Session
+        # ASGI headers: list of (name: bytes, value: bytes) tuples
+        cookie_header = b''
+        for header_name, header_value in scope.get('headers', []):
+            if header_name == b'cookie':
+                cookie_header = header_value
+                break
+        if not cookie_header:
+            return AnonymousUser()
+        # Parse "sessionid=abc123; csrftoken=xyz; ..."
+        cookies = {}
+        for part in cookie_header.decode().split(';'):
+            part = part.strip()
+            if '=' in part:
+                k, v = part.split('=', 1)
+                cookies[k.strip()] = v.strip()
+        session_key = cookies.get('sessionid', '')
+        if not session_key:
+            return AnonymousUser()
+        session = Session.objects.get(session_key=session_key)
+        uid = session.get_decoded().get('_auth_user_id')
+        if uid:
+            return User.objects.get(id=uid)
+    except Exception:
+        logger.debug("WS session auth failed", exc_info=True)
+    return AnonymousUser()
 
 
 class JWTAuthMiddleware(BaseMiddleware):
     """
-    Middleware для аутентификации WebSocket через JWT.
-    
-    Использование на клиенте:
-        new WebSocket('ws://host/ws/projects/1/?token=eyJ...')
+    Middleware для аутентификации WebSocket через JWT или Django session.
+
+    JWT (frontend):  ws://host/ws/projects/1/?token=eyJ...
+    Session (admin): ws://host/ws/feedback/1/ (uses sessionid cookie)
     """
 
     async def __call__(self, scope, receive, send):
@@ -38,6 +75,7 @@ class JWTAuthMiddleware(BaseMiddleware):
         if token_list:
             scope['user'] = await get_user_from_token(token_list[0])
         else:
-            scope['user'] = AnonymousUser()
+            # Fallback to Django session auth (for admin interface)
+            scope['user'] = await get_user_from_session(scope)
 
         return await super().__call__(scope, receive, send)

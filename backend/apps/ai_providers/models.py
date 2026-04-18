@@ -1,4 +1,14 @@
+from django.core.exceptions import ValidationError
 from django.db import models
+
+
+# Module-level constants (before any model class)
+MODEL_TYPE_IMAGE = 'IMAGE'
+MODEL_TYPE_VIDEO = 'VIDEO'
+MODEL_TYPE_CHOICES = [
+    (MODEL_TYPE_IMAGE, 'Изображение'),
+    (MODEL_TYPE_VIDEO, 'Видео'),
+]
 
 
 class AIProvider(models.Model):
@@ -43,17 +53,80 @@ class AIProvider(models.Model):
         return f'{status} {self.name}'
 
 
+class ModelFamily(models.Model):
+    """Семейство вариантов AI-модели (например, Veo 3.1 Fast/Quality)."""
+
+    VARIANT_UI_PILLS = 'pills'
+    VARIANT_UI_SELECT = 'select'
+    VARIANT_UI_CHOICES = [
+        (VARIANT_UI_PILLS, 'Кнопки (pills)'),
+        (VARIANT_UI_SELECT, 'Выпадающий список (select)'),
+    ]
+
+    name = models.CharField(
+        max_length=100,
+        verbose_name='Название семейства',
+        help_text='Например: Veo 3.1, Flux 2, Kling'
+    )
+    model_type = models.CharField(
+        max_length=10,
+        choices=MODEL_TYPE_CHOICES,
+        verbose_name='Тип модели'
+    )
+    preview_url = models.CharField(
+        max_length=500,
+        blank=True,
+        verbose_name='URL превью',
+        help_text='Превью-картинка для карточки семейства в пикере'
+    )
+    description = models.TextField(
+        blank=True,
+        verbose_name='Описание',
+        help_text='Описание семейства для пикера'
+    )
+    tags = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name='Теги',
+        help_text='Бейджи для карточки семейства'
+    )
+    variant_ui_control = models.CharField(
+        max_length=20,
+        choices=VARIANT_UI_CHOICES,
+        default=VARIANT_UI_PILLS,
+        verbose_name='Тип переключателя вариантов',
+        help_text='Как пользователь переключает варианты: кнопки или выпадающий список'
+    )
+    sort_order = models.PositiveIntegerField(
+        default=0,
+        verbose_name='Порядок сортировки'
+    )
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name='Активно',
+        help_text='Если выключено — все варианты семейства скрыты'
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='Дата обновления')
+
+    class Meta:
+        verbose_name = 'Семейство моделей'
+        verbose_name_plural = 'Семейства моделей'
+        ordering = ['sort_order', 'name']
+
+    def __str__(self) -> str:
+        status = '✓' if self.is_active else '✗'
+        return f'{status} {self.name} ({self.get_model_type_display()})'
+
+
 class AIModel(models.Model):
     """Модель AI для генерации изображений или видео."""
-    
-    # Типы моделей
-    MODEL_TYPE_IMAGE = 'IMAGE'
-    MODEL_TYPE_VIDEO = 'VIDEO'
-    
-    MODEL_TYPE_CHOICES = [
-        (MODEL_TYPE_IMAGE, 'Изображение'),
-        (MODEL_TYPE_VIDEO, 'Видео'),
-    ]
+
+    # Типы моделей (алиасы на модульные константы для обратной совместимости)
+    MODEL_TYPE_IMAGE = MODEL_TYPE_IMAGE
+    MODEL_TYPE_VIDEO = MODEL_TYPE_VIDEO
+
+    MODEL_TYPE_CHOICES = MODEL_TYPE_CHOICES
     
     PARAMETERS_SCHEMA_SOURCE_EMPTY = 'empty'
     PARAMETERS_SCHEMA_SOURCE_LEGACY = 'legacy'
@@ -112,11 +185,18 @@ class AIModel(models.Model):
         verbose_name='Схема параметров',
         help_text='Описание параметров для UI в виде списка: [{"key": "aspect_ratio", "label": "Соотношение сторон", "type": "toggle_group", "options": [...], "default": "1:1"}]'
     )
+    preview_image = models.ImageField(
+        upload_to='system/model-previews/',
+        blank=True,
+        null=True,
+        verbose_name='Превью (файл)',
+        help_text='Загрузите изображение — оно сохранится в S3 и будет использоваться как превью. Имеет приоритет над URL превью.'
+    )
     preview_url = models.CharField(
         max_length=500,
         blank=True,
-        verbose_name='URL превью',
-        help_text='URL или путь к превью-картинке, например: /images/models/veo_3_1_fast.png или https://...'
+        verbose_name='URL превью (внешний)',
+        help_text='Используется, только если файл не загружен. Внешний URL, начинающийся с https://...'
     )
     description = models.TextField(
         blank=True,
@@ -128,6 +208,32 @@ class AIModel(models.Model):
         blank=True,
         verbose_name='Теги',
         help_text='Теги-бейджи для карточки модели, например: ["Style Ref", "Content Ref", "Image Ref"]'
+    )
+    family = models.ForeignKey(
+        ModelFamily,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='variants',
+        verbose_name='Семейство',
+        help_text='Принадлежность к семейству. Пусто = standalone модель.'
+    )
+    variant_label = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name='Название варианта',
+        help_text='Короткое название: Fast, Quality, Pro, v2'
+    )
+    variant_sort_order = models.PositiveIntegerField(
+        default=0,
+        blank=True,
+        verbose_name='Порядок варианта',
+        help_text='Порядок в переключателе вариантов'
+    )
+    is_default_variant = models.BooleanField(
+        default=False,
+        verbose_name='Вариант по умолчанию',
+        help_text='Какой вариант выбирается при клике на семейство в пикере'
     )
     image_inputs_schema = models.JSONField(
         default=list,
@@ -174,6 +280,15 @@ class AIModel(models.Model):
         endpoint = self.api_endpoint.lstrip('/')
         return f'{base}/{endpoint}'
 
+    def get_preview_url(self) -> str:
+        """Эффективный URL превью: файл из S3, иначе внешний URL."""
+        if self.preview_image:
+            try:
+                return self.preview_image.url
+            except ValueError:
+                return ''
+        return self.preview_url or ''
+
     def get_parameters_schema_source(self) -> str:
         """
         Dict payloads remain the legacy authoring format.
@@ -204,6 +319,33 @@ class AIModel(models.Model):
 
             return compile_pricing_payload(self)
         return self.pricing_schema
+
+    def clean(self):
+        super().clean()
+
+        if self.family:
+            if self.family.model_type != self.model_type:
+                raise ValidationError({
+                    'family': f'Тип модели ({self.get_model_type_display()}) не совпадает '
+                              f'с типом семейства ({self.family.get_model_type_display()}).'
+                })
+            if not self.variant_label:
+                raise ValidationError({
+                    'variant_label': 'Название варианта обязательно для модели в семействе.'
+                })
+            if self.is_default_variant:
+                existing = type(self).objects.filter(
+                    family=self.family, is_default_variant=True
+                ).exclude(pk=self.pk)
+                if existing.exists():
+                    raise ValidationError({
+                        'is_default_variant': f'В семействе уже есть вариант по умолчанию: {existing.first().name}'
+                    })
+        else:
+            if self.variant_label:
+                raise ValidationError({
+                    'variant_label': 'Название варианта должно быть пусто для standalone модели.'
+                })
 
 
 class CanonicalParameter(models.Model):

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useAuthStore } from "@/lib/store/auth";
 import { authApi } from "@/lib/api/auth";
 
@@ -13,6 +13,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const setUser = useAuthStore((s) => s.setUser);
   const syncFromCookies = useAuthStore((s) => s.syncFromCookies);
   const router = useRouter();
+  const pathname = usePathname();
   const redirected = useRef(false);
   const [isMounted, setIsMounted] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
@@ -46,9 +47,10 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     }
   }, [isMounted, isHydrated, syncFromCookies]);
 
+  const hasQuota = Boolean(user?.quota);
   useEffect(() => {
     if (!isMounted || !isHydrated || !canAccessWorkspace) return;
-    if (user?.quota) return;
+    if (hasQuota) return;
 
     let isActive = true;
     authApi
@@ -65,14 +67,22 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     return () => {
       isActive = false;
     };
-  }, [isMounted, isHydrated, canAccessWorkspace, user, setUser]);
+  }, [isMounted, isHydrated, canAccessWorkspace, hasQuota, setUser]);
 
   useEffect(() => {
-    if (isMounted && isHydrated && !canAccessWorkspace && !redirected.current) {
+    // Never redirect if we're already on an auth route — prevents render loop
+    // when /login briefly mounts AuthGuard during hydration.
+    const onAuthRoute = pathname?.startsWith("/login")
+      || pathname?.startsWith("/register")
+      || pathname?.startsWith("/forgot-password")
+      || pathname?.startsWith("/reset-password")
+      || pathname?.startsWith("/verify-email");
+
+    if (isMounted && isHydrated && !canAccessWorkspace && !redirected.current && !onAuthRoute) {
       redirected.current = true;
       router.replace("/login");
     }
-  }, [isMounted, isHydrated, canAccessWorkspace, router]);
+  }, [isMounted, isHydrated, canAccessWorkspace, router, pathname]);
 
   if (!isMounted || !isHydrated) {
     return (

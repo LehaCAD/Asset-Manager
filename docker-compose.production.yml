@@ -1,3 +1,9 @@
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   db:
     image: postgres:16-alpine
@@ -73,13 +79,20 @@ services:
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
       - SENTRY_DSN=${SENTRY_DSN:-}
       - EMAIL_BACKEND=${EMAIL_BACKEND:-django.core.mail.backends.smtp.EmailBackend}
-      - EMAIL_HOST=${EMAIL_HOST:-smtp.yandex.ru}
-      - EMAIL_PORT=${EMAIL_PORT:-587}
-      - EMAIL_USE_TLS=${EMAIL_USE_TLS:-True}
+      - EMAIL_HOST=${EMAIL_HOST:-mail.hosting.reg.ru}
+      - EMAIL_PORT=${EMAIL_PORT:-465}
+      - EMAIL_USE_SSL=${EMAIL_USE_SSL:-True}
+      - EMAIL_USE_TLS=${EMAIL_USE_TLS:-False}
       - EMAIL_HOST_USER=${EMAIL_HOST_USER:-}
       - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD:-}
+      - EMAIL_TIMEOUT=${EMAIL_TIMEOUT:-20}
       - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL:-}
+      - SERVER_EMAIL=${SERVER_EMAIL:-}
       - FRONTEND_URL=${FRONTEND_URL:-https://raskadrawka.ru}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
+      - SENTRY_RELEASE=${SENTRY_RELEASE:-}
     depends_on:
       db:
         condition: service_healthy
@@ -87,6 +100,7 @@ services:
         condition: service_healthy
     networks:
       - apom_network
+    logging: *default-logging
 
   celery:
     build:
@@ -123,19 +137,27 @@ services:
       - REDIS_HOST=${REDIS_HOST}
       - SENTRY_DSN=${SENTRY_DSN:-}
       - EMAIL_BACKEND=${EMAIL_BACKEND:-django.core.mail.backends.smtp.EmailBackend}
-      - EMAIL_HOST=${EMAIL_HOST:-smtp.yandex.ru}
-      - EMAIL_PORT=${EMAIL_PORT:-587}
-      - EMAIL_USE_TLS=${EMAIL_USE_TLS:-True}
+      - EMAIL_HOST=${EMAIL_HOST:-mail.hosting.reg.ru}
+      - EMAIL_PORT=${EMAIL_PORT:-465}
+      - EMAIL_USE_SSL=${EMAIL_USE_SSL:-True}
+      - EMAIL_USE_TLS=${EMAIL_USE_TLS:-False}
       - EMAIL_HOST_USER=${EMAIL_HOST_USER:-}
       - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD:-}
+      - EMAIL_TIMEOUT=${EMAIL_TIMEOUT:-20}
       - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL:-}
+      - SERVER_EMAIL=${SERVER_EMAIL:-}
       - FRONTEND_URL=${FRONTEND_URL:-https://raskadrawka.ru}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
+      - SENTRY_RELEASE=${SENTRY_RELEASE:-}
     depends_on:
       - backend
       - redis
       - db
     networks:
       - apom_network
+    logging: *default-logging
 
   frontend:
     build:
@@ -155,10 +177,18 @@ services:
     environment:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
       - NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL}
+      - NEXT_PUBLIC_SENTRY_DSN=${NEXT_PUBLIC_SENTRY_DSN:-}
+      - NEXT_PUBLIC_SENTRY_ENVIRONMENT=${NEXT_PUBLIC_SENTRY_ENVIRONMENT:-production}
+      - NEXT_PUBLIC_SENTRY_RELEASE=${NEXT_PUBLIC_SENTRY_RELEASE:-}
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - SENTRY_ORG=${SENTRY_ORG:-}
+      - SENTRY_PROJECT=${SENTRY_PROJECT:-}
+      - SENTRY_AUTH_TOKEN=${SENTRY_AUTH_TOKEN:-}
     depends_on:
       - backend
     networks:
       - apom_network
+    logging: *default-logging
 
   nginx:
     image: nginx:alpine
@@ -177,6 +207,7 @@ services:
       - frontend
     networks:
       - apom_network
+    logging: *default-logging
 
   certbot:
     image: certbot/certbot

@@ -75,6 +75,14 @@ class ProjectConsumer(AsyncJsonWebsocketConsumer):
             'created_at': event['comment']['created_at'],
         })
 
+    async def reaction_updated(self, event):
+        """Forward reaction update to project owner."""
+        await self.send_json(event['data'])
+
+    async def review_updated(self, event):
+        """Forward review update to project owner."""
+        await self.send_json(event['data'])
+
     # --- Helpers ---
 
     @database_sync_to_async

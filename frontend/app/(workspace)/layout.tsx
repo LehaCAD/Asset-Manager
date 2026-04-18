@@ -1,6 +1,7 @@
 import { AuthGuard } from "@/components/layout/AuthGuard";
 import { Navbar } from "@/components/layout/Navbar";
 import { EmailVerificationBanner } from "@/components/layout/EmailVerificationBanner";
+import { OnboardingBootstrap } from "@/components/onboarding/OnboardingBootstrap";
 
 export default function WorkspaceLayout({
   children,
@@ -13,6 +14,7 @@ export default function WorkspaceLayout({
         <Navbar />
         <EmailVerificationBanner />
         <main className="flex-1 flex flex-col min-h-0">{children}</main>
+        <OnboardingBootstrap />
       </div>
     </AuthGuard>
   );

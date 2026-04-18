@@ -6,11 +6,16 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDate, formatStorage, formatCurrency } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
+import { logger } from "@/lib/utils/logger";
 import { Copy, Check, Save, RotateCcw, ImageOff } from "lucide-react";
 import { toast } from "sonner";
 import { elementsApi } from "@/lib/api/elements";
 import { sharingApi } from "@/lib/api/sharing";
 import { useGenerationStore } from "@/lib/store/generation";
+import { useOnboardingStore } from "@/lib/store/onboarding";
+import { useAuthStore } from "@/lib/store/auth";
+import { TierBadge } from "@/components/subscription/TierBadge";
+import { UpgradeModal } from "@/components/subscription/UpgradeModal";
 import { CommentThread } from "@/components/sharing/CommentThread";
 import { ThumbsUp, ThumbsDown } from "lucide-react";
 import type { Element, Comment, PublicElementReaction } from "@/lib/types";
@@ -67,7 +72,16 @@ function InputImageThumbnail({ url, index }: { url: string; index: number }) {
 }
 
 export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelProps) {
-  const [promptText, setPromptText] = useState(element.prompt_text ?? "");
+  // Display enhanced prompt if available, otherwise original
+  const getDisplayPrompt = (el: Element) => {
+    const enhanced = el.generation_config?.["_prompt_enhanced"] === true;
+    if (enhanced) {
+      return (el.generation_config?.["_enhanced_prompt"] as string) ?? el.prompt_text ?? "";
+    }
+    return el.prompt_text ?? "";
+  };
+
+  const [promptText, setPromptText] = useState(getDisplayPrompt(element));
   const [isSaving, setIsSaving] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -75,10 +89,16 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
   const [reviews, setReviews] = useState<Array<{ session_id: string; author_name: string; action: string }>>([]);
 
   const { retryFromElement, availableModels } = useGenerationStore();
+  const quota = useAuthStore((s) => s.user?.quota);
+  const [storageUpgradeOpen, setStorageUpgradeOpen] = useState(false);
+
+  const isStorageFull = quota
+    ? quota.storage_limit_bytes > 0 && quota.storage_used_bytes >= quota.storage_limit_bytes
+    : false;
 
   // Sync prompt text when element changes
   useEffect(() => {
-    setPromptText(element.prompt_text ?? "");
+    setPromptText(getDisplayPrompt(element));
   }, [element.id, element.prompt_text]);
 
   // Fetch comments and reactions when element changes
@@ -86,17 +106,17 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
     let cancelled = false;
     sharingApi.getElementComments(element.id).then((data) => {
       if (!cancelled) setComments(data);
-    }).catch(() => {});
+    }).catch((err) => logger.warn("detail_panel.fetch_comments_failed", { elementId: element.id, cause: err }));
     sharingApi.getElementReactions(element.id).then((data) => {
       if (!cancelled) setReactions(data);
-    }).catch(() => {});
+    }).catch((err) => logger.warn("detail_panel.fetch_reactions_failed", { elementId: element.id, cause: err }));
     sharingApi.getElementReviews(element.id).then((data) => {
       if (!cancelled) setReviews(data);
-    }).catch(() => {});
+    }).catch((err) => logger.warn("detail_panel.fetch_reviews_failed", { elementId: element.id, cause: err }));
     return () => { cancelled = true; };
   }, [element.id]);
 
-  const hasPromptChanged = promptText !== (element.prompt_text ?? "");
+  const hasPromptChanged = promptText !== getDisplayPrompt(element);
   const isGenerated = element.source_type === "GENERATED";
 
   // Build label + value label maps from model's parameters_schema
@@ -126,7 +146,7 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
   const configParams = useMemo(() => {
     if (!element.generation_config || !isGenerated) return [];
     return Object.entries(element.generation_config)
-      .filter(([key]) => !HIDDEN_CONFIG_KEYS.has(key))
+      .filter(([key]) => !HIDDEN_CONFIG_KEYS.has(key) && !key.startsWith("_"))
       .filter(([, value]) => {
         if (typeof value === "string" && value.startsWith("http")) return false;
         if (Array.isArray(value)) return false;
@@ -144,9 +164,14 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
   const generationCost = element.generation_cost
     ?? (element.generation_config?.["_debit_amount"] as string | undefined);
 
+  // Prompt enhancement info
+  const enhanceCost = element.generation_config?.["_enhance_cost"] as string | undefined;
+  const wasEnhanced = element.generation_config?.["_prompt_enhanced"] === true;
+
   const metadata = [
     ...(element.ai_model_name ? [{ label: "Модель", value: element.ai_model_name }] : []),
     ...(generationCost ? [{ label: "Стоимость", value: formatCurrency(generationCost) }] : []),
+    ...(enhanceCost ? [{ label: "Усиление промпта", value: formatCurrency(enhanceCost) }] : []),
     ...(element.file_size ? [{ label: "Размер", value: formatStorage(element.file_size) }] : []),
     ...(element.seed ? [{ label: "Seed", value: String(element.seed) }] : []),
     { label: "Создан", value: formatDate(element.created_at) },
@@ -179,7 +204,12 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
   };
 
   const handleRepeat = () => {
+    if (isStorageFull) {
+      setStorageUpgradeOpen(true);
+      return;
+    }
     retryFromElement(element);
+    useOnboardingStore.getState().completeTask('retry_generation');
   };
 
   const handleCommentSubmit = async (text: string, parentId?: number) => {
@@ -254,7 +284,14 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
 
       {/* Prompt Section */}
       <div>
-        <h3 className="text-sm font-medium text-muted-foreground mb-2">Промпт</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-medium text-muted-foreground mb-2">Промпт</h3>
+          {wasEnhanced && (
+            <span className="text-[11px] text-primary bg-primary/10 px-2 py-0.5 rounded mb-2">
+              ✦ Усилен
+            </span>
+          )}
+        </div>
         <Separator className="mb-3" />
         <div className="space-y-2">
           <Textarea
@@ -305,7 +342,15 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
           >
             <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
             Повторить запрос
+            {isStorageFull && <TierBadge tier="plus" className="ml-1.5" />}
           </Button>
+          <UpgradeModal
+            open={storageUpgradeOpen}
+            onOpenChange={setStorageUpgradeOpen}
+            limitTitle="Хранилище"
+            limitUsed={quota?.storage_used_bytes}
+            limitMax={quota?.storage_limit_bytes}
+          />
         </div>
       )}
 

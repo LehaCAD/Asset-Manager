@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useCallback, useState, useRef } from 'react'
-import { X, Download, ExternalLink, MessageCircle, Video, Image, ThumbsUp, ThumbsDown, Check, RotateCcw } from 'lucide-react'
+import { X, Download, ExternalLink, MessageSquare, Video, Image, ThumbsUp, ThumbsDown, Check, RotateCcw } from 'lucide-react'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -12,6 +12,16 @@ import { ReviewerNameInput } from './ReviewerNameInput'
 import { sharingApi } from '@/lib/api/sharing'
 import { cn } from '@/lib/utils'
 import type { PublicElement, Comment } from '@/lib/types'
+import { getDownloadFilename } from '@/lib/utils/download-filename'
+
+/** Aggregate review status (worst-wins): rejected > changes_requested > approved */
+function getReviewStatus(reviews?: { action: string }[]): string | null {
+  if (!reviews || reviews.length === 0) return null
+  const actions = reviews.map(r => r.action)
+  if (actions.includes('rejected')) return 'rejected'
+  if (actions.includes('changes_requested')) return 'changes_requested'
+  return 'approved'
+}
 
 // ── Download helper ─────────────────────────────────────────
 
@@ -102,6 +112,26 @@ export function ReviewerLightbox({
     return () => window.removeEventListener('keydown', handleKey)
   }, [isOpen, onClose, goNext, goPrev])
 
+  // Touch swipe navigation (mobile)
+  const touchRef = useRef<{ x: number; y: number } | null>(null)
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const t = e.touches[0]
+    if (!t) return
+    touchRef.current = { x: t.clientX, y: t.clientY }
+  }, [])
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    const start = touchRef.current
+    touchRef.current = null
+    if (!start) return
+    const t = e.changedTouches[0]
+    if (!t) return
+    const dx = t.clientX - start.x
+    const dy = t.clientY - start.y
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return
+    if (dx > 0) goPrev()
+    else goNext()
+  }, [goPrev, goNext])
+
   // Prevent body scroll
   useEffect(() => {
     if (isOpen) {
@@ -177,12 +207,11 @@ export function ReviewerLightbox({
   const comments = commentsMap[current.id] || []
   const hasIdentity = !!reviewerName && !!sessionId
   const hasFileUrl = !!current.file_url?.trim()
-  const ext = current.file_url?.split('/').pop()?.split('?')[0]?.split('.').pop() ?? 'file'
-  const fileName = `element-${current.id}.${ext}`
+  const fileName = getDownloadFilename(current)
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col"
+      className="fixed inset-0 z-[80] bg-background/95 backdrop-blur-sm flex flex-col"
       role="dialog"
       aria-modal="true"
       aria-label="Просмотр элемента"
@@ -212,7 +241,11 @@ export function ReviewerLightbox({
       {/* Main content area */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Media area with navigation */}
-        <div className="flex-1 relative flex flex-col items-center justify-center p-4 md:p-8">
+        <div
+          className="flex-1 relative flex flex-col items-center justify-center p-4 md:p-8"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
           <LightboxNavigation
             onPrev={goPrev}
             onNext={goNext}
@@ -294,7 +327,7 @@ export function ReviewerLightbox({
                 className="md:hidden rounded-md bg-muted px-3 py-1.5 text-xs text-muted-foreground"
                 onClick={() => setMobileCommentsOpen(true)}
               >
-                <MessageCircle className="w-4 h-4 inline mr-1" />
+                <MessageSquare className="w-4 h-4 inline mr-1" />
                 Комменты
               </button>
             </div>
@@ -351,25 +384,26 @@ export function ReviewerLightbox({
         {/* Comments panel — matches DetailPanel structure */}
         <div className="w-80 border-l overflow-hidden bg-background shrink-0 hidden md:flex flex-col">
           <div className="px-4 py-3 border-b flex items-center gap-2 shrink-0">
-            <MessageCircle className="w-4 h-4 text-muted-foreground" />
+            <MessageSquare className="w-4 h-4 text-muted-foreground" />
             <h3 className="text-sm font-medium text-foreground">Комментарии</h3>
             {comments.length > 0 && (
-              <span className="text-xs text-muted-foreground bg-muted rounded-full px-2 py-0.5">
+              <span className="text-xs text-muted-foreground bg-muted rounded px-2 py-0.5">
                 {comments.length}
               </span>
             )}
           </div>
-          <div className="flex-1 overflow-y-auto px-4 py-3">
-            {!hasIdentity ? (
+          {!hasIdentity ? (
+            <div className="flex-1 overflow-y-auto px-4 py-3">
               <ReviewerNameInput onSave={handleNameSave} />
-            ) : (
-              <CommentThread
-                comments={comments}
-                onSubmit={handleCommentSubmit}
-                isAuthenticated={true}
-              />
-            )}
-          </div>
+            </div>
+          ) : (
+            <CommentThread
+              comments={comments}
+              onSubmit={handleCommentSubmit}
+              isAuthenticated={true}
+              pinInputBottom
+            />
+          )}
         </div>
       </div>
 
@@ -380,6 +414,7 @@ export function ReviewerLightbox({
             {elements.map((el, idx) => {
               const isActive = idx === currentIndex
               const elIsVideo = el.element_type === 'VIDEO'
+              const thumbReviewStatus = getReviewStatus(el.reviews)
 
               return (
                 <button
@@ -390,6 +425,9 @@ export function ReviewerLightbox({
                     'shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all relative group',
                     isActive
                       ? 'border-primary ring-2 ring-primary/30'
+                      : thumbReviewStatus === 'approved' ? 'border-emerald-500/50 hover:border-emerald-500/70'
+                      : thumbReviewStatus === 'changes_requested' ? 'border-orange-500/50 hover:border-orange-500/70'
+                      : thumbReviewStatus === 'rejected' ? 'border-red-500/50 hover:border-red-500/70'
                       : 'border-transparent hover:border-muted-foreground/30'
                   )}
                 >
@@ -419,25 +457,26 @@ export function ReviewerLightbox({
         <SheetContent side="bottom" className="h-[70vh] p-0">
           <div className="flex flex-col h-full">
             <div className="px-4 py-3 border-b flex items-center gap-2 shrink-0">
-              <MessageCircle className="w-4 h-4 text-muted-foreground" />
+              <MessageSquare className="w-4 h-4 text-muted-foreground" />
               <h3 className="text-sm font-medium text-foreground">Комментарии</h3>
               {comments.length > 0 && (
-                <span className="text-xs text-muted-foreground bg-muted rounded-full px-2 py-0.5">
+                <span className="text-xs text-muted-foreground bg-muted rounded px-2 py-0.5">
                   {comments.length}
                 </span>
               )}
             </div>
-            <div className="flex-1 overflow-y-auto px-4 py-3">
-              {!hasIdentity ? (
+            {!hasIdentity ? (
+              <div className="flex-1 overflow-y-auto px-4 py-3">
                 <ReviewerNameInput onSave={handleNameSave} />
-              ) : (
-                <CommentThread
-                  comments={comments}
-                  onSubmit={handleCommentSubmit}
-                  isAuthenticated={true}
-                />
-              )}
-            </div>
+              </div>
+            ) : (
+              <CommentThread
+                comments={comments}
+                onSubmit={handleCommentSubmit}
+                isAuthenticated={true}
+                pinInputBottom
+              />
+            )}
           </div>
         </SheetContent>
       </Sheet>

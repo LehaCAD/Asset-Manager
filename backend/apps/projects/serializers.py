@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from apps.elements.url_helpers import build_best_preview_url
 from .models import Project
 
 
@@ -44,7 +45,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         return getattr(obj, '_storage_bytes', None) or 0
 
     def get_preview_thumbnails(self, obj) -> list[str]:
-        """First 4 element preview URLs (800px) across all project scenes."""
+        """First 4 element preview URLs (800px) across all project scenes, via branded redirect."""
         from apps.elements.models import Element
         if hasattr(obj, '_preview_elements'):
             elements = obj._preview_elements[:4]
@@ -55,11 +56,9 @@ class ProjectSerializer(serializers.ModelSerializer):
             ).exclude(
                 file_url=''
             ).order_by('-created_at')[:4]
-        return [
-            e.preview_url or e.thumbnail_url or e.file_url
-            for e in elements
-            if e.file_url
-        ]
+        request = self.context.get('request')
+        urls = [build_best_preview_url(e, request) for e in elements if e.file_url]
+        return [u for u in urls if u]
 
 
 class ProjectStatsSerializer(serializers.Serializer):

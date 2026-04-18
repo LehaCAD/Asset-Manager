@@ -1,6 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { CheckSquare, Square, FolderInput, Trash2, Share2, X } from "lucide-react";
+import { useFeatureGate } from "@/lib/hooks/useFeatureGate";
+import { TierBadge } from "@/components/subscription/TierBadge";
+import { UpgradeModal } from "@/components/subscription/UpgradeModal";
+import { CheckSquare, Square, FolderInput, Trash2, Share2, Download, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface ElementBulkBarProps {
@@ -9,6 +12,7 @@ export interface ElementBulkBarProps {
   onDeleteSelected: () => void;
   onMoveSelected?: () => void;
   onShareSelected?: () => void;
+  onDownloadSelected?: () => void;
   onClearSelection: () => void;
   onToggleSelectAll: () => void;
 }
@@ -19,14 +23,19 @@ export function ElementBulkBar({
   onDeleteSelected,
   onMoveSelected,
   onShareSelected,
+  onDownloadSelected,
   onClearSelection,
   onToggleSelectAll,
 }: ElementBulkBarProps) {
+  const sharing = useFeatureGate("sharing");
+  const batchDownload = useFeatureGate("batch_download");
+
   if (selectedCount === 0) return null;
 
   const isAllSelected = selectedCount === totalCount && totalCount > 0;
 
   return (
+    <>
     <div
       className={cn(
         "fixed bottom-24 left-1/2 -translate-x-1/2 z-50",
@@ -59,11 +68,37 @@ export function ElementBulkBar({
           <Button
             variant="ghost"
             size="sm"
-            onClick={onShareSelected}
+            onClick={() => {
+              if (sharing.isLocked) {
+                sharing.openUpgrade();
+                return;
+              }
+              onShareSelected();
+            }}
             className="gap-1.5 h-8 px-3 text-xs"
           >
             <Share2 className="h-3.5 w-3.5" />
             Поделиться
+            {sharing.isLocked && <TierBadge tier={sharing.tier} className="ml-1" />}
+          </Button>
+        )}
+
+        {onDownloadSelected && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              if (batchDownload.isLocked) {
+                batchDownload.openUpgrade();
+                return;
+              }
+              onDownloadSelected();
+            }}
+            className="gap-1.5 h-8 px-3 text-xs"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Скачать
+            {batchDownload.isLocked && <TierBadge tier={batchDownload.tier} className="ml-1" />}
           </Button>
         )}
 
@@ -103,5 +138,16 @@ export function ElementBulkBar({
         <X className="h-4 w-4" />
       </Button>
     </div>
+    <UpgradeModal
+      open={sharing.upgradeOpen}
+      onOpenChange={sharing.setUpgradeOpen}
+      featureCode="sharing"
+    />
+    <UpgradeModal
+      open={batchDownload.upgradeOpen}
+      onOpenChange={batchDownload.setUpgradeOpen}
+      featureCode="batch_download"
+    />
+    </>
   );
 }

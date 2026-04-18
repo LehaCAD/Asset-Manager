@@ -80,4 +80,15 @@ export const sharingApi = {
     apiClient.get<{ elements: Array<{ id: number; element_type: string; is_favorite: boolean; source_type: string }> }>(
       `/api/sharing/group-elements/${sceneId}/`
     ).then(r => r.data.elements),
+
+  // Project feedback (aggregated reviews/comments across all links)
+  getProjectFeedback: (projectId: number) =>
+    apiClient.get(`/api/sharing/project-feedback/${projectId}/`).then(r => r.data),
+
+  // Global feedback (all links across all user's projects)
+  getAllFeedback: () =>
+    apiClient.get(`/api/sharing/all-feedback/`).then(r => r.data),
+
+  addLinkComment: (linkId: number, data: { text: string; parent_id?: number }) =>
+    apiClient.post(`/api/sharing/links/${linkId}/comments/`, data).then(r => r.data),
 }

@@ -1,0 +1,10 @@
+{% extends "admin/app_index.html" %}
+{% block content_title %}
+<div style="margin-bottom:16px">
+  <a href="/admin/feedback/inbox/"
+     style="display:inline-flex;align-items:center;gap:8px;padding:10px 24px;background:#2B5278;color:#fff;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">
+    &#128172; Открыть чат с клиентами
+  </a>
+</div>
+{{ block.super }}
+{% endblock %}

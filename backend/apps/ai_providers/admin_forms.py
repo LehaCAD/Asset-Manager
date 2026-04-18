@@ -165,15 +165,36 @@ class AIModelAdminForm(forms.ModelForm):
         if self.errors:
             return cleaned_data
 
+        family = self.cleaned_data.get('family')
+        variant_label = self.cleaned_data.get('variant_label')
+        is_default = self.cleaned_data.get('is_default_variant')
+
+        if family and not variant_label:
+            self.add_error('variant_label', 'Название варианта обязательно для модели в семействе.')
+        if not family and variant_label:
+            self.add_error('variant_label', 'Уберите название варианта для standalone модели.')
+        if family and is_default:
+            existing = AIModel.objects.filter(
+                family=family, is_default_variant=True
+            ).exclude(pk=self.instance.pk)
+            if existing.exists():
+                self.add_error('is_default_variant',
+                    f'В семействе уже есть вариант по умолчанию: {existing.first().name}')
+
         json_defaults = {
             'parameters_schema': [],
             'image_inputs_schema': [],
             'pricing_schema': {},
             'tags': [],
+            'request_schema': {},
+            'response_mapping': {},
         }
         for field_name, default in json_defaults.items():
             if cleaned_data.get(field_name) is None:
                 cleaned_data[field_name] = default
+
+        if cleaned_data.get('variant_sort_order') in (None, ''):
+            cleaned_data['variant_sort_order'] = 0
 
         instance = self.instance
         for field_name, value in cleaned_data.items():

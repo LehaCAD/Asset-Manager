@@ -17,10 +17,14 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from apps.elements.views_webhook import generation_callback_view
+from apps.elements.views_redirect import element_redirect
 from apps.common.views import health_check
+
+from apps.feedback.admin import inbox_view as feedback_inbox_view
 
 urlpatterns = [
     path('api/health/', health_check, name='health_check'),
+    path('admin/feedback/inbox/', admin.site.admin_view(feedback_inbox_view), name='feedback_inbox'),
     path('admin/', admin.site.urls),
     path('api/auth/', include('apps.users.urls')),
     path('api/projects/', include('apps.projects.urls')),
@@ -32,4 +36,11 @@ urlpatterns = [
     path('api/cabinet/', include('apps.cabinet.urls')),
     path('api/sharing/', include('apps.sharing.urls')),
     path('api/notifications/', include('apps.notifications.urls')),
+    path('api/subscriptions/', include('apps.subscriptions.urls')),
+    path('api/feedback/', include('apps.feedback.urls')),
+    path('api/onboarding/', include('apps.onboarding.urls')),
+    # Public redirect that hides raw S3 URLs behind a branded route.
+    # Matches /elements/<id>/ (file) and /elements/<id>/<variant>/ (thumb|preview).
+    path('elements/<int:element_id>/', element_redirect, name='element_redirect_file'),
+    path('elements/<int:element_id>/<str:variant>/', element_redirect, name='element_redirect_variant'),
 ]

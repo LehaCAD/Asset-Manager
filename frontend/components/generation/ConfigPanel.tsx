@@ -1,25 +1,34 @@
 "use client";
 
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useGenerationStore } from "@/lib/store/generation";
 import { useCreditsStore } from "@/lib/store/credits";
 import { ModelSelector } from "@/components/generation/ModelSelector";
 import { ParametersForm } from "@/components/generation/ParametersForm";
+import { VariantSwitcher } from "@/components/generation/VariantSwitcher";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { PanelLeftClose, PanelLeft, ChevronRight, AlertCircle } from "lucide-react";
-import { ChargeIcon } from "@/components/ui/charge-icon";
+import { KadrIcon } from "@/components/ui/kadr-icon";
+import { useOnboardingStore } from "@/lib/store/onboarding";
+import { useHintDismissal } from "@/lib/hooks/useHintDismissal";
+import { HintBubble } from "@/components/onboarding/HintBubble";
 
 interface ConfigPanelProps {
   className?: string;
+  /** Force the panel into expanded mode regardless of store state.
+   *  Used by the mobile top-sheet where collapsing to 48 px is meaningless. */
+  forceOpen?: boolean;
+  /** Hide the collapse-to-sidebar button (irrelevant on mobile). */
+  hideCollapseButton?: boolean;
 }
 
-export function ConfigPanel({ className }: ConfigPanelProps) {
+export function ConfigPanel({ className, forceOpen = false, hideCollapseButton = false }: ConfigPanelProps) {
   const {
     availableModels,
     selectedModel,
     parameters,
-    configPanelOpen,
+    configPanelOpen: storeConfigPanelOpen,
     modelSelectorOpen,
     loadModels,
     selectModel,
@@ -27,7 +36,10 @@ export function ConfigPanel({ className }: ConfigPanelProps) {
     toggleConfigPanel,
     openModelSelector,
     closeModelSelector,
+    familyVariants,
   } = useGenerationStore();
+
+  const configPanelOpen = forceOpen || storeConfigPanelOpen;
   
   const estimateCost = useCreditsStore((s) => s.estimateCost);
   const estimateError = useCreditsStore((s) => s.estimateError);
@@ -60,10 +72,39 @@ export function ConfigPanel({ className }: ConfigPanelProps) {
     (param) => param.visible !== false
   );
 
+  const variants = familyVariants();
+  const showVariantSwitcher = variants.length >= 2 && selectedModel?.family != null;
+
+  // Onboarding hint: show when first_generation task not done, panel is open, and not manually dismissed.
+  // Gate on `isLoaded` to avoid flashing the hint for old accounts while tasks hydrate.
+  const onboardingTasks = useOnboardingStore((s) => s.tasks);
+  const onboardingLoaded = useOnboardingStore((s) => s.isLoaded);
+  const firstGenDone = onboardingTasks.find((t) => t.code === "first_generation")?.completed;
+  const hintDismissal = useHintDismissal("config-panel");
+  const [hintClosing, setHintClosing] = useState(false);
+  const showConfigHint =
+    onboardingLoaded && !firstGenDone && configPanelOpen && hintDismissal.hydrated && !hintDismissal.dismissed;
+
+  const dismissHint = useCallback(() => {
+    if (hintClosing || hintDismissal.dismissed) return;
+    setHintClosing(true);
+    setTimeout(() => hintDismissal.dismiss(), 260);
+  }, [hintClosing, hintDismissal]);
+
+  // Clicking ANY interactive control inside the panel dismisses the hint
+  const handlePanelInteract = (e: React.MouseEvent) => {
+    if (!showConfigHint) return;
+    const target = e.target as HTMLElement;
+    if (target.closest("button, [role='button'], input, select, a")) {
+      dismissHint();
+    }
+  };
+
   return (
     <div
+      onClick={handlePanelInteract}
       className={cn(
-        "relative flex flex-col border-r bg-surface transition-all duration-200 h-full",
+        "relative z-[51] flex flex-col border-r bg-surface transition-all duration-200 h-full",
         configPanelOpen ? "w-72" : "w-12",
         className
       )}
@@ -74,15 +115,17 @@ export function ConfigPanel({ className }: ConfigPanelProps) {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <label className="text-sm font-medium">Модель</label>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleConfigPanel}
-                className="h-7 w-7"
-                title="Свернуть"
-              >
-                <PanelLeftClose className="h-4 w-4" />
-              </Button>
+              {!hideCollapseButton && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={toggleConfigPanel}
+                  className="h-7 w-7"
+                  title="Свернуть"
+                >
+                  <PanelLeftClose className="h-4 w-4" />
+                </Button>
+              )}
             </div>
             <button
               onClick={handleModelClick}
@@ -108,14 +151,23 @@ export function ConfigPanel({ className }: ConfigPanelProps) {
                   {selectedModel?.name ?? "Выберите модель"}
                 </p>
               </div>
-              <ChevronRight 
+              <ChevronRight
                 className={cn(
                   "h-4 w-4 text-muted-foreground shrink-0 transition-transform",
                   modelSelectorOpen && "rotate-90"
-                )} 
+                )}
               />
             </button>
           </div>
+
+          {showVariantSwitcher && selectedModel?.family && (
+            <VariantSwitcher
+              variants={variants}
+              currentId={selectedModel.id}
+              uiControl={selectedModel.family.variant_ui_control}
+              onSelect={selectModel}
+            />
+          )}
 
           {/* Parameters form */}
           {hasParameters && (
@@ -141,7 +193,7 @@ export function ConfigPanel({ className }: ConfigPanelProps) {
                       ? "text-destructive"
                       : "text-foreground"
                 )}>
-                  <ChargeIcon size="sm" />
+                  <KadrIcon size="sm" />
                   {isEstimateLoading ? (
                     <span className="w-5 h-3 rounded bg-muted animate-pulse inline-block" />
                   ) : estimateError && !estimateCost ? (
@@ -190,6 +242,26 @@ export function ConfigPanel({ className }: ConfigPanelProps) {
         selectedModelId={selectedModel?.id ?? null}
         onSelectModel={handleSelectModel}
       />
+
+      {/* Onboarding hint — desktop only; mobile has labelled «Выбрать модель» button which is self-explanatory */}
+      {showConfigHint && (
+        <HintBubble
+          arrow="left"
+          positionClassName="hidden md:block"
+          positionStyle={{
+            top: "calc(50% - 160px)",
+            left: "calc(100% + 14px)",
+          }}
+          width={280}
+          closing={hintClosing}
+          onDismiss={dismissHint}
+        >
+          <div className="font-semibold mb-0.5">Выберите модель</div>
+          <div className="text-white/85 text-[12.5px]">
+            Здесь настраивается модель генерации и её параметры.
+          </div>
+        </HintBubble>
+      )}
     </div>
   );
 }

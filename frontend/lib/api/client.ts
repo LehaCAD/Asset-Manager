@@ -1,5 +1,6 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
 import { API_BASE_URL } from "@/lib/utils/constants";
+import { logger } from "@/lib/utils/logger";
 
 export const DEFAULT_API_TIMEOUT_MS = 15_000;
 export const LONG_API_TIMEOUT_MS = 120_000;
@@ -11,6 +12,36 @@ export const apiClient = axios.create({
     "Content-Type": "application/json",
   },
 });
+
+/**
+ * Error subclass carrying correlation data from the backend response so UI
+ * layers can surface a copy-pastable `error_id` to the user.
+ */
+export class ApiError extends Error {
+  readonly status: number | undefined;
+  readonly errorId: string | undefined;
+  readonly requestId: string | undefined;
+  readonly url: string | undefined;
+  readonly payload: unknown;
+  constructor(
+    message: string,
+    init: {
+      status?: number;
+      errorId?: string;
+      requestId?: string;
+      url?: string;
+      payload?: unknown;
+    } = {},
+  ) {
+    super(message);
+    this.name = "ApiError";
+    this.status = init.status;
+    this.errorId = init.errorId;
+    this.requestId = init.requestId;
+    this.url = init.url;
+    this.payload = init.payload;
+  }
+}
 
 const PUBLIC_API_PATHS = ["/api/auth/register/", "/api/auth/login/", "/api/auth/token/refresh/"];
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
@@ -143,26 +174,70 @@ apiClient.interceptors.response.use(
 
 export function normalizeError(error: unknown): Error {
   if (axios.isAxiosError(error)) {
+    const response = error.response;
+    const status = response?.status;
+    const url = error.config?.url;
+    const data = response?.data as Record<string, unknown> | undefined;
+    const headerRaw = response?.headers?.["x-request-id"];
+    const requestId = typeof headerRaw === "string" ? headerRaw : undefined;
+    const errorId = typeof data?.error_id === "string" ? (data.error_id as string) : undefined;
+
     const timeoutLike =
       error.code === "ECONNABORTED" || error.message.toLowerCase().includes("timeout");
+    let message: string;
     if (timeoutLike) {
-      return new Error("Превышено время ожидания ответа сервера");
-    }
-    const data = error.response?.data as Record<string, unknown> | undefined;
-    if (data) {
-      // Plain string detail/message
-      if (typeof data.detail === "string") return new Error(data.detail);
-      if (typeof data.message === "string") return new Error(data.message);
-      // DRF field validation errors: { field: ["msg", ...] | "msg" }
-      const messages: string[] = [];
-      for (const val of Object.values(data)) {
-        if (typeof val === "string") messages.push(val);
-        else if (Array.isArray(val))
-          val.forEach((v) => typeof v === "string" && messages.push(v));
+      message = "Превышено время ожидания ответа сервера";
+    } else if (data) {
+      if (typeof data.error === "string") {
+        message = data.error as string;
+      } else if (typeof data.detail === "string") {
+        message = data.detail as string;
+      } else if (typeof data.message === "string") {
+        message = data.message as string;
+      } else {
+        const parts: string[] = [];
+        for (const [field, val] of Object.entries(data)) {
+          if (field === "error_id") continue;
+          if (typeof val === "string") parts.push(val);
+          else if (Array.isArray(val)) {
+            val.forEach((v) => typeof v === "string" && parts.push(v));
+          }
+        }
+        message = parts.length ? parts.join(" ") : error.message || "Произошла ошибка";
       }
-      if (messages.length) return new Error(messages.join(" "));
+    } else {
+      message = error.message || "Произошла ошибка";
     }
-    return new Error(error.message || "Произошла ошибка");
+
+    const apiError = new ApiError(message, {
+      status,
+      errorId,
+      requestId,
+      url,
+      payload: data,
+    });
+
+    // Log everything except auth redirects (handled explicitly by refresh flow)
+    // and explicit client aborts (navigation, React StrictMode double-invoke).
+    const aborted = error.code === "ERR_CANCELED" || error.name === "CanceledError";
+    if (status !== 401 && !timeoutLike && !aborted) {
+      logger.error(
+        "api_error",
+        {
+          url,
+          method: error.config?.method,
+          status,
+          code: error.code,
+          request_id: requestId,
+          error_id: errorId,
+        },
+        apiError,
+      );
+    } else if (timeoutLike) {
+      logger.warn("api_timeout", { url, method: error.config?.method });
+    }
+
+    return apiError;
   }
   if (error instanceof Error) return error;
   return new Error("Неизвестная ошибка");

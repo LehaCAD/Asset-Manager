@@ -51,20 +51,25 @@ services:
       - DB_PORT=5432
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_STORAGE_BUCKET_NAME=${AWS_STORAGE_BUCKET_NAME:-ai-production-asset-managemer}
-      - AWS_S3_REGION_NAME=ru-1
-      - AWS_S3_ENDPOINT_URL=https://s3.timeweb.com
+      - AWS_STORAGE_BUCKET_NAME=${AWS_STORAGE_BUCKET_NAME:-raskadrawka-clients}
+      - AWS_S3_REGION_NAME=${AWS_S3_REGION_NAME:-ru-1}
+      - AWS_S3_ENDPOINT_URL=${AWS_S3_ENDPOINT_URL:-https://s3.regru.cloud}
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - REDIS_HOST=redis
       - EMAIL_BACKEND=${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
-      - EMAIL_HOST=${EMAIL_HOST:-smtp.yandex.ru}
-      - EMAIL_PORT=${EMAIL_PORT:-587}
-      - EMAIL_USE_TLS=${EMAIL_USE_TLS:-True}
+      - EMAIL_HOST=${EMAIL_HOST:-mail.hosting.reg.ru}
+      - EMAIL_PORT=${EMAIL_PORT:-465}
+      - EMAIL_USE_SSL=${EMAIL_USE_SSL:-True}
+      - EMAIL_USE_TLS=${EMAIL_USE_TLS:-False}
       - EMAIL_HOST_USER=${EMAIL_HOST_USER:-}
       - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD:-}
+      - EMAIL_TIMEOUT=${EMAIL_TIMEOUT:-20}
       - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL:-}
+      - SERVER_EMAIL=${SERVER_EMAIL:-}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+      - LOG_FORMAT=${LOG_FORMAT:-text}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     depends_on:
       db:
         condition: service_healthy
@@ -93,20 +98,25 @@ services:
       - DB_PORT=5432
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_STORAGE_BUCKET_NAME=${AWS_STORAGE_BUCKET_NAME:-ai-production-asset-managemer}
-      - AWS_S3_REGION_NAME=ru-1
-      - AWS_S3_ENDPOINT_URL=https://s3.timeweb.com
+      - AWS_STORAGE_BUCKET_NAME=${AWS_STORAGE_BUCKET_NAME:-raskadrawka-clients}
+      - AWS_S3_REGION_NAME=${AWS_S3_REGION_NAME:-ru-1}
+      - AWS_S3_ENDPOINT_URL=${AWS_S3_ENDPOINT_URL:-https://s3.regru.cloud}
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - REDIS_HOST=redis
       - EMAIL_BACKEND=${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
-      - EMAIL_HOST=${EMAIL_HOST:-smtp.yandex.ru}
-      - EMAIL_PORT=${EMAIL_PORT:-587}
-      - EMAIL_USE_TLS=${EMAIL_USE_TLS:-True}
+      - EMAIL_HOST=${EMAIL_HOST:-mail.hosting.reg.ru}
+      - EMAIL_PORT=${EMAIL_PORT:-465}
+      - EMAIL_USE_SSL=${EMAIL_USE_SSL:-True}
+      - EMAIL_USE_TLS=${EMAIL_USE_TLS:-False}
       - EMAIL_HOST_USER=${EMAIL_HOST_USER:-}
       - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD:-}
+      - EMAIL_TIMEOUT=${EMAIL_TIMEOUT:-20}
       - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL:-}
+      - SERVER_EMAIL=${SERVER_EMAIL:-}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+      - LOG_FORMAT=${LOG_FORMAT:-text}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     depends_on:
       - backend
       - redis

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Loader2, Plus } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,20 +13,36 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useProjectsStore } from "@/lib/store/projects";
-import type { AspectRatio } from "@/lib/types";
 
 interface CreateProjectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
+function suggestName(existingCount: number): string {
+  if (existingCount === 0) return "Мой первый проект";
+  return `Проект ${existingCount + 1}`;
+}
+
 export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogProps) {
   const createProject = useProjectsStore((s) => s.createProject);
+  const projectsCount = useProjectsStore((s) => s.projects.length);
   const [name, setName] = useState("");
-  const [aspectRatio, setAspectRatio] = useState<AspectRatio>("16:9");
   const [isLoading, setIsLoading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Pre-fill default name on each open and select it for easy overwrite
+  useEffect(() => {
+    if (open) {
+      const suggested = suggestName(projectsCount);
+      setName(suggested);
+      // Focus + select after the dialog mounts
+      requestAnimationFrame(() => {
+        inputRef.current?.select();
+      });
+    }
+  }, [open, projectsCount]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -34,10 +50,9 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
 
     setIsLoading(true);
     try {
-      await createProject({ name: name.trim(), aspect_ratio: aspectRatio });
+      await createProject({ name: name.trim(), aspect_ratio: "16:9" });
       toast.success("Проект создан");
       setName("");
-      setAspectRatio("16:9");
       onOpenChange(false);
     } catch {
       toast.error("Не удалось создать проект");
@@ -48,45 +63,27 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Новый проект</DialogTitle>
+      <DialogContent className="sm:max-w-lg p-8">
+        <DialogHeader className="mb-2">
+          <DialogTitle className="text-xl">Новый проект</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="space-y-2">
-            <Label htmlFor="project-name">Название</Label>
+
+        <form onSubmit={handleSubmit} className="space-y-8 pt-4">
+          <div className="space-y-3">
+            <Label htmlFor="project-name" className="text-[13px] text-muted-foreground">
+              Название
+            </Label>
             <Input
+              ref={inputRef}
               id="project-name"
-              placeholder="Название проекта..."
               value={name}
               onChange={(e) => setName(e.target.value)}
-              autoFocus
               maxLength={120}
+              className="h-11 text-[15px]"
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>Соотношение сторон</Label>
-            <ToggleGroup
-              type="single"
-              value={aspectRatio}
-              onValueChange={(v) => v && setAspectRatio(v as AspectRatio)}
-              className="justify-start gap-2"
-            >
-              <ToggleGroupItem value="16:9" className="flex items-center gap-2 px-4 h-auto py-2.5">
-                <span className="inline-block w-7 h-4 border-2 border-current rounded-sm" />
-                <span className="text-sm">16:9</span>
-                <span className="text-xs text-muted-foreground hidden sm:block">Горизонтальный</span>
-              </ToggleGroupItem>
-              <ToggleGroupItem value="9:16" className="flex items-center gap-2 px-4 h-auto py-2.5">
-                <span className="inline-block w-4 h-7 border-2 border-current rounded-sm" />
-                <span className="text-sm">9:16</span>
-                <span className="text-xs text-muted-foreground hidden sm:block">Вертикальный</span>
-              </ToggleGroupItem>
-            </ToggleGroup>
-          </div>
-
-          <DialogFooter>
+          <DialogFooter className="gap-2 pt-2">
             <Button
               type="button"
               variant="ghost"
@@ -96,11 +93,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
               Отмена
             </Button>
             <Button type="submit" disabled={!name.trim() || isLoading}>
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <Plus className="h-4 w-4 mr-2" />
-              )}
+              {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Создать
             </Button>
           </DialogFooter>

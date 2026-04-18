@@ -40,6 +40,20 @@ Thumbs.db
 # Docker
 postgres_data/
 
+# Staging uploads (Celery обрабатывает локально, не коммитить)
+backend/tmp_uploads/
+
+# Временные моки/каталоги
+.tmp-mockup/
+
+# Claude auto-memory (генерируется хостом, локальный артефакт)
+memory/
+
+# Файлы с ключами и секретами — никогда в git
+docs/Ключи*
+docs/*secret*
+docs/*keys*
+
 # Local worktrees
 .worktrees/
 

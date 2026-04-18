@@ -16,6 +16,9 @@ app.config_from_object('django.conf:settings', namespace='CELERY')
 # Автоматическое обнаружение tasks.py в Django приложениях
 app.autodiscover_tasks()
 
+# Correlation-context signals for Celery (see docs/systems/observability.md)
+import apps.common.celery_signals  # noqa: E402,F401 — imported for side effects
+
 
 @app.task(bind=True, ignore_result=True)
 def debug_task(self):

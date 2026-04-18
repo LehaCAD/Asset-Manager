@@ -1,0 +1,27 @@
+"use client";
+
+import { cn } from "@/lib/utils";
+
+interface KadrIconProps {
+  size?: "xs" | "sm" | "md" | "lg" | "xl" | "auto";
+  className?: string;
+}
+
+const SIZES = {
+  xs: "h-2.5 w-2.5",
+  sm: "h-3 w-3",
+  md: "h-3.5 w-3.5",
+  lg: "h-4.5 w-4.5",
+  xl: "h-7 w-7",
+  auto: "h-[1em] w-[1em]",
+} as const;
+
+export function KadrIcon({ size = "sm", className }: KadrIconProps) {
+  return (
+    <img
+      src="/kadr-icon.svg"
+      alt="К"
+      className={cn(SIZES[size], "inline-block shrink-0", className)}
+    />
+  );
+}

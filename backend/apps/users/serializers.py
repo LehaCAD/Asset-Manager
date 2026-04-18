@@ -1,9 +1,36 @@
-from django.db import models
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
+from apps.subscriptions.models import Subscription
+from apps.subscriptions.services import SubscriptionService
+from apps.subscriptions.serializers import SubscriptionSerializer
 
 User = get_user_model()
+
+
+class UsernameOrEmailTokenSerializer(TokenObtainPairSerializer):
+    """Accept either username or email in the `username` field of /auth/login/.
+
+    If the input looks like an email and matches exactly one user by
+    case-insensitive email, that user's `username` is substituted before the
+    parent `validate` runs — keeping downstream logic (throttling, password
+    check, token issuance) untouched.
+
+    If multiple users share the same email (model-level uniqueness is NOT
+    enforced historically), we refuse to guess: fall through with the original
+    identifier, which will fail authentication. The user must log in by username.
+    """
+
+    def validate(self, attrs):
+        identifier = (attrs.get("username") or "").strip()
+        if "@" in identifier:
+            matches = list(User.objects.filter(email__iexact=identifier)[:2])
+            if len(matches) == 1:
+                attrs["username"] = matches[0].username
+            # len == 0 or len > 1 → leave identifier as-is; simplejwt will 401.
+        return super().validate(attrs)
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -25,9 +52,12 @@ class RegisterSerializer(serializers.ModelSerializer):
         fields = ('username', 'email', 'password', 'password_confirm', 'tos_accepted')
 
     def validate_email(self, value: str) -> str:
-        if User.objects.filter(email=value).exists():
+        # Case-insensitive to match the login-by-email path and prevent near-duplicates
+        # like "Alice@x.com" vs "alice@x.com" which would break `UsernameOrEmailTokenSerializer`.
+        normalized = (value or "").strip().lower()
+        if User.objects.filter(email__iexact=normalized).exists():
             raise serializers.ValidationError("Пользователь с таким email уже существует.")
-        return value
+        return normalized
 
     def validate_tos_accepted(self, value):
         if not value:
@@ -51,59 +81,25 @@ class UserSerializer(serializers.ModelSerializer):
     """Сериализатор данных пользователя."""
 
     quota = serializers.SerializerMethodField()
+    subscription = serializers.SerializerMethodField()
     is_email_verified = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'is_email_verified', 'quota', 'created_at', 'updated_at')
+        fields = ('id', 'username', 'email', 'is_email_verified', 'quota', 'subscription', 'created_at', 'updated_at')
         read_only_fields = ('id', 'created_at', 'updated_at')
-    
+
     def get_quota(self, obj: User) -> dict:
-        """Получение информации о квотах пользователя."""
-        from apps.projects.models import Project
-        from apps.scenes.models import Scene
-        from apps.elements.models import Element
-        from apps.users.models import UserQuota
-        
-        # Получаем квоты, создаем если не существует (защита от legacy users)
+        """Получение информации о квотах пользователя из тарифного плана."""
+        return SubscriptionService.get_limits(obj)
+
+    def get_subscription(self, obj: User) -> dict | None:
+        """Получение информации о подписке пользователя."""
         try:
-            user_quota = obj.quota
-        except UserQuota.DoesNotExist:
-            # Автоматически создаем квоту для legacy users
-            user_quota = UserQuota.objects.create(user=obj)
-        
-        # Подсчитываем использование (3 запроса вместо N+1)
-        used_projects = Project.objects.filter(user=obj).count()
-
-        max_scenes_used = (
-            Scene.objects.filter(project__user=obj)
-            .values('project')
-            .annotate(c=models.Count('id'))
-            .aggregate(m=models.Max('c'))['m']
-        ) or 0
-
-        max_elements_used = (
-            Element.objects.filter(project__user=obj, scene__isnull=False)
-            .values('scene')
-            .annotate(c=models.Count('id'))
-            .aggregate(m=models.Max('c'))['m']
-        ) or 0
-
-        storage_used = Element.objects.filter(
-            project__user=obj,
-            file_size__isnull=False,
-        ).aggregate(total=models.Sum('file_size'))['total'] or 0
-
-        return {
-            'max_projects': user_quota.max_projects,
-            'used_projects': used_projects,
-            'max_scenes_per_project': user_quota.max_scenes_per_project,
-            'max_scenes_used': max_scenes_used,
-            'max_elements_per_scene': user_quota.max_elements_per_scene,
-            'max_elements_used': max_elements_used,
-            'storage_limit_bytes': user_quota.storage_limit_bytes,
-            'storage_used_bytes': storage_used,
-        }
+            sub = obj.subscription
+            return SubscriptionSerializer(sub).data
+        except Subscription.DoesNotExist:
+            return None
 
 
 class ForgotPasswordSerializer(serializers.Serializer):

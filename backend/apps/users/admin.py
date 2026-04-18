@@ -7,7 +7,7 @@ from django.utils.html import format_html
 from apps.credits.models import CreditsTransaction
 from apps.credits.services import CreditsService
 
-from .models import User, UserQuota
+from .models import User
 
 
 class CreditsTransactionInline(admin.TabularInline):
@@ -112,11 +112,3 @@ class CustomUserAdmin(UserAdmin):
     @admin.action(description="Пополнить баланс на 1000 ₽")
     def topup_balance_1000(self, request, queryset):
         self._topup_users(request, queryset, Decimal("1000.00"), "topup_balance_1000")
-
-
-@admin.register(UserQuota)
-class UserQuotaAdmin(admin.ModelAdmin):
-    list_display = ("user", "max_projects", "max_scenes_per_project", "max_elements_per_scene", "created_at")
-    search_fields = ("user__username", "user__email")
-    list_filter = ("max_projects", "max_scenes_per_project", "max_elements_per_scene")
-    ordering = ("-created_at",)
