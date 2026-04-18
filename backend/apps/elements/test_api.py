@@ -154,9 +154,10 @@ class ElementAPITest(APITestCase):
         self.client.force_authenticate(user=self.user1)
         url = reverse('element-detail', kwargs={'pk': self.element1.pk})
         response = self.client.get(url)
-        
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['file_url'], 'https://example.com/1.jpg')
+        # file_url is now a branded redirect URL that hides raw S3.
+        self.assertTrue(response.data['file_url'].endswith(f'/elements/{self.element1.pk}/'))
         self.assertEqual(response.data['scene_name'], 'Сцена 1')
         self.assertEqual(response.data['ai_model_name'], 'Test Model')
     
