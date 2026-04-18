@@ -81,6 +81,15 @@ class NotificationWSManager {
               totalCount: onboardingData.total_count,
             });
           });
+        } else if (data.type === "credits_changed") {
+          const payload = data as { type: "credits_changed"; balance?: string };
+          void import("@/lib/store/credits").then(({ useCreditsStore }) => {
+            if (payload.balance) {
+              useCreditsStore.setState({ balance: payload.balance });
+            } else {
+              useCreditsStore.getState().loadBalance();
+            }
+          });
         } else if (data.type === "subscription_changed") {
           // Re-fetch user data to update subscription store
           void Promise.all([

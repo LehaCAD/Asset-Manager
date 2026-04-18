@@ -28,3 +28,11 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
 
     async def subscription_changed(self, event):
         await self.send_json(event)
+
+    async def credits_changed(self, event):
+        await self.send_json(event)
+
+    async def credits_balance_changed(self, event):
+        # Legacy event name kept for backward compatibility — re-emit as `credits_changed`
+        # so a single frontend handler covers both producers.
+        await self.send_json({**event, 'type': 'credits_changed'})
