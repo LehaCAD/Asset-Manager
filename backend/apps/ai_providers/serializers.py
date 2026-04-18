@@ -27,10 +27,14 @@ class AIModelSerializer(serializers.ModelSerializer):
     """
     provider_name = serializers.CharField(source='provider.name', read_only=True)
     parameters_schema = serializers.SerializerMethodField()
+    preview_url = serializers.SerializerMethodField()
     family = ModelFamilyBriefSerializer(read_only=True)
 
     def get_parameters_schema(self, obj):
         return obj.get_runtime_parameters_schema()
+
+    def get_preview_url(self, obj):
+        return obj.get_preview_url()
 
     class Meta:
         model = AIModel

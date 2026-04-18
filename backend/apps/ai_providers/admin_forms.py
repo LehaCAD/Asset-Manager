@@ -186,10 +186,15 @@ class AIModelAdminForm(forms.ModelForm):
             'image_inputs_schema': [],
             'pricing_schema': {},
             'tags': [],
+            'request_schema': {},
+            'response_mapping': {},
         }
         for field_name, default in json_defaults.items():
             if cleaned_data.get(field_name) is None:
                 cleaned_data[field_name] = default
+
+        if cleaned_data.get('variant_sort_order') in (None, ''):
+            cleaned_data['variant_sort_order'] = 0
 
         instance = self.instance
         for field_name, value in cleaned_data.items():

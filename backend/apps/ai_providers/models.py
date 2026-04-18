@@ -185,11 +185,18 @@ class AIModel(models.Model):
         verbose_name='Схема параметров',
         help_text='Описание параметров для UI в виде списка: [{"key": "aspect_ratio", "label": "Соотношение сторон", "type": "toggle_group", "options": [...], "default": "1:1"}]'
     )
+    preview_image = models.ImageField(
+        upload_to='system/model-previews/',
+        blank=True,
+        null=True,
+        verbose_name='Превью (файл)',
+        help_text='Загрузите изображение — оно сохранится в S3 и будет использоваться как превью. Имеет приоритет над URL превью.'
+    )
     preview_url = models.CharField(
         max_length=500,
         blank=True,
-        verbose_name='URL превью',
-        help_text='URL или путь к превью-картинке, например: /images/models/veo_3_1_fast.png или https://...'
+        verbose_name='URL превью (внешний)',
+        help_text='Используется, только если файл не загружен. Внешний URL, начинающийся с https://...'
     )
     description = models.TextField(
         blank=True,
@@ -219,6 +226,7 @@ class AIModel(models.Model):
     )
     variant_sort_order = models.PositiveIntegerField(
         default=0,
+        blank=True,
         verbose_name='Порядок варианта',
         help_text='Порядок в переключателе вариантов'
     )
@@ -271,6 +279,15 @@ class AIModel(models.Model):
         base = self.provider.base_url.rstrip('/')
         endpoint = self.api_endpoint.lstrip('/')
         return f'{base}/{endpoint}'
+
+    def get_preview_url(self) -> str:
+        """Эффективный URL превью: файл из S3, иначе внешний URL."""
+        if self.preview_image:
+            try:
+                return self.preview_image.url
+            except ValueError:
+                return ''
+        return self.preview_url or ''
 
     def get_parameters_schema_source(self) -> str:
         """

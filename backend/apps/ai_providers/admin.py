@@ -108,6 +108,7 @@ class AIModelAdmin(admin.ModelAdmin):
         'full_url_display',
         'compiled_parameters_preview',
         'compiled_pricing_preview',
+        'preview_image_thumb',
     )
     ordering = ('provider', 'name')
 
@@ -120,8 +121,11 @@ class AIModelAdmin(admin.ModelAdmin):
         (
             'Карточка модели',
             {
-                'fields': ('preview_url', 'tags', 'description'),
-                'description': 'Превью, теги-бейджи и описание для карточки в селекторе моделей.',
+                'fields': ('preview_image', 'preview_image_thumb', 'preview_url', 'tags', 'description'),
+                'description': (
+                    'Загрузите файл в поле «Превью (файл)» — он сохранится в S3 и будет показан в интерфейсе. '
+                    'Поле «URL превью (внешний)» используется как fallback, если файл не загружен.'
+                ),
             },
         ),
         (
@@ -184,6 +188,18 @@ class AIModelAdmin(admin.ModelAdmin):
         return format_html('<code style="background:#f0f0f0;padding:5px;display:block;">{}</code>', obj.get_full_url())
 
     full_url_display.short_description = 'Полный URL'
+
+    def preview_image_thumb(self, obj):
+        url = obj.get_preview_url() if obj and obj.pk else ''
+        if not url:
+            return '—'
+        return format_html(
+            '<img src="{}" alt="" style="max-width:160px;max-height:160px;border-radius:8px;'
+            'border:1px solid #ddd;background:#fafafa;object-fit:contain;" />',
+            url,
+        )
+
+    preview_image_thumb.short_description = 'Текущее превью'
 
     def compiled_parameters_preview(self, obj):
         return obj.get_runtime_parameters_schema()
