@@ -29,33 +29,29 @@ export function EmailVerificationBanner() {
   }
 
   return (
-    <div className="bg-surface border-b border-border px-3 sm:px-4 py-2">
+    <div className="bg-surface border-b border-border px-3 sm:px-4 py-1.5">
       <div className="flex items-center gap-2 sm:gap-3 max-w-7xl mx-auto">
-        <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0" />
-        <p className="flex-1 min-w-0 text-[12px] sm:text-sm text-muted-foreground leading-snug truncate sm:whitespace-normal">
-          <span className="hidden sm:inline">
-            Отправили письмо со ссылкой для подтверждения адреса. Подтвердите почту, чтобы получать рассылки о важных изменениях в вашем аккаунте.
-            {' '}Иногда Gmail помечает письма как спам. Если у вас так — нажмите «Письмо безопасно».
-          </span>
-          <span className="sm:hidden">Подтвердите почту — ссылка в письме.</span>
+        <AlertTriangle className="h-3.5 w-3.5 text-warning flex-shrink-0" />
+        <p className="flex-1 min-w-0 text-[12px] sm:text-[13px] text-muted-foreground leading-snug truncate">
+          Отправили письмо со ссылкой для подтверждения адреса. Подтвердите почту, чтобы получать рассылки о важных изменениях в вашем аккаунте. Иногда почта помечает письма как спам. Если у вас так — нажмите «Письмо безопасно».
         </p>
         {!resendDone ? (
           <button
             onClick={handleResend}
             disabled={resendLoading}
-            className="flex-shrink-0 rounded-md border border-primary bg-transparent px-2.5 sm:px-3 py-1.5 text-[11px] sm:text-sm font-medium text-primary hover:bg-primary/10 transition-colors disabled:opacity-50 cursor-pointer whitespace-nowrap"
+            className="flex-shrink-0 rounded-md border border-primary/70 bg-transparent px-2 h-6 text-[12px] font-medium text-primary hover:bg-primary/10 transition-colors disabled:opacity-50 cursor-pointer whitespace-nowrap"
           >
-            {resendLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Отправить'}
+            {resendLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Отправить'}
           </button>
         ) : (
-          <span className="flex-shrink-0 text-[12px] sm:text-sm text-muted-foreground">Отправлено</span>
+          <span className="flex-shrink-0 text-[12px] text-muted-foreground">Отправлено</span>
         )}
         <button
           onClick={() => setDismissed(true)}
           className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0 cursor-pointer"
           aria-label="Закрыть"
         >
-          <X className="h-4 w-4" />
+          <X className="h-3.5 w-3.5" />
         </button>
       </div>
     </div>

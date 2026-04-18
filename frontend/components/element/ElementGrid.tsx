@@ -439,7 +439,7 @@ export function ElementGrid({ className, onRequestDelete, groups = [], onGroupCl
             />
             {!collapsedSections.elements && (
               <SortableContext items={prefixedElementIds} strategy={rectSortingStrategy}>
-                <div className={cn("grid", elementMobileGridClass, gridConfig.gap)} style={gridStyle}>
+                <div className={cn("grid pt-2", elementMobileGridClass, gridConfig.gap)} style={gridStyle}>
                   {filteredElements.map((element, index) => (
                     <SortableElementCard
                       key={element.id}

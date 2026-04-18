@@ -22,27 +22,26 @@ export function OnboardingPopover({ children }: Props) {
       <PopoverContent
         align="end"
         sideOffset={8}
-        className="p-0 w-80 border-0 shadow-xl"
-        style={{ background: '#1C1C1E', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)' }}
+        className="p-0 w-80 bg-card border border-border rounded-xl shadow-xl"
       >
         {/* Header */}
-        <div className="p-4 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+        <div className="p-4 pb-3 border-b border-border">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold text-white">Достижения</h3>
+            <h3 className="text-sm font-semibold text-foreground">Достижения</h3>
             <div className="flex items-center gap-1">
-              <span className="text-xs font-medium" style={{ color: '#FFD700' }}>{Math.round(Number(totalEarned))}</span>
+              <span className="text-xs font-medium text-warning">{Math.round(Number(totalEarned))}</span>
               <KadrIcon size="sm" />
-              <span className="text-xs text-zinc-500">/ {Math.round(Number(totalPossible))}</span>
+              <span className="text-xs text-muted-foreground">/ {Math.round(Number(totalPossible))}</span>
             </div>
           </div>
           {/* Progress bar */}
-          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+          <div className="h-1.5 rounded-full overflow-hidden bg-muted">
             <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{ width: `${progressPercent}%`, background: 'linear-gradient(90deg, #8B7CF7, #6B5CE7)' }}
+              className="h-full rounded-full transition-all duration-500 bg-gradient-to-r from-primary to-[oklch(0.48_0.19_281)]"
+              style={{ width: `${progressPercent}%` }}
             />
           </div>
-          <p className="text-xs mt-1" style={{ color: '#888' }}>{completedCount} из {totalCount}</p>
+          <p className="text-xs mt-1 text-muted-foreground">{completedCount} из {totalCount}</p>
         </div>
 
         {/* Task list */}
@@ -60,8 +59,7 @@ export function OnboardingPopover({ children }: Props) {
         <div className="p-3 pt-0">
           <Link
             href="/cabinet/achievements"
-            className="block text-xs text-center py-2 rounded-lg transition-colors"
-            style={{ color: '#8B7CF7', background: 'rgba(139, 124, 247, 0.08)' }}
+            className="block text-xs text-center py-2 rounded-lg transition-colors text-primary bg-primary/10 hover:bg-primary/15"
           >
             Все достижения →
           </Link>

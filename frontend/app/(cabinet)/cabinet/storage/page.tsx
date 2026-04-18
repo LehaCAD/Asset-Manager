@@ -92,7 +92,7 @@ export default function StoragePage() {
           </div>
           <span className="text-2xl font-bold font-mono text-foreground">{usagePercent}%</span>
         </div>
-        <div className="h-3 rounded-full bg-border/40 dark:bg-muted/40 overflow-hidden">
+        <div className="h-3 rounded-full bg-muted overflow-hidden">
           <div
             className={`h-full rounded-full ${barColor} transition-all`}
             style={{ width: `${Math.max(Math.min(usagePercent, 100), totalUsed > 0 ? 1 : 0)}%` }}
@@ -128,7 +128,7 @@ export default function StoragePage() {
                     {formatStorage(p.storage_bytes)}
                   </span>
                 </div>
-                <div className="h-1.5 rounded-full bg-border/50 dark:bg-muted/50 overflow-hidden">
+                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                   <div
                     className="h-full rounded-full bg-primary transition-all"
                     style={{ width: `${Math.max(limitPercent, 0.5)}%` }}

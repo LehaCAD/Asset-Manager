@@ -41,7 +41,7 @@ export function PlanBadge({ planCode, isTrial, className }: PlanBadgeProps) {
       <span
         className={cn(
           BASE,
-          "bg-gradient-to-r from-amber-400 to-pink-500",
+          "bg-gradient-to-r from-teal-500 to-emerald-500",
           className,
         )}
       >

@@ -318,7 +318,7 @@ export function ChatMessageList({
 
             {showDatePill && (
               <div className="flex justify-center py-1.5">
-                <span className="bg-[#213040]/80 text-white/80 text-[11px] font-medium rounded-full px-3 py-0.5">
+                <span className="bg-muted text-muted-foreground text-[11px] font-medium rounded-full px-3 py-0.5">
                   {dateLabel}
                 </span>
               </div>

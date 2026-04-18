@@ -64,9 +64,12 @@ function radiusClasses(position: BubblePosition, isOwn: boolean): string {
 /* ── Component ─────────────────────────────────────────────── */
 
 export function MessageBubble({ message, isOwn, position }: MessageBubbleProps) {
-  // Color always based on is_admin, never isOwn
-  const bubbleColor = message.is_admin ? 'bg-[#2B5278]' : 'bg-[#182533]'
-  const timeColor = message.is_admin ? 'text-white/40' : 'text-muted-foreground'
+  // Color always based on is_admin, never isOwn.
+  // admin → brand-tinted (primary/15), user → neutral (muted).
+  const bubbleColor = message.is_admin
+    ? 'bg-primary/15 border border-primary/20'
+    : 'bg-muted border border-border/50'
+  const timeColor = 'text-muted-foreground'
 
   return (
     <div

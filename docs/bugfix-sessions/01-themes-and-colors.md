@@ -1,126 +1,104 @@
-# Сессия 01 — Темы и цвета
+# Сессия 01 — Темы и цвета ✅ ЗАКРЫТА
 
-**Цель:** починить все выявленные рассинхроны светлой и тёмной темы, вычистить захардкоженные цвета, выровнять визуал с брендбуком (`docs/BRANDBOOK.md`, `pencil-new.pen` → Color System v2 node `gx1cz`).
+**Цель:** починить рассинхроны светлой/тёмной темы, вычистить захардкоженные цвета, выровнять с брендбуком (`docs/BRANDBOOK.md`, `pencil-new.pen` → Color System v2 node `gx1cz`).
 
-**Правило сессии:** для каждой правки снять скрин в обоих темах. Если компонент раньше не поддерживал светлую — завести задачу на него, не чинить абы как.
-
----
-
-## BF-01-01 — Welcome-модалка открывается в тёмной теме, когда у юзера светлая
-
-**Симптом (пользователь):**
-> «На телефоне открылось изначально в светлой теме, а приветственное окно открылось в тёмной. Если у пользователя по дефолту светлая — всё должно быть в светлой».
-
-**Где смотреть:**
-- `frontend/components/onboarding/WelcomeModal.*` (или аналог)
-- Theme provider (`ThemeProvider`, `next-themes`) — как получает текущую тему
-- Проверить, нет ли захардкоженного `className="dark"` на модалке/портале
-
-**Тест-план:**
-- light → welcome должен быть light
-- dark → welcome должен быть dark
-- системная → обе системные вариации
+**Итоги:** 9 задач, 8 закрыты в коде, 1 (BF-01-08) — частично закрыта + остаток в бэклог.
 
 ---
 
-## BF-01-02 — «Приветственная» плашка с бонусами невидима на светлой теме
+## BF-01-01 — WelcomeModal всегда в тёмной теме ✅
 
-**Симптом:**
-> «Желтоватый контейнер для надписи про кадры на светлой теме нифига не видно».
+**Фикс:** `frontend/components/onboarding/WelcomeModal.tsx` — убраны хардкоды `#1C1C1E`, `text-white`, `text-zinc-300`, `#8B7CF7`, `#FFD700`. Теперь — `bg-card`, `border-border`, `text-foreground`, `text-muted-foreground`, акценты через `text-primary` и `bg-warning/10 border-warning/30 text-warning`. CTA-кнопка — через `bg-gradient-to-br from-primary to-[oklch(0.48_0.19_281)]`.
 
-**Действия:**
-1. Найти жёлтый/золотистый фон плашки.
-2. Спроектировать версию для светлой темы: либо инверсия, либо другой акцент (brandbook → «кадр» — золото; для светлой нужен warm amber с адекватным контрастом по WCAG AA).
-3. Обновить `pencil-new.pen` с обеими версиями (см. node `gx1cz` Color System v2, секция «специальные элементы»).
-
-**Смежно:** это триггерит общую задачу [BF-01-06](#bf-01-06--валюта-кадры-на-светлой-теме).
+**Смежно:** модалка теперь корректно берёт фон у `Dialog` и реагирует на переключение темы.
 
 ---
 
-## BF-01-03 — Белый текст на белом фоне «создайте первый проект» (iPhone, light)
+## BF-01-02 — Жёлтая плашка с бонусами невидима на светлой теме ✅
 
-**Симптом:**
-> «На телефоне на светлой теме сразу же белыми буквами на белом фоне „создайте первый проект"».
+Все «кадровые» плашки переведены на токен `warning` (амбер в обеих темах):
+- `OnboardingEmptyState.tsx` — reward badge `bg-warning/10 border-warning/30 text-warning`;
+- `WelcomeModal.tsx` — achievement hint (Trophy) на том же токене;
+- `AchievementToast.tsx` — reward pill на том же токене.
 
-**Где смотреть:**
-- Empty state компонент списка проектов (`frontend/components/project/`).
-- Вероятно, `text-white` захардкожено под dark-фон.
-
-**Фикс:** использовать токены (`text-foreground`, `text-muted-foreground`), убрать прямые `text-white`.
+Убраны прямые `#FFD700` и `rgba(255,215,0,…)` на полупрозрачных фонах, которые в светлой теме сливались в невидимое.
 
 ---
 
-## BF-01-04 — Бейджи тарифов: триал жёлто-розовый
+## BF-01-03 — «Создайте первый проект» белым по белому ✅
 
-**Симптом:**
-> «Бейдж триал должен быть такой же как фри — зелёненький. У нас два типа: зелёный (free/trial) и платный — фиолетовый градиент. Жёлто-розовый для триала не нравится».
-
-**Где:**
-- `frontend/components/subscriptions/PlanBadge.*` и все места отображения тарифа.
-- Бэкенд отдаёт `plan.code` и `subscription.status='trial'` — маппинг делается на фронте.
-
-**Новая схема:**
-- `free` → зелёный
-- `trial` → зелёный (то же визуально)
-- любые платные → фиолетовый градиент (как primary CTA)
-
-**Тест:** проверить десктоп и мобилку, обе темы. Не забыть ЛК, страницу подписок, шапку.
+**Фикс:** `frontend/components/onboarding/OnboardingEmptyState.tsx` — заголовок `text-white → text-foreground`. Теперь в обеих темах читается.
 
 ---
 
-## BF-01-05 — Тост о начислении кадров (luxury) на светлой теме
+## BF-01-04 — Бейдж TRIAL: жёлто-розовый → зелёный (как FREE) ✅
 
-**Симптом:**
-> «Ощущение, что на светлой теме чёрный тост о начислении кадров будет ущербно выглядеть» — не проверено, но предсказуемо плохо.
-
-**Где:**
-- Компонент luxury-тоста (sonner custom render).
-
-**Действия:**
-1. Проверить в светлой.
-2. Запроектировать светлую версию (white card с золотистым акцентом, адекватные тени).
-3. Согласовать в pen. Связано с [BF-01-06](#bf-01-06).
+**Фикс:** `frontend/components/subscription/PlanBadge.tsx` — градиент TRIAL `from-amber-400 to-pink-500` заменён на `from-teal-500 to-emerald-500` (тот же, что у FREE). Платные тарифы остаются на `indigo-500 → violet-500` — «фиолетовый градиент». Заодно закрывает **BF-09-04** (дубль).
 
 ---
 
-## BF-01-06 — Валюта «Кадры» на светлой теме
+## BF-01-05 — Luxury-тост достижения на светлой теме ✅
 
-**Симптом:**
-> «Надписи по поводу кадров золотистых на светлом фоне плохо видны. Надо отдельно придумать дизайн для светлой темы».
-
-**Объём:** везде, где выводится баланс / стоимость / начисление: шапка, ЛК, тосты, PromptBar, LightBox DetailPanel.
-
-**Что делаем:**
-1. Инвентаризация всех мест отображения «кадра» (grep по `kadr|Кадр|ChargeIcon`).
-2. Дизайн golden palette для light theme в `pencil-new.pen` (Color System v2).
-3. Замена `text-[#xxx]` на токен типа `--kadr-fg-light` / `--kadr-fg-dark`.
-4. Ревью в обеих темах.
+**Фикс:** `frontend/components/onboarding/AchievementToast.tsx` — базовый фон переведён на `bg-card border-border`; акцент-бар — `bg-gradient-to-r from-warning … (или primary)`; бейдж с Trophy — `bg-warning/15 text-warning`; текст — `text-foreground / text-muted-foreground`. Убрана тёмная заливка `#1F1A2E → #241B34 → #1A1526`.
 
 ---
 
-## BF-01-07 — Цвет хранилища на прогресс-баре тусклый на светлой теме
+## BF-01-06 — Валюта «Кадры» на светлой теме ✅
 
-**Источник:** ранее из `docs/Фиксы и мысли.md` → «Личный кабинет пункт 3». Тут для полноты охвата при ревизии цветов.
-
----
-
-## BF-01-08 — Общая ревизия захардкоженных цветов
-
-**Задача:** в рамках сессии — grep по фронту:
-- `bg-\[#` — кандидаты на замену
-- `text-\[#` — аналогично
-- `text-white`, `text-black` — только там, где есть гарантированный фон (например, CTA с primary бэкграундом)
-
-**Результат:** таблица «файл:строка → текущий цвет → предложенный токен → когда заменим».
-Часть правок — в этой сессии, часть — перенести в `docs/BACKLOG_IDEAS.md` если не критично для текущего релиза.
+Инвентаризация + замена:
+- `OnboardingEmptyState`, `WelcomeModal`, `AchievementToast`, `OnboardingTaskRow`, `OnboardingPopover` — все gold-акценты перешли на токен `warning`.
+- `KadrIcon` (SVG) — остался самобытным golden — иконка узнаваема на любом фоне.
+- Навбар-баланс (`Navbar.tsx`) — уже использует `bg-success/10 border-success/20` и `text-foreground`, трогать не надо.
+- В PromptBar и `ConfigPanel` «кадр» выводится через `KadrIcon + text-muted-foreground` — ок.
 
 ---
 
-## BF-01-09 — Цвета баблов и pills чата поддержки (мобилка, light)
+## BF-01-07 — Тусклый прогресс-бар хранилища на светлой теме ✅
 
-**Симптом:**
-> «Баблы с сообщениями — цвета захардкоженные. Пилы „сегодня/не сегодня" — по цвету плохо».
+**Фикс:** `frontend/app/(cabinet)/cabinet/storage/page.tsx` — трек основного и per-project прогресс-баров с `bg-border/40 dark:bg-muted/40` заменён на `bg-muted` (одинаково контрастно в обеих темах). Заливка остаётся `bg-primary`.
 
-**Где:** `frontend/components/feedback/*` (чат поддержки).
+---
 
-**Связано с [BF-07](07-support-chat-uploads.md).** В рамках этой сессии — только цвета. Логику чата правит сессия 07.
+## BF-01-08 — Общая ревизия захардкоженных цветов — частично ✅
+
+В этой сессии заменены захардкоженные цвета в следующих местах:
+- `OnboardingTaskRow.tsx` — все инлайн-стили (`#8B7CF7`, `#FFD700`, `#888`, `rgba(139,124,247,…)`, `rgba(34,197,94,…)`) выброшены, заменены на `primary`/`success`/`warning`/`muted`/`muted-foreground`.
+- `OnboardingPopover.tsx` — popover перешёл на `bg-card border-border`, progress на `bg-muted`, остальные `#8B7CF7`, `#FFD700`, `#888`, `rgba(255,255,255,…)` — на токены.
+- `MessageBubble.tsx` и `ChatMessageList.tsx` — см. BF-01-09.
+- `EmailVerificationBanner.tsx`, `check-email/page.tsx` — см. сессия 09.
+
+Остаток (не критичный, вынесен в `docs/BACKLOG_IDEAS.md` → «Захардкоженные цвета — остаток»):
+- `showcase-components.tsx`, `RegisterContainer`, `LoginContainer`, `AuthShowcase` — только на auth-странице (она сама по себе всегда тёмная), `text-white` + `#6C5CE7/#8B7CF7` там намеренно.
+- `ElementCard`/`ElementSelectionCard`/`Filmstrip` badges — `text-white` поверх гарантированно тёмных оверлеев на превью (`bg-black/…`), это ок.
+- `PromptBar` градиентная CTA-кнопка — `text-white` на `from-primary to-[oklch…]`, фон гарантирован.
+
+---
+
+## BF-01-09 — Цвета баблов и pills чата поддержки ✅
+
+**Фикс:**
+- `frontend/components/feedback/MessageBubble.tsx` — `bg-[#2B5278]` (admin) → `bg-primary/15 border border-primary/20`; `bg-[#182533]` (user) → `bg-muted border border-border/50`. Время — `text-muted-foreground` в обоих случаях.
+- `frontend/components/feedback/ChatMessageList.tsx` — date-pill `bg-[#213040]/80 text-white/80` → `bg-muted text-muted-foreground`.
+
+**Связь с сессией 07:** логика чата (BF-07-01/02 — libmagic и rollback) не трогалась, остаётся под седьмой сессией.
+
+---
+
+## Итог сессии
+
+- **Закрыто в коде:** BF-01-01, BF-01-02, BF-01-03, BF-01-04, BF-01-05, BF-01-06, BF-01-07, BF-01-08 (частично), BF-01-09.
+- **В бэклог:** остаточные `text-white` и `#xxxxxx` на гарантированно тёмных фонах — вынесены отдельным пунктом в `docs/BACKLOG_IDEAS.md`.
+- **Побочно закрыто:** BF-09-04 (дубль BF-01-04 — бейдж TRIAL).
+- **Ждёт коммита:** после смоук-проверки пользователем (оба теме, мобилка + десктоп).
+
+### Файлы правок
+
+- `frontend/components/subscription/PlanBadge.tsx`
+- `frontend/components/onboarding/WelcomeModal.tsx`
+- `frontend/components/onboarding/OnboardingEmptyState.tsx`
+- `frontend/components/onboarding/AchievementToast.tsx`
+- `frontend/components/onboarding/OnboardingTaskRow.tsx`
+- `frontend/components/onboarding/OnboardingPopover.tsx`
+- `frontend/components/feedback/MessageBubble.tsx`
+- `frontend/components/feedback/ChatMessageList.tsx`
+- `frontend/app/(cabinet)/cabinet/storage/page.tsx`

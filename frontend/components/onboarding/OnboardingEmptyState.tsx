@@ -128,20 +128,13 @@ export function OnboardingEmptyState({ task, onAction }: Props) {
       </div>
 
       {/* Title */}
-      <h2 className="text-[26px] font-semibold text-white mb-4 tracking-tight">
+      <h2 className="text-[26px] font-semibold text-foreground mb-4 tracking-tight">
         {es.title}
       </h2>
 
       {/* Reward badge — hidden when task is already completed */}
       {reward > 0 && !task.completed && (
-        <div
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[13px] font-medium"
-          style={{
-            background: "rgba(255, 215, 0, 0.1)",
-            border: "1px solid rgba(255, 215, 0, 0.2)",
-            color: "#FFD700",
-          }}
-        >
+        <div className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[13px] font-medium bg-warning/10 border border-warning/30 text-warning">
           <KadrIcon size="xs" />
           <span>+{reward} кадров за выполнение</span>
         </div>
