@@ -35,3 +35,22 @@
 
 ### Frontend pipeline
 Сначала отрисовать в pen → согласовать → перенос в код → ревью. Связать с UX-анализом. Добавление фичи = комплексная работа под ключ.
+
+### Захардкоженные цвета — остаток (из BF-01-08)
+
+Оставшиеся `text-white` / `#xxxxxx` живут на гарантированно тёмных фонах и не ломают темы. Пройтись при следующем визуальном ревью:
+- `components/auth/*` (AuthShowcase, LoginContainer, RegisterContainer, showcase-components) — auth-страницы сами по себе всегда тёмные. Перевести на токены при смене layout-политики.
+- `components/element/ElementCard.tsx`, `ElementSelectionCard.tsx`, `Filmstrip.tsx` — `text-white` поверх `bg-black/…` оверлеев на превью.
+- `components/generation/PromptBar.tsx`, `components/generation/ConfigPanel.tsx` — `text-white` на primary-градиенте; ок, но можно унифицировать с помощью `text-primary-foreground`.
+- `components/lightbox/LightboxModal.tsx` — controls поверх полноэкранного тёмного шторки.
+- `components/sharing/ReviewsOverlay.tsx`, `components/sharing/CommentThread.tsx` — автор-инициалы в цветных кружках.
+
+### Feedback: WS-event `attachment_rejected` + optimistic attachment UI (из BF-07-02)
+
+Сейчас при отклонении вложения на бэке (libmagic MIME не в whitelist) файл молча удаляется из `feedback/tmp/`, а юзеру ничего не приходит — визуально «вложение отправлено», по факту нет. Нужен:
+- бэк: новый WS-event `attachment_rejected` из `process_feedback_attachment` при rejected-MIME;
+- фронт: оптимистичная карточка вложения в `messages.attachments` с состояниями `uploading` / `failed` / `rejected` + кнопка «повторить»;
+- UI в `AttachmentPreview`: обработка новых состояний, иконка ошибки, retry handler.
+
+Разрозненно трогает: `backend/apps/feedback/tasks.py`, `services.py`, `consumers.py`, `frontend/lib/store/feedback.ts`, `frontend/components/feedback/AttachmentPreview.tsx`, `FeedbackChat.tsx`.
+

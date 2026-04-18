@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { toast } from 'sonner'
 import { useFeedbackStore } from '@/lib/store/feedback'
 import { ChatMessageList } from './ChatMessageList'
 import { ChatInput } from './ChatInput'
@@ -44,9 +45,25 @@ export function FeedbackChat() {
 
   const handleSend = async (text: string, files?: File[]) => {
     const msg = await sendMessage(text || '')
-    if (files?.length && msg) {
+    if (!msg) {
+      if (text || files?.length) toast.error('Не удалось отправить сообщение')
+      return
+    }
+    if (files?.length) {
+      const failed: string[] = []
       for (const file of files) {
-        try { await uploadAttachment(msg.id, file) } catch { /* toast shown by ChatInput */ }
+        try {
+          await uploadAttachment(msg.id, file)
+        } catch {
+          failed.push(file.name)
+        }
+      }
+      if (failed.length) {
+        toast.error(
+          failed.length === 1
+            ? `Не удалось отправить вложение: ${failed[0]}`
+            : `Не отправлено вложений: ${failed.length}`,
+        )
       }
     }
   }

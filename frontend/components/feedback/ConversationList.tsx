@@ -95,7 +95,7 @@ export function ConversationList() {
             className={cn(
               'w-full text-left px-3 py-2.5 border-b border-border/50 transition-colors',
               activeConversation?.id === conv.id
-                ? 'bg-[#14213D] border-l-2 border-l-primary/50'
+                ? 'bg-primary/10 border-l-2 border-l-primary/50'
                 : 'border-l-2 border-l-transparent hover:bg-muted/30',
             )}
           >
