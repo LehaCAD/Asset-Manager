@@ -12,6 +12,7 @@ import { ReviewerNameInput } from './ReviewerNameInput'
 import { sharingApi } from '@/lib/api/sharing'
 import { cn } from '@/lib/utils'
 import type { PublicElement, Comment } from '@/lib/types'
+import { getDownloadFilename } from '@/lib/utils/download-filename'
 
 /** Aggregate review status (worst-wins): rejected > changes_requested > approved */
 function getReviewStatus(reviews?: { action: string }[]): string | null {
@@ -186,8 +187,7 @@ export function ReviewerLightbox({
   const comments = commentsMap[current.id] || []
   const hasIdentity = !!reviewerName && !!sessionId
   const hasFileUrl = !!current.file_url?.trim()
-  const ext = current.file_url?.split('/').pop()?.split('?')[0]?.split('.').pop() ?? 'file'
-  const fileName = `element-${current.id}.${ext}`
+  const fileName = getDownloadFilename(current)
 
   return (
     <div

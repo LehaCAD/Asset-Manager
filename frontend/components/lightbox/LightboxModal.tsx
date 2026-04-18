@@ -25,6 +25,7 @@ import {
 import type { Element, ElementFilter } from "@/lib/types";
 import { BADGE_MD } from "@/lib/utils/constants";
 import { useOnboardingStore } from "@/lib/store/onboarding";
+import { getDownloadFilename } from "@/lib/utils/download-filename";
 
 // URL helpers for display hierarchy
 function getPreviewUrl(element: Element): string {
@@ -543,8 +544,7 @@ export function LightboxModal({
                   onClick={async () => {
                     useOnboardingStore.getState().completeTask('download_original');
                     const fileUrl = currentElement.file_url;
-                    const ext = fileUrl.split("/").pop()?.split("?")[0]?.split(".").pop() ?? "file";
-                    const fileName = `element-${currentElement.id}.${ext}`;
+                    const fileName = getDownloadFilename(currentElement);
 
                     const downloadBlob = (blob: Blob) => {
                       const blobUrl = URL.createObjectURL(blob);

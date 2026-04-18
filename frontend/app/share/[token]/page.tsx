@@ -29,6 +29,7 @@ import { ThemeToggle } from '@/components/layout/ThemeToggle'
 import { useDisplayStore } from '@/lib/store/project-display'
 import { ASPECT_RATIO_CLASSES, FIT_MODE_CLASSES, DISPLAY_GRID_CONFIG, CARD_SIZES, WS_BASE_URL } from '@/lib/utils/constants'
 import type { PublicProject, PublicElement, Comment, DisplayCardSize, DisplayAspectRatio, DisplayFitMode } from '@/lib/types'
+import { getDownloadFilename } from '@/lib/utils/download-filename'
 
 /** Aggregate review status (worst-wins): rejected > changes_requested > approved */
 function getReviewStatus(reviews?: { action: string }[]): string | null {
@@ -162,7 +163,7 @@ function ElementCard({
         {/* Hover: download + original — top-right */}
         <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-10">
           <button
-            onClick={(e) => { e.stopPropagation(); handleDownload(element.file_url, `element-${element.id}`) }}
+            onClick={(e) => { e.stopPropagation(); handleDownload(element.file_url, getDownloadFilename(element)) }}
             className="w-7 h-7 rounded-full bg-overlay-button hover:bg-overlay-button-hover flex items-center justify-center"
             aria-label="Скачать"
           >
