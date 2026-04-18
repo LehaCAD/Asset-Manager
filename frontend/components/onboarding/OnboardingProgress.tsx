@@ -29,7 +29,7 @@ export function OnboardingProgress() {
               <circle
                 cx="16" cy="16" r="13"
                 fill="none"
-                stroke="rgba(255,255,255,0.1)"
+                className="stroke-muted-foreground/20"
                 strokeWidth="2.5"
               />
               {/* Progress arc */}
@@ -45,7 +45,7 @@ export function OnboardingProgress() {
                 style={{ transition: 'stroke-dashoffset 0.5s ease' }}
               />
             </svg>
-            <span className="text-[10px] font-bold text-white z-10">{completedCount}</span>
+            <span className="text-[10px] font-bold text-foreground z-10">{completedCount}</span>
           </>
         )}
       </button>
