@@ -145,11 +145,11 @@ export default function RegisterPage() {
 
   return (
     <div
-      className="flex flex-1 flex-col justify-center py-10"
+      className="flex flex-1 flex-col justify-center py-6"
       style={{ paddingLeft: "clamp(24px, 5vw, 64px)", paddingRight: "clamp(24px, 5vw, 64px)" }}
     >
       {/* Logo */}
-      <div className="mb-10 flex items-center gap-3.5">
+      <div className="mb-6 flex items-center gap-3.5">
         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
           <Clapperboard className="h-6 w-6 text-white" />
         </div>
@@ -175,8 +175,8 @@ export default function RegisterPage() {
       </div>
 
       {/* Title */}
-      <div className="mb-8">
-        <h1 className="text-[34px] font-extrabold leading-tight tracking-tight text-white">
+      <div className="mb-5">
+        <h1 className="text-[30px] font-extrabold leading-tight tracking-tight text-white">
           Начните создавать
         </h1>
       </div>
@@ -189,7 +189,7 @@ export default function RegisterPage() {
       )}
 
       {/* Form */}
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-4">
         {/* Логин */}
         <div>
           <label
@@ -206,10 +206,15 @@ export default function RegisterPage() {
             value={username}
             onChange={(e) => onFieldChange("username", e.target.value.toLowerCase())}
             disabled={isLoading}
-            placeholder="латиница, цифры, «_»"
             className={`h-[50px] w-full rounded-xl border ${errors.username ? borderError : borderNormal} bg-[#13131D] px-4 text-[15px] text-white outline-none transition-colors placeholder:text-[#4A4A6A] focus:border-primary/60 disabled:opacity-50`}
           />
-          <FieldError message={errors.username} />
+          {errors.username ? (
+            <FieldError message={errors.username} />
+          ) : (
+            <p className="mt-1.5 text-[11px] leading-snug text-[#6B7280]">
+              Латиница, цифры и «_»
+            </p>
+          )}
         </div>
 
         {/* Email */}
@@ -355,7 +360,7 @@ export default function RegisterPage() {
       </form>
 
       {/* Login link */}
-      <p className="mt-8 text-[14px] text-[#6B7280]">
+      <p className="mt-5 text-[14px] text-[#6B7280]">
         Уже есть аккаунт?{" "}
         <Link
           href="/login"

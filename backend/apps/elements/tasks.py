@@ -423,7 +423,7 @@ def process_uploaded_file(self, element_id: int, staging_path: str) -> dict:
         # Onboarding: mark first upload
         try:
             from apps.onboarding.services import OnboardingService
-            OnboardingService().try_complete(element.scene.project.user, 'element.upload_success')
+            OnboardingService().try_complete(element.project.user, 'element.upload_success')
         except Exception:
             logger.exception(
                 "onboarding trigger failed for element.upload_success",

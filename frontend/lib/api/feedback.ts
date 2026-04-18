@@ -8,10 +8,10 @@ import type {
 
 export const feedbackApi = {
   // User
-  getConversation: async () => {
+  getConversation: async (): Promise<FeedbackConversation | null> => {
     try {
-      const { data } = await apiClient.get<FeedbackConversation>('/api/feedback/conversation/')
-      return data
+      const { data } = await apiClient.get<FeedbackConversation | null>('/api/feedback/conversation/')
+      return data ?? null
     } catch (error) {
       throw normalizeError(error)
     }

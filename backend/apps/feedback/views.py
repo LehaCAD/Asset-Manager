@@ -49,7 +49,7 @@ def conversation_view(request):
         if not conv:
             conv = Conversation.objects.filter(user=request.user).order_by('-updated_at').first()
         if not conv:
-            return Response(status=status.HTTP_404_NOT_FOUND)
+            return Response(None, status=status.HTTP_200_OK)
         return Response(ConversationSerializer(conv).data)
 
     # POST — create new conversation (only if no open one exists)

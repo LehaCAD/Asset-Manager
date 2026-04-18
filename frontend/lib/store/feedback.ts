@@ -38,6 +38,10 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => {
     loadConversation: async () => {
       try {
         const conv = await feedbackApi.getConversation()
+        if (!conv) {
+          set({ conversation: null, hasUnreadReply: false })
+          return
+        }
         set({ conversation: conv, hasUnreadReply: conv.unread_count > 0 })
       } catch {
         set({ conversation: null })
@@ -202,7 +206,7 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => {
     checkUnread: async () => {
       try {
         const conv = await feedbackApi.getConversation()
-        set({ hasUnreadReply: conv.unread_count > 0 })
+        set({ hasUnreadReply: !!conv && conv.unread_count > 0 })
       } catch {
         // no conversation yet
       }

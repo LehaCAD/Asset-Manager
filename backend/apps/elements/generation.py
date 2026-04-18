@@ -215,8 +215,8 @@ def finalize_generation_success(element_id: int, source_url: str) -> tuple[bool,
     # Onboarding: mark first generation
     try:
         from apps.onboarding.services import OnboardingService
-        el = Element.objects.select_related('scene__project__user').get(id=element_id)
-        OnboardingService().try_complete(el.scene.project.user, 'element.generation_success')
+        el = Element.objects.select_related('project__user').get(id=element_id)
+        OnboardingService().try_complete(el.project.user, 'element.generation_success')
     except Exception:
         logger.exception(
             "onboarding trigger failed for element.generation_success",
