@@ -64,7 +64,7 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => {
     sendMessage: async (text) => {
       try {
         const prevConvId = get().conversation?.id
-        const wasClosed = get().conversation && !get().conversation.can_reply
+        const wasClosed = get().conversation && !get().conversation?.can_reply
 
         // sendMessage POST — backend auto-creates new conversation if needed
         const msg = await feedbackApi.sendMessage(text)

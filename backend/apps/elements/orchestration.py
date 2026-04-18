@@ -41,7 +41,7 @@ def create_generation(project, scene, prompt, ai_model_id, generation_config, us
     # Storage limit check
     from apps.subscriptions.services import SubscriptionService
     if not SubscriptionService.check_storage(user):
-        raise ValueError('Хранилище заполнено. Перейдите на другой тариф для увеличения.')
+        return {'error': 'Хранилище заполнено. Перейдите на более высокий тариф для увеличения объёма.'}, http_status.HTTP_403_FORBIDDEN
 
     element_type = ai_model.model_type
 
@@ -151,7 +151,7 @@ def create_upload(project, scene, file, prompt_text='', is_favorite=False, ai_mo
     # Storage limit check (user derived from project)
     from apps.subscriptions.services import SubscriptionService
     if not SubscriptionService.check_storage(project.user):
-        raise ValueError('Хранилище заполнено. Перейдите на другой тариф для увеличения.')
+        return {'error': 'Хранилище заполнено. Перейдите на более высокий тариф для увеличения объёма.'}, http_status.HTTP_403_FORBIDDEN
 
     if not validate_file_type(file.name):
         return (

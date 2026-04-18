@@ -38,7 +38,7 @@ export function SelectDropdown({
         <button
           className={cn(
             "inline-flex items-center justify-between gap-2 h-8 px-3 rounded-lg border border-border text-xs font-medium transition-colors",
-            "bg-muted/60 text-foreground hover:bg-muted min-w-[120px]",
+            "bg-muted/60 text-foreground hover:bg-muted w-full sm:w-auto sm:min-w-[120px]",
             !value && "text-muted-foreground",
             className
           )}

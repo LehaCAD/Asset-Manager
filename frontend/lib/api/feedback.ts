@@ -34,6 +34,16 @@ export const feedbackApi = {
       throw normalizeError(error)
     }
   },
+  getAllMessages: async (cursor?: number) => {
+    try {
+      const { data } = await apiClient.get<FeedbackMessage[]>('/api/feedback/all-messages/', {
+        params: cursor ? { cursor } : undefined,
+      })
+      return data
+    } catch (error) {
+      throw normalizeError(error)
+    }
+  },
   sendMessage: async (text: string) => {
     try {
       const { data } = await apiClient.post<FeedbackMessage>('/api/feedback/messages/', { text })
@@ -59,6 +69,14 @@ export const feedbackApi = {
         `/api/feedback/messages/${messageId}/confirm-attach/`,
         { file_key: fileKey, file_name: fileName, file_size: fileSize, content_type: contentType },
       )
+      return data
+    } catch (error) {
+      throw normalizeError(error)
+    }
+  },
+  getConversationHistory: async () => {
+    try {
+      const { data } = await apiClient.get<FeedbackConversation[]>('/api/feedback/conversations/')
       return data
     } catch (error) {
       throw normalizeError(error)

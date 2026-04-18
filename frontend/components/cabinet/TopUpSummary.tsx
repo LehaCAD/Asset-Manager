@@ -47,7 +47,7 @@ export function TopUpSummary() {
         <button
           onClick={createTopUp}
           disabled={!isValid || isTopUpProcessing}
-          className="w-full rounded-md bg-gradient-to-r from-primary to-primary/80 py-3.5 text-center text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="w-full rounded-md bg-primary py-3.5 text-center text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
         >
           {isTopUpProcessing ? (
             <span className="flex items-center justify-center gap-2">

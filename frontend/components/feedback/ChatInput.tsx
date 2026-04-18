@@ -208,7 +208,7 @@ export function ChatInput({
           placeholder={placeholder}
           rows={1}
           style={{ overflow: 'hidden' }}
-          className="flex-1 resize-none bg-muted/30 text-foreground rounded-lg text-sm border border-border/50 outline-none focus:border-primary/50 placeholder:text-muted-foreground min-h-9 max-h-[120px] px-3 py-2 transition-colors [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="flex-1 resize-none bg-muted text-foreground rounded-lg text-sm border border-border outline-none focus:border-primary/50 placeholder:text-muted-foreground min-h-9 max-h-[120px] px-3 py-2 transition-colors [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         />
 
         <Button

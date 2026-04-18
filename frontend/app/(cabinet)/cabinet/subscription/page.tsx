@@ -154,12 +154,12 @@ export default function SubscriptionPage() {
         </p>
       </div>
 
-      <div className={`rounded-lg border p-6 space-y-4 ${
+      <div className={`rounded-md border p-6 space-y-4 shadow-[var(--shadow-card)] ${
         isPaid
-          ? "border-primary/30 bg-gradient-to-br from-[var(--bg-elevated)] to-[var(--bg-surface)] shadow-[0_0_24px_-6px_hsl(var(--primary)/0.15)]"
+          ? "border-primary/30 bg-card"
           : isTrial
-            ? "border-primary/20 bg-gradient-to-br from-[var(--bg-elevated)] to-primary/[0.03]"
-            : "border-border bg-gradient-to-br from-[var(--bg-elevated)] to-[var(--bg-surface)]"
+            ? "border-primary/20 bg-card"
+            : "border-border bg-card"
       }`}>
         <div className="flex items-center justify-between">
           <div className="space-y-1">
@@ -181,13 +181,13 @@ export default function SubscriptionPage() {
           </div>
 
           {isPaid && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--success-muted)] text-xs font-bold text-[var(--success)] shadow-[0_0_12px_-2px_var(--success)]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[var(--success)] animate-pulse" />
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-success/10 text-xs font-bold text-success">
+              <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
               Активна
             </span>
           )}
           {isTrial && trialDaysLeft !== null && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--primary-muted)] text-xs font-bold text-primary shadow-[0_0_12px_-2px_hsl(var(--primary)/0.3)]">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 text-xs font-bold text-primary">
               {trialDaysLeft} {trialDaysLeft === 1 ? "день" : trialDaysLeft < 5 ? "дня" : "дней"} осталось
             </span>
           )}
@@ -197,7 +197,7 @@ export default function SubscriptionPage() {
             </span>
           )}
           {isExpired && (
-            <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-[var(--warning-muted)] text-xs font-semibold text-[var(--warning)]">
+            <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-warning/10 text-xs font-semibold text-warning">
               Истекла
             </span>
           )}
@@ -233,15 +233,15 @@ export default function SubscriptionPage() {
         {isPaid && (
           <>
             <hr className="border-border" />
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
               <Link
                 href="/pricing"
-                className="inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-primary to-primary/80 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_2px_12px_-2px_hsl(var(--primary)/0.4)] hover:opacity-90 transition-opacity"
+                className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
               >
-                <ArrowRight className="h-3.5 w-3.5" />
+                <ArrowRight className="h-3.5 w-3.5 hidden sm:block" />
                 Сменить тариф
               </Link>
-              <button className="rounded-md border border-border px-5 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-[var(--border-strong)] transition-colors">
+              <button className="rounded-md border border-border px-5 py-2.5 text-sm font-medium text-center text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors">
                 Отменить подписку
               </button>
             </div>
@@ -303,7 +303,7 @@ export default function SubscriptionPage() {
       {quota && (
         <>
           <h2 className="text-[15px] font-semibold text-foreground">Использование</h2>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <UsageCard
               label="Проекты"
               icon={Folder}
@@ -349,10 +349,10 @@ export default function SubscriptionPage() {
           {allFeatures.map((feat) => (
             <div
               key={feat.code}
-              className={`flex items-center justify-between rounded-md border px-3.5 py-2.5 transition-all duration-150 ${
+              className={`flex items-center justify-between rounded-md border px-3.5 py-2.5 transition-colors ${
                 feat.available
-                  ? "border-border bg-[var(--bg-elevated)]"
-                  : "border-l-2 border-l-primary/30 border-t-border/60 border-r-border/60 border-b-border/60 bg-gradient-to-r from-primary/[0.04] to-[var(--bg-inset)] hover:from-primary/[0.08] hover:border-l-primary/50 cursor-pointer"
+                  ? "border-border bg-card"
+                  : "border-border/60 bg-muted/30 hover:bg-muted/50 cursor-pointer"
               }`}
             >
               <div className="flex items-center gap-2.5">
@@ -390,7 +390,7 @@ function UsageCard({
   percent: number;
 }) {
   return (
-    <div className="rounded-md border border-border bg-[var(--bg-elevated)] p-4 space-y-2.5">
+    <div className="rounded-md border border-border bg-card shadow-[var(--shadow-card)] p-4 space-y-2.5">
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Icon className="h-3.5 w-3.5 text-primary" />
         {label}

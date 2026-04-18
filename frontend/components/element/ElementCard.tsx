@@ -313,8 +313,10 @@ export function ElementCard({
           )}
         </button>
 
-        {/* Top-right badges: star → type → AI (hidden during upload — Cancel × takes this spot) */}
-        <div className={cn("absolute top-2 right-2 z-40 flex items-center gap-1", isUploading && "hidden")}>
+        {/* Top-right badges: star → type → AI.
+            Hidden when uploading (× cancel takes this spot) and when failed
+            (no media yet — badges imply content that doesn't exist). */}
+        <div className={cn("absolute top-2 right-2 z-40 flex items-center gap-1", (isUploading || isFailed) && "hidden")}>
           {/* Star - always leftmost to prevent layout jump on hover */}
           <button
             type="button"
@@ -329,17 +331,19 @@ export function ElementCard({
             <Star className={cn(BADGE_SM.icon, "text-white", element.is_favorite && "fill-amber-400 text-amber-400")} />
           </button>
 
-          {/* Media type - always visible */}
-          <div className="rounded-md bg-black/60 backdrop-blur-sm h-6 w-6 flex items-center justify-center">
-            {isVideo ? (
-              <Video className={cn(BADGE_SM.icon, "text-white")} />
-            ) : (
-              <Image className={cn(BADGE_SM.icon, "text-white")} />
-            )}
-          </div>
+          {/* Media type - visible only for completed content */}
+          {element.status === "COMPLETED" && (
+            <div className="rounded-md bg-black/60 backdrop-blur-sm h-6 w-6 flex items-center justify-center">
+              {isVideo ? (
+                <Video className={cn(BADGE_SM.icon, "text-white")} />
+              ) : (
+                <Image className={cn(BADGE_SM.icon, "text-white")} />
+              )}
+            </div>
+          )}
 
-          {/* AI badge - only for GENERATED */}
-          {element.source_type === "GENERATED" && (
+          {/* AI badge - only for completed GENERATED */}
+          {element.source_type === "GENERATED" && element.status === "COMPLETED" && (
             <div className="rounded-md bg-black/60 backdrop-blur-sm h-6 w-6 flex items-center justify-center">
               <span className="text-white font-bold leading-none text-[10px]">AI</span>
             </div>
@@ -445,44 +449,6 @@ export function ElementCard({
           </div>
         )}
 
-        {isFailed && (
-          <div
-            className={cn(
-              "absolute inset-0 z-20 bg-overlay-heavy",
-              "opacity-0 group-hover:opacity-100 transition-opacity duration-150",
-              "flex flex-col items-center justify-center gap-3 p-3"
-            )}
-          >
-            <div className="flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-error" />
-              <span className="text-xs font-medium text-error">{element.source_type === "UPLOADED" ? "Ошибка загрузки" : "Ошибка генерации"}</span>
-            </div>
-            {element.error_message && (
-              <span className="text-[10px] text-overlay-text-muted text-center line-clamp-2 max-w-[90%]">
-                {element.error_message}
-              </span>
-            )}
-            <button
-              type="button"
-              onPointerDown={handleControlPointerDown}
-              onClick={handleRetryClick}
-              className="flex items-center gap-1.5 rounded-md bg-white text-black px-5 py-2 text-xs font-semibold hover:bg-white/90 transition-colors"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              Повторить
-            </button>
-            <button
-              type="button"
-              onPointerDown={handleControlPointerDown}
-              onClick={handleDeleteClick}
-              className="flex items-center gap-1.5 rounded-md bg-overlay-button text-overlay-text-muted px-4 py-1.5 text-[11px] hover:bg-overlay-button-hover transition-colors"
-            >
-              <Trash2 className="w-3 h-3" />
-              Удалить
-            </button>
-          </div>
-        )}
-
         {/* Status overlay */}
         {isSubmitting && (
           <div className="absolute inset-0 z-30 bg-overlay-heavy flex flex-col items-center justify-center pointer-events-none">
@@ -535,15 +501,27 @@ export function ElementCard({
                   <span className="text-[9px] text-overlay-text-muted truncate">{element.error_message}</span>
                 )}
               </div>
-              <button
-                type="button"
-                onPointerDown={handleControlPointerDown}
-                onClick={handleRetryClick}
-                className="flex items-center gap-1 rounded px-2 py-1 bg-overlay-button text-[10px] text-overlay-text font-medium hover:bg-overlay-button-hover transition-colors shrink-0"
-              >
-                <RotateCcw className="w-2.5 h-2.5" />
-                Повторить
-              </button>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onPointerDown={handleControlPointerDown}
+                  onClick={handleRetryClick}
+                  className="flex items-center gap-1 rounded px-2 py-1 bg-overlay-button text-[10px] text-overlay-text font-medium hover:bg-overlay-button-hover transition-colors"
+                >
+                  <RotateCcw className="w-2.5 h-2.5" />
+                  Повторить
+                </button>
+                <button
+                  type="button"
+                  onPointerDown={handleControlPointerDown}
+                  onClick={handleDeleteClick}
+                  className="flex items-center justify-center rounded px-1.5 py-1 bg-overlay-button text-overlay-text-muted hover:bg-error/40 hover:text-overlay-text transition-colors"
+                  title="Удалить"
+                  aria-label="Удалить"
+                >
+                  <Trash2 className="w-2.5 h-2.5" />
+                </button>
+              </div>
             </div>
           </div>
         )}

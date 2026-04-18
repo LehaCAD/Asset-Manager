@@ -44,10 +44,10 @@ export function PaymentMethods() {
             key={m.id}
             onClick={() => setPaymentMethod(m.id)}
             className={cn(
-              'flex items-center gap-2.5 rounded-md border bg-[var(--bg-inset)] p-3 text-left transition-colors',
+              'flex items-center gap-2.5 rounded-md border p-3 text-left transition-colors',
               paymentMethod === m.id
-                ? 'border-primary bg-primary/5'
-                : 'border-border/50 hover:border-border',
+                ? 'border-primary bg-primary/10'
+                : 'border-border bg-card hover:bg-muted/50',
             )}
           >
             <div
@@ -67,7 +67,7 @@ export function PaymentMethods() {
               <div className="text-sm font-medium">{m.name}</div>
             </div>
             {m.badge && (
-              <span className="rounded-md bg-[var(--success-muted)] px-2 py-0.5 text-[10px] font-medium text-[var(--success)]">
+              <span className="rounded-md bg-success/10 px-2 py-0.5 text-[10px] font-medium text-success">
                 {m.badge}
               </span>
             )}

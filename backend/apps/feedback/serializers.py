@@ -39,14 +39,18 @@ class MessageSerializer(serializers.ModelSerializer):
 class ConversationSerializer(serializers.ModelSerializer):
     last_message_preview = serializers.SerializerMethodField()
     unread_count = serializers.SerializerMethodField()
+    can_reply = serializers.SerializerMethodField()
 
     class Meta:
         model = Conversation
         fields = [
             "id", "status", "tag", "created_at", "updated_at",
             "user_last_read_at",
-            "last_message_preview", "unread_count",
+            "last_message_preview", "unread_count", "can_reply",
         ]
+
+    def get_can_reply(self, obj):
+        return obj.status != Conversation.STATUS_CLOSED
 
     def get_last_message_preview(self, obj):
         msg = obj.messages.order_by("-created_at").first()

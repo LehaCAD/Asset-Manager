@@ -78,7 +78,7 @@ export function AdminChatPanel() {
   }
 
   const toggleStatus = () => {
-    const newStatus = conv.status === 'open' ? 'resolved' : 'open'
+    const newStatus = conv.status === 'open' ? 'closed' : 'open'
     updateConversation(conv.id, { status: newStatus })
   }
 
@@ -135,7 +135,7 @@ export function AdminChatPanel() {
               {conv.status === 'open' ? (
                 <>
                   <Check className="w-3 h-3" />
-                  Решено
+                  Закрыть
                 </>
               ) : (
                 <>

@@ -89,9 +89,14 @@ export function ModelSelector({
     onSelectModel(model);
   };
 
-  // Handle click outside to close
+  // Handle click outside to close — desktop only.
+  // On mobile the panel is fullscreen; closing happens via the × button or after picking a model.
+  // Click-outside on mobile was buggy (tab clicks closed the panel) — disable it there.
   useEffect(() => {
     if (!isOpen) return;
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches) {
+      return;
+    }
 
     const handleClickOutside = (event: MouseEvent) => {
       if (panelRef.current && !panelRef.current.contains(event.target as Node)) {
@@ -115,12 +120,12 @@ export function ModelSelector({
     <div
       ref={panelRef}
       className={cn(
-        "absolute left-full top-0 z-50 w-[440px]",
-        "rounded-lg bg-popover shadow-lg",
-        "border border-border",
-        "flex flex-col"
+        "bg-popover border border-border flex flex-col",
+        // Mobile: fullscreen overlay on top of the ConfigPanel top-sheet (which is z-60)
+        "max-md:fixed max-md:inset-0 max-md:z-[70] max-md:rounded-none",
+        // Desktop: slide-out panel to the right of ConfigPanel
+        "md:absolute md:left-full md:top-0 md:z-50 md:w-[440px] md:rounded-lg md:shadow-lg md:max-h-[calc(100vh-280px)]"
       )}
-      style={{ maxHeight: 'calc(100vh - 280px)' }}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-3 pb-2 shrink-0">

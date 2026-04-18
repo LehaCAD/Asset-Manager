@@ -85,6 +85,10 @@ export const sharingApi = {
   getProjectFeedback: (projectId: number) =>
     apiClient.get(`/api/sharing/project-feedback/${projectId}/`).then(r => r.data),
 
+  // Global feedback (all links across all user's projects)
+  getAllFeedback: () =>
+    apiClient.get(`/api/sharing/all-feedback/`).then(r => r.data),
+
   addLinkComment: (linkId: number, data: { text: string; parent_id?: number }) =>
     apiClient.post(`/api/sharing/links/${linkId}/comments/`, data).then(r => r.data),
 }

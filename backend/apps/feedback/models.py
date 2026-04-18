@@ -3,13 +3,13 @@ from django.conf import settings
 
 
 class Conversation(models.Model):
-    """Один юзер = один диалог (в MVP)."""
+    """Диалог обратной связи. Один юзер может иметь несколько диалогов (lifecycle: open → closed)."""
 
     STATUS_OPEN = "open"
-    STATUS_RESOLVED = "resolved"
+    STATUS_CLOSED = "closed"
     STATUS_CHOICES = [
         (STATUS_OPEN, "Открыт"),
-        (STATUS_RESOLVED, "Решён"),
+        (STATUS_CLOSED, "Закрыт"),
     ]
 
     TAG_BUG = "bug"
@@ -21,10 +21,10 @@ class Conversation(models.Model):
         (TAG_IDEA, "Идея"),
     ]
 
-    user = models.OneToOneField(
+    user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="feedback_conversation",
+        related_name="feedback_conversations",
     )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_OPEN)
     tag = models.CharField(max_length=20, choices=TAG_CHOICES, blank=True)

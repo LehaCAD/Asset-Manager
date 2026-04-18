@@ -1,3 +1,4 @@
+import logging
 import uuid
 
 from django.contrib.auth import get_user_model
@@ -11,6 +12,7 @@ from .emails import send_verification_email, send_password_reset_email
 from .serializers import RegisterSerializer, UserSerializer, ForgotPasswordSerializer, ResetPasswordSerializer
 from .throttles import AuthRateThrottle
 
+logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
@@ -33,7 +35,8 @@ class RegisterView(generics.CreateAPIView):
         try:
             send_verification_email(user)
         except Exception:
-            pass  # Don't fail registration if email fails
+            # Registration must not fail because of email issues — log and move on.
+            logger.exception("send_verification_email failed", extra={"user_id": user.id})
 
         refresh = RefreshToken.for_user(user)
         return Response({

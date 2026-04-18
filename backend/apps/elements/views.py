@@ -301,4 +301,15 @@ def download_meta(request):
             Scene.objects.filter(id__in=scene_ids).values('id', 'name', 'parent_id')
         )
 
+    # Onboarding: engaging with batch download counts as discovery.
+    if elements:
+        try:
+            from apps.onboarding.services import OnboardingService
+            OnboardingService().try_complete(request.user, 'element.batch_download')
+        except Exception:
+            logger.exception(
+                "onboarding trigger failed for element.batch_download",
+                extra={"user_id": request.user.id},
+            )
+
     return Response({'elements': elements, 'groups': groups})

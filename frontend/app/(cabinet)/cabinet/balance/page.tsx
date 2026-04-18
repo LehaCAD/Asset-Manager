@@ -102,9 +102,9 @@ export default function BalancePage() {
 
       {/* Tab: Payment */}
       {activeTab === "payment" && (
-        <div className="rounded-lg border border-border bg-[var(--bg-elevated)] p-6 space-y-6">
+        <div className="rounded-md border border-border bg-card shadow-[var(--shadow-card)] p-6 space-y-6">
           {/* Balance header */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Текущий баланс</span>
             <span className="flex items-center gap-1.5 text-lg font-bold font-mono text-foreground">
               <KadrIcon size="md" />
@@ -125,7 +125,7 @@ export default function BalancePage() {
       {activeTab === "history" && (
         <>
           {/* History header with filters */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <h2 className="text-base font-semibold text-foreground">
               История операций
             </h2>
@@ -159,40 +159,41 @@ export default function BalancePage() {
           ) : (
             <>
               {/* Transactions table — 4 columns (removed "Способ") */}
-              <div className="rounded-lg border border-border bg-[var(--bg-elevated)] shadow-[var(--shadow-card)] overflow-hidden">
+              <div className="rounded-md border border-border bg-card shadow-[var(--shadow-card)] overflow-hidden">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground text-[11px] uppercase tracking-wider">Дата</th>
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground text-[11px] uppercase tracking-wider">Описание</th>
-                      <th className="text-center px-4 py-3 font-medium text-muted-foreground text-[11px] uppercase tracking-wider">Сумма</th>
-                      <th className="text-center px-4 py-3 font-medium text-muted-foreground text-[11px] uppercase tracking-wider">Статус</th>
+                      <th className="text-left px-2 sm:px-4 py-3 font-medium text-muted-foreground text-[11px] uppercase tracking-wider">Дата</th>
+                      <th className="text-left px-2 sm:px-4 py-3 font-medium text-muted-foreground text-[11px] uppercase tracking-wider hidden sm:table-cell">Описание</th>
+                      <th className="text-center px-2 sm:px-4 py-3 font-medium text-muted-foreground text-[11px] uppercase tracking-wider">Сумма</th>
+                      <th className="text-center px-2 sm:px-4 py-3 font-medium text-muted-foreground text-[11px] uppercase tracking-wider">Статус</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/50">
                     {loading ? (
                       [...Array(3)].map((_, i) => (
                         <tr key={i}>
-                          {[...Array(4)].map((_, j) => (
-                            <td key={j} className="px-4 py-3"><Skeleton className="h-4 w-full" /></td>
-                          ))}
+                          <td className="px-2 sm:px-4 py-3"><Skeleton className="h-4 w-full" /></td>
+                          <td className="px-2 sm:px-4 py-3 hidden sm:table-cell"><Skeleton className="h-4 w-full" /></td>
+                          <td className="px-2 sm:px-4 py-3"><Skeleton className="h-4 w-full" /></td>
+                          <td className="px-2 sm:px-4 py-3"><Skeleton className="h-4 w-full" /></td>
                         </tr>
                       ))
                     ) : data && data.results.length > 0 ? (
                       data.results.map((tx) => (
                         <tr key={tx.id} className="hover:bg-muted/20 transition-colors">
-                          <td className="px-4 py-3 font-mono text-muted-foreground whitespace-nowrap text-[11px]">
+                          <td className="px-2 sm:px-4 py-3 font-mono text-muted-foreground text-[11px]">
                             {formatDateTime(tx.created_at)}
                           </td>
-                          <td className="px-4 py-3 text-foreground">
+                          <td className="px-2 sm:px-4 py-3 text-foreground hidden sm:table-cell">
                             Пополнение баланса
                           </td>
-                          <td className="px-4 py-3 text-center">
+                          <td className="px-2 sm:px-4 py-3 text-center">
                             <span className="inline-flex items-center gap-1 font-mono font-medium text-success">
                               +<KadrIcon size="xs" />{'\u2009'}{formatRubles(parseFloat(String(tx.amount)))}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-center">
+                          <td className="px-2 sm:px-4 py-3 text-center">
                             <span className="inline-flex items-center gap-1 text-[10px] text-success font-medium">
                               <CheckCircle2 className="h-3 w-3" />
                               Оплачено
@@ -202,7 +203,7 @@ export default function BalancePage() {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={4} className="px-4 py-16 text-center text-muted-foreground">
+                        <td colSpan={4} className="px-2 sm:px-4 py-16 text-center text-muted-foreground">
                           Нет операций за выбранный период
                         </td>
                       </tr>

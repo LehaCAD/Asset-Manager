@@ -1,15 +1,13 @@
 "use client";
 
 import { useOnboardingStore } from "@/lib/store/onboarding";
-import { useCreditsStore } from "@/lib/store/credits";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Clapperboard, FolderPlus, WandSparkles, Image } from "lucide-react";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Clapperboard, FolderPlus, Pencil, Image, Trophy } from "lucide-react";
 
 export function WelcomeModal() {
   const welcomeSeen = useOnboardingStore((s) => s.welcomeSeen);
   const isLoaded = useOnboardingStore((s) => s.isLoaded);
   const markWelcomeSeen = useOnboardingStore((s) => s.markWelcomeSeen);
-  const balance = useCreditsStore((s) => s.balance);
 
   if (!isLoaded || welcomeSeen) return null;
 
@@ -36,57 +34,51 @@ export function WelcomeModal() {
           {/* Icon + heading */}
           <div className="flex flex-col items-center text-center mb-6">
             <Clapperboard size={40} color="#8B7CF7" className="mb-3" />
-            <h2 className="text-xl font-semibold text-white">
+            <DialogTitle className="text-xl font-semibold text-white">
               Добро пожаловать в Раскадровку
-            </h2>
-            <p className="text-sm text-zinc-400 mt-1">
-              Ваш инструмент для AI-продакшена
-            </p>
-          </div>
-
-          {/* Bonus card */}
-          <div
-            className="rounded-lg p-3 mb-5 text-center"
-            style={{
-              background: "rgba(139, 124, 247, 0.1)",
-              border: "1px solid rgba(139, 124, 247, 0.3)",
-            }}
-          >
-            <p className="text-sm text-zinc-300">Ваш стартовый баланс</p>
-            <p
-              className="text-2xl font-bold mt-1"
-              style={{ color: "#8B7CF7" }}
-            >
-              {balance} кадров
-            </p>
+            </DialogTitle>
           </div>
 
           {/* Steps */}
-          <div className="space-y-3 mb-6">
+          <div className="space-y-3 mb-5">
             {[
               {
                 icon: FolderPlus,
-                text: "Создайте проект и добавьте первую группу",
-              },
-              {
-                icon: WandSparkles,
-                text: "Напишите промпт — нейросеть создаст изображение",
+                text: "Создайте проект — пространство для ваших идей",
               },
               {
                 icon: Image,
-                text: "Просматривайте, скачивайте, делитесь результатами",
+                text: "Генерируйте картинки и видео или загружайте свои файлы",
+              },
+              {
+                icon: Pencil,
+                text: "Собирайте в группы и делитесь с командой",
               },
             ].map(({ icon: Icon, text }, i) => (
               <div key={i} className="flex items-center gap-3">
                 <div
-                  className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
-                  style={{ background: "rgba(139, 124, 247, 0.15)" }}
+                  className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
+                  style={{ background: "rgba(139, 124, 247, 0.15)", color: "#8B7CF7" }}
                 >
-                  <Icon size={16} color="#8B7CF7" />
+                  {i + 1}
                 </div>
                 <span className="text-sm text-zinc-300">{text}</span>
               </div>
             ))}
+          </div>
+
+          {/* Achievement hint */}
+          <div
+            className="rounded-xl px-4 py-3.5 mb-5 flex items-center justify-center gap-3"
+            style={{
+              background: "rgba(255, 215, 0, 0.06)",
+              border: "1px solid rgba(255, 215, 0, 0.15)",
+            }}
+          >
+            <Trophy size={24} color="#FFD700" className="shrink-0" />
+            <p className="text-[13px] text-zinc-400 leading-snug">
+              За первые шаги начисляются бонусные кадры
+            </p>
           </div>
 
           {/* CTA */}
@@ -97,7 +89,7 @@ export function WelcomeModal() {
               background: "linear-gradient(135deg, #8B7CF7, #6B5CE7)",
             }}
           >
-            Начать
+            Начать работу
           </button>
         </div>
       </DialogContent>

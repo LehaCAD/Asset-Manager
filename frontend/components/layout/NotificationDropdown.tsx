@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { NotificationIcon } from '@/components/ui/notification-icon'
 import { useNotificationStore } from '@/lib/store/notifications'
+import { logger } from '@/lib/utils/logger'
 import type { Notification } from '@/lib/types'
 
 function relativeTime(dateStr: string): string {
@@ -34,7 +35,11 @@ function NotificationItem({
   const router = useRouter()
 
   function handleClick() {
-    if (!notification.is_read) markRead(notification.id).catch(() => {})
+    if (!notification.is_read) {
+      markRead(notification.id).catch((err) =>
+        logger.warn('notification_dropdown.mark_read_failed', { notificationId: notification.id, cause: err })
+      )
+    }
     if (notification.project) {
       let url = `/projects/${notification.project}`
       if (notification.scene) url += `/groups/${notification.scene}`
@@ -86,7 +91,9 @@ export function NotificationDropdown({ children }: NotificationDropdownProps) {
   function handleOpenChange(next: boolean) {
     setOpen(next)
     if (next && bellNotifications.length === 0) {
-      fetchNotifications(0).catch(() => {})
+      fetchNotifications(0).catch((err) =>
+        logger.warn('notification_dropdown.fetch_failed', { cause: err })
+      )
     }
   }
 
@@ -102,7 +109,7 @@ export function NotificationDropdown({ children }: NotificationDropdownProps) {
               variant="ghost"
               size="sm"
               className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
-              onClick={() => markAllRead().catch(() => {})}
+              onClick={() => markAllRead().catch((err) => logger.warn('notification_dropdown.mark_all_failed', { cause: err }))}
             >
               Прочитать все
             </Button>

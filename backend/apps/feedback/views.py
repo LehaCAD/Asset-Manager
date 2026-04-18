@@ -1,7 +1,10 @@
 # backend/apps/feedback/views.py
+import logging
 import uuid
 
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
 from django.db import models
 from django.db.models import Q, F, Subquery, OuterRef, Count, Sum
 from django.db.models.functions import Coalesce
@@ -37,15 +40,25 @@ MAX_ATTACHMENTS_PER_MESSAGE = 5
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def conversation_view(request):
-    """GET: получить свой диалог. POST: создать если нет."""
+    """GET: получить активный диалог. POST: создать новый (если нет открытого)."""
     if request.method == "GET":
-        try:
-            conv = Conversation.objects.get(user=request.user)
-        except Conversation.DoesNotExist:
+        # Return the latest open conversation, or fallback to latest closed
+        conv = Conversation.objects.filter(
+            user=request.user, status=Conversation.STATUS_OPEN
+        ).order_by('-updated_at').first()
+        if not conv:
+            conv = Conversation.objects.filter(user=request.user).order_by('-updated_at').first()
+        if not conv:
             return Response(status=status.HTTP_404_NOT_FOUND)
         return Response(ConversationSerializer(conv).data)
 
-    conv, _ = Conversation.objects.get_or_create(user=request.user)
+    # POST — create new conversation (only if no open one exists)
+    existing_open = Conversation.objects.filter(
+        user=request.user, status=Conversation.STATUS_OPEN
+    ).first()
+    if existing_open:
+        return Response(ConversationSerializer(existing_open).data, status=status.HTTP_200_OK)
+    conv = Conversation.objects.create(user=request.user)
     return Response(ConversationSerializer(conv).data, status=status.HTTP_201_CREATED)
 
 
@@ -53,9 +66,15 @@ def conversation_view(request):
 @permission_classes([IsAuthenticated])
 def messages_view(request):
     """GET: список сообщений. POST: отправить сообщение."""
-    conv = Conversation.objects.filter(user=request.user).first()
+    # Find open conversation, or fall through to create new / show closed
+    conv = Conversation.objects.filter(
+        user=request.user, status=Conversation.STATUS_OPEN
+    ).order_by('-updated_at').first()
 
     if request.method == "GET":
+        if not conv:
+            # Fallback: show latest closed conversation messages (read-only history)
+            conv = Conversation.objects.filter(user=request.user).order_by('-updated_at').first()
         if not conv:
             return Response([])
         cursor = request.query_params.get("cursor")
@@ -69,12 +88,8 @@ def messages_view(request):
     ser.is_valid(raise_exception=True)
 
     if not conv:
+        # All conversations are closed or none exist — create new one
         conv = Conversation.objects.create(user=request.user)
-
-    # Reopen if resolved
-    if conv.status == Conversation.STATUS_RESOLVED:
-        conv.status = Conversation.STATUS_OPEN
-        conv.save(update_fields=["status"])
 
     # Пустой text допустим: фронтенд создаёт сообщение с пустым текстом,
     # а затем отдельным запросом прикрепляет файлы (confirm-attach).
@@ -87,6 +102,17 @@ def messages_view(request):
     )
     conv.save(update_fields=["updated_at"])  # touch updated_at
     notify_new_message(conv, msg)
+
+    # Onboarding: first user-authored support message
+    try:
+        from apps.onboarding.services import OnboardingService
+        OnboardingService().try_complete(request.user, "feedback.first_message")
+    except Exception:
+        logger.exception(
+            "onboarding trigger failed for feedback.first_message",
+            extra={"user_id": request.user.id, "conversation_id": conv.id},
+        )
+
     return Response(MessageSerializer(msg).data, status=status.HTTP_201_CREATED)
 
 
@@ -165,15 +191,56 @@ def confirm_attach_view(request, message_id):
     return Response({"status": "processing"}, status=status.HTTP_202_ACCEPTED)
 
 
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def all_messages_view(request):
+    """Get all messages across all user's conversations (unified stream)."""
+    convs = Conversation.objects.filter(user=request.user).order_by('created_at')
+    if not convs.exists():
+        return Response([])
+
+    cursor = request.query_params.get("cursor")
+    qs = Message.objects.filter(
+        conversation__user=request.user, is_deleted=False
+    ).select_related("sender").prefetch_related("attachments").order_by("-created_at")
+
+    if cursor:
+        qs = qs.filter(id__lt=int(cursor))
+
+    messages = list(qs[:30])
+    messages.reverse()
+
+    # Use MessageSerializer but add conversation_id
+    data = []
+    for msg in messages:
+        msg_data = MessageSerializer(msg).data
+        msg_data['conversation_id'] = msg.conversation_id
+        data.append(msg_data)
+
+    return Response(data)
+
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def mark_read_view(request):
     """Обновить user_last_read_at."""
-    conv = Conversation.objects.filter(user=request.user).first()
+    conv = Conversation.objects.filter(
+        user=request.user, status=Conversation.STATUS_OPEN
+    ).order_by('-updated_at').first()
+    if not conv:
+        conv = Conversation.objects.filter(user=request.user).order_by('-updated_at').first()
     if conv:
         conv.user_last_read_at = timezone.now()
         conv.save(update_fields=["user_last_read_at"])
     return Response({"status": "ok"})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def conversation_history_view(request):
+    """List all conversations for the current user (for history browsing)."""
+    convs = Conversation.objects.filter(user=request.user).order_by('-updated_at')
+    return Response(ConversationSerializer(convs, many=True).data)
 
 
 # ─── Admin endpoints ──────────────────────────────────────
@@ -371,7 +438,10 @@ def admin_clear_history(request, conversation_id):
         try:
             client.delete_object(Bucket=bucket, Key=att.file_key)
         except Exception:
-            pass
+            logger.exception(
+                "S3 delete failed during clear_history",
+                extra={"conversation_id": conv.id, "file_key": att.file_key},
+            )
 
     # Delete all messages (cascades to attachments)
     conv.messages.all().delete()
@@ -400,7 +470,10 @@ def admin_delete_conversation(request, conversation_id):
         try:
             client.delete_object(Bucket=bucket, Key=att.file_key)
         except Exception:
-            pass
+            logger.exception(
+                "S3 delete failed during delete_conversation",
+                extra={"conversation_id": conv.id, "file_key": att.file_key},
+            )
 
     conv.delete()  # Cascades to messages, attachments, rewards
 
@@ -427,7 +500,10 @@ def admin_clear_attachments(request, conversation_id):
             try:
                 client.delete_object(Bucket=bucket, Key=att.file_key)
             except Exception:
-                pass
+                logger.exception(
+                    "S3 delete failed during clear_attachments",
+                    extra={"conversation_id": conv.id, "file_key": att.file_key},
+                )
         att.file_key = ''
         att.is_expired = True
         att.save(update_fields=['file_key', 'is_expired'])
@@ -465,19 +541,63 @@ def admin_bulk_action(request):
     """Bulk actions on conversations."""
     action = request.data.get("action")
 
-    if action == "close_old_resolved":
+    if action == "close_old_inactive":
         days = int(request.data.get("days", 30))
         cutoff = timezone.now() - timedelta(days=days)
-        qs = Conversation.objects.filter(status="resolved", updated_at__lt=cutoff)
+        qs = Conversation.objects.filter(status="closed", updated_at__lt=cutoff)
         count = qs.count()
         qs.delete()  # Cascade deletes messages + attachments (S3 files stay — use cleanup task)
         return Response({"action": action, "deleted": count})
 
-    if action == "resolve_all_open":
-        count = Conversation.objects.filter(status="open").update(status="resolved")
-        return Response({"action": action, "resolved": count})
+    if action == "close_all_open":
+        count = Conversation.objects.filter(status="open").update(status="closed")
+        return Response({"action": action, "closed": count})
 
     return Response({"detail": "Unknown action"}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["POST"])
+@authentication_classes(ADMIN_AUTH)
+@permission_classes([IsAdminUser])
+def admin_merge_conversations(request):
+    """Merge source conversation into target conversation."""
+    source_id = request.data.get("source_id")
+    target_id = request.data.get("target_id")
+
+    if not source_id or not target_id or source_id == target_id:
+        return Response(
+            {"detail": "Укажите source_id и target_id"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        source = Conversation.objects.get(id=source_id)
+        target = Conversation.objects.get(id=target_id)
+    except Conversation.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    # Verify same user
+    if source.user_id != target.user_id:
+        return Response(
+            {"detail": "Диалоги принадлежат разным пользователям"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Move all messages from source to target
+    Message.objects.filter(conversation=source).update(conversation=target)
+
+    # Move rewards
+    FeedbackReward.objects.filter(conversation=source).update(conversation=target)
+
+    # Reopen target if it was closed
+    if target.status != Conversation.STATUS_OPEN:
+        target.status = Conversation.STATUS_OPEN
+    target.save(update_fields=["status", "updated_at"])
+
+    # Delete empty source
+    source.delete()
+
+    return Response({"status": "merged", "target_id": target_id})
 
 
 @api_view(["PATCH", "DELETE"])
@@ -523,7 +643,10 @@ def admin_message_actions(request, message_id):
                 client = get_s3_client()
                 client.delete_object(Bucket=get_bucket_name(), Key=att.file_key)
             except Exception:
-                pass
+                logger.exception(
+                    "S3 delete failed during message delete",
+                    extra={"message_id": message_id, "file_key": att.file_key},
+                )
             att.file_key = ""
             att.is_expired = True
             att.save(update_fields=["file_key", "is_expired"])

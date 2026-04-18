@@ -47,7 +47,13 @@ export const useFeedbackAdminStore = create<FeedbackAdminState>((set, get) => {
       try {
         const convs = await feedbackApi.getConversations(get().filters)
         const totalUnread = convs.reduce((sum, c) => sum + c.unread_by_admin, 0)
-        set({ conversations: convs, totalUnread })
+        const active = get().activeConversation
+        // Reset stale activeConversation if it's no longer in the list (e.g. deleted)
+        if (active && !convs.some((c) => c.id === active.id)) {
+          set({ conversations: convs, totalUnread, activeConversation: null, messages: [] })
+        } else {
+          set({ conversations: convs, totalUnread })
+        }
       } finally {
         set({ isLoading: false })
       }
@@ -58,16 +64,24 @@ export const useFeedbackAdminStore = create<FeedbackAdminState>((set, get) => {
       set({ activeConversation: conv })
 
       if (conv) {
-        const msgs = await feedbackApi.getConversationMessages(id)
-        set({ messages: msgs })
-        await feedbackApi.adminMarkRead(id)
-        // Clear unread badge locally — no need to reload the full list
-        set((s) => ({
-          conversations: s.conversations.map((c) =>
-            c.id === id ? { ...c, unread_by_admin: 0 } : c,
-          ),
-        }))
-        get().connectWS(id)
+        try {
+          const msgs = await feedbackApi.getConversationMessages(id)
+          set({ messages: msgs })
+          await feedbackApi.adminMarkRead(id)
+          set((s) => ({
+            conversations: s.conversations.map((c) =>
+              c.id === id ? { ...c, unread_by_admin: 0 } : c,
+            ),
+          }))
+          get().connectWS(id)
+        } catch {
+          // Conversation was deleted — remove from local state
+          set((s) => ({
+            activeConversation: null,
+            messages: [],
+            conversations: s.conversations.filter((c) => c.id !== id),
+          }))
+        }
       }
     },
 
@@ -75,6 +89,11 @@ export const useFeedbackAdminStore = create<FeedbackAdminState>((set, get) => {
       const conv = get().activeConversation
       const current = get().messages
       if (!conv || !current.length) return []
+      // Validate conversation still exists in local list
+      if (!get().conversations.some((c) => c.id === conv.id)) {
+        set({ activeConversation: null, messages: [] })
+        return []
+      }
       try {
         const oldest = current[0]
         const msgs = await feedbackApi.getConversationMessages(conv.id, oldest.id)

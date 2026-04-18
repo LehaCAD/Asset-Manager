@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { useOnboardingStore } from "@/lib/store/onboarding";
-import { ChargeIcon } from "@/components/ui/charge-icon";
+import { KadrIcon } from "@/components/ui/kadr-icon";
 import { OnboardingTaskRow } from "./OnboardingTaskRow";
 
 interface Props {
@@ -28,11 +28,11 @@ export function OnboardingPopover({ children }: Props) {
         {/* Header */}
         <div className="p-4 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold text-white">Первые шаги</h3>
+            <h3 className="text-sm font-semibold text-white">Достижения</h3>
             <div className="flex items-center gap-1">
-              <span className="text-xs font-medium" style={{ color: '#FFD700' }}>{totalEarned}</span>
-              <ChargeIcon size="sm" />
-              <span className="text-xs text-zinc-500">/ {totalPossible}</span>
+              <span className="text-xs font-medium" style={{ color: '#FFD700' }}>{Math.round(Number(totalEarned))}</span>
+              <KadrIcon size="sm" />
+              <span className="text-xs text-zinc-500">/ {Math.round(Number(totalPossible))}</span>
             </div>
           </div>
           {/* Progress bar */}
@@ -42,7 +42,7 @@ export function OnboardingPopover({ children }: Props) {
               style={{ width: `${progressPercent}%`, background: 'linear-gradient(90deg, #8B7CF7, #6B5CE7)' }}
             />
           </div>
-          <p className="text-xs mt-1" style={{ color: '#888' }}>{completedCount} из {totalCount} заданий</p>
+          <p className="text-xs mt-1" style={{ color: '#888' }}>{completedCount} из {totalCount}</p>
         </div>
 
         {/* Task list */}

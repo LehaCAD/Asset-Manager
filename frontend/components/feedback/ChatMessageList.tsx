@@ -288,8 +288,23 @@ export function ChatMessageList({
         )}
 
         {/* Messages */}
-        {items.map(({ msg, position, isSystem, showDatePill, dateLabel, gapClass }, idx) => (
+        {items.map(({ msg, position, isSystem, showDatePill, dateLabel, gapClass }, idx) => {
+          // Detect conversation boundary from conversation_id in unified stream
+          const prevConvId = idx > 0 ? items[idx - 1].msg.conversation_id : undefined
+          const currConvId = msg.conversation_id
+          const showConversationBoundary = prevConvId && currConvId && prevConvId !== currConvId
+
+          return (
           <div key={msg.id} className={gapClass}>
+            {/* Conversation boundary pill */}
+            {showConversationBoundary && (
+              <div className="flex justify-center py-2">
+                <span className="bg-primary/20 text-primary text-[11px] font-medium rounded-full px-3 py-0.5">
+                  Новое обращение
+                </span>
+              </div>
+            )}
+
             {/* Unread separator */}
             {idx === unreadSepIdx && (
               <div ref={unreadSepRef} className="flex items-center gap-3 py-2">
@@ -319,7 +334,8 @@ export function ChatMessageList({
               />
             )}
           </div>
-        ))}
+          )
+        })}
 
         <div ref={bottomRef} />
       </div>

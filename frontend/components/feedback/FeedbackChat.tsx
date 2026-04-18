@@ -59,7 +59,7 @@ export function FeedbackChat() {
           <h1 className="text-lg font-semibold">Обратная связь</h1>
           {conversation && (
             <Badge variant={conversation.status === 'open' ? 'default' : 'secondary'}>
-              {conversation.status === 'open' ? 'Открыт' : 'Решён'}
+              {conversation.status === 'open' ? 'Открыт' : 'Закрыт'}
             </Badge>
           )}
         </div>
@@ -89,6 +89,13 @@ export function FeedbackChat() {
           <span className="text-xs text-muted-foreground animate-pulse">
             Поддержка печатает...
           </span>
+        </div>
+      )}
+
+      {/* Closed conversation notice */}
+      {conversation && !conversation.can_reply && (
+        <div className="px-6 py-2 text-center text-sm text-muted-foreground bg-muted/30">
+          Обращение закрыто. Напишите новое сообщение, чтобы начать новый диалог.
         </div>
       )}
 

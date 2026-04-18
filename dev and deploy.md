@@ -170,6 +170,9 @@ docker compose -f docker-compose.production.yml restart nginx
 |--------|---------|----------|
 | 502 Bad Gateway | Nginx не видит frontend/backend после пересоздания контейнеров | `docker compose -f docker-compose.production.yml restart nginx` |
 | 404 на логин | Неверный `NEXT_PUBLIC_API_URL` (с /api) | Исправить .env, пересобрать frontend: `docker compose -f docker-compose.production.yml up -d --build frontend` |
+| `ModuleNotFoundError` (backend/celery) после правки `requirements.txt` | Образ не пересобран — контейнер запущен со старым слоем `pip install` | `docker compose build backend celery && docker compose up -d backend celery` |
+| `Cannot find module '@sentry/nextjs'` или любой npm-пакет после правки `package.json` | Образ пересобран, но анонимный volume `/app/node_modules` сохранил старый набор пакетов между пересозданиями | `docker compose build frontend && docker compose rm -fsv frontend && docker compose up -d frontend` — флаг `-v` удаляет анонимные volumes |
+| Падение при старте с `Unable to configure formatter 'json'` | В `settings.py` использован `pythonjsonlogger`, а пакет не установлен | Проверить, что `python-json-logger` есть в `requirements.txt`, и пересобрать backend/celery |
 | Кракозябры при миграции БД | Дамп в UTF-16 | См. `scripts/MIGRATE-DB.md` — дамп в UTF-8 |
 | CSRF в админке | `CSRF_TRUSTED_ORIGINS` | Добавить `https://raskadrawka.ru` в settings.py |
 | Сертификат не доверен | DNS на старый IP | Проверить DNS, очистить кэш |

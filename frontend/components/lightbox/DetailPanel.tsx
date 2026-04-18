@@ -6,12 +6,16 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDate, formatStorage, formatCurrency } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
+import { logger } from "@/lib/utils/logger";
 import { Copy, Check, Save, RotateCcw, ImageOff } from "lucide-react";
 import { toast } from "sonner";
 import { elementsApi } from "@/lib/api/elements";
 import { sharingApi } from "@/lib/api/sharing";
 import { useGenerationStore } from "@/lib/store/generation";
 import { useOnboardingStore } from "@/lib/store/onboarding";
+import { useAuthStore } from "@/lib/store/auth";
+import { TierBadge } from "@/components/subscription/TierBadge";
+import { UpgradeModal } from "@/components/subscription/UpgradeModal";
 import { CommentThread } from "@/components/sharing/CommentThread";
 import { ThumbsUp, ThumbsDown } from "lucide-react";
 import type { Element, Comment, PublicElementReaction } from "@/lib/types";
@@ -85,6 +89,12 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
   const [reviews, setReviews] = useState<Array<{ session_id: string; author_name: string; action: string }>>([]);
 
   const { retryFromElement, availableModels } = useGenerationStore();
+  const quota = useAuthStore((s) => s.user?.quota);
+  const [storageUpgradeOpen, setStorageUpgradeOpen] = useState(false);
+
+  const isStorageFull = quota
+    ? quota.storage_limit_bytes > 0 && quota.storage_used_bytes >= quota.storage_limit_bytes
+    : false;
 
   // Sync prompt text when element changes
   useEffect(() => {
@@ -96,13 +106,13 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
     let cancelled = false;
     sharingApi.getElementComments(element.id).then((data) => {
       if (!cancelled) setComments(data);
-    }).catch(() => {});
+    }).catch((err) => logger.warn("detail_panel.fetch_comments_failed", { elementId: element.id, cause: err }));
     sharingApi.getElementReactions(element.id).then((data) => {
       if (!cancelled) setReactions(data);
-    }).catch(() => {});
+    }).catch((err) => logger.warn("detail_panel.fetch_reactions_failed", { elementId: element.id, cause: err }));
     sharingApi.getElementReviews(element.id).then((data) => {
       if (!cancelled) setReviews(data);
-    }).catch(() => {});
+    }).catch((err) => logger.warn("detail_panel.fetch_reviews_failed", { elementId: element.id, cause: err }));
     return () => { cancelled = true; };
   }, [element.id]);
 
@@ -194,6 +204,10 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
   };
 
   const handleRepeat = () => {
+    if (isStorageFull) {
+      setStorageUpgradeOpen(true);
+      return;
+    }
     retryFromElement(element);
     useOnboardingStore.getState().completeTask('retry_generation');
   };
@@ -328,7 +342,15 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
           >
             <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
             Повторить запрос
+            {isStorageFull && <TierBadge tier="plus" className="ml-1.5" />}
           </Button>
+          <UpgradeModal
+            open={storageUpgradeOpen}
+            onOpenChange={setStorageUpgradeOpen}
+            limitTitle="Хранилище"
+            limitUsed={quota?.storage_used_bytes}
+            limitMax={quota?.storage_limit_bytes}
+          />
         </div>
       )}
 

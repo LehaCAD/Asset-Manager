@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
-import { useSubscriptionStore } from "@/lib/store/subscription";
-import { ProBadge } from "./ProBadge";
+import { type ReactNode } from "react";
+import { useFeatureGate } from "@/lib/hooks/useFeatureGate";
+import { TierBadge } from "./TierBadge";
 import { UpgradeModal } from "./UpgradeModal";
 
 interface FeatureGateProps {
@@ -12,20 +12,18 @@ interface FeatureGateProps {
 }
 
 export function FeatureGate({ feature, children, fallback }: FeatureGateProps) {
-  const hasFeature = useSubscriptionStore((s) => s.hasFeature);
-  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const { isLocked, tier, upgradeOpen, setUpgradeOpen, openUpgrade } =
+    useFeatureGate(feature);
 
-  const isAvailable = hasFeature(feature);
-
-  if (isAvailable) {
+  if (!isLocked) {
     return <>{children}</>;
   }
 
-  // Custom fallback
+  // Custom fallback — render it with click handler
   if (fallback) {
     return (
       <>
-        <div onClick={() => setUpgradeOpen(true)} className="cursor-pointer">
+        <div onClick={openUpgrade} className="cursor-pointer">
           {fallback}
         </div>
         <UpgradeModal
@@ -37,17 +35,17 @@ export function FeatureGate({ feature, children, fallback }: FeatureGateProps) {
     );
   }
 
-  // Default locked overlay
+  // Default: normal appearance + badge + click → upgrade modal
   return (
     <>
       <div
         className="relative cursor-pointer"
-        onClick={() => setUpgradeOpen(true)}
+        onClick={openUpgrade}
       >
-        <div className="pointer-events-none opacity-50 select-none">
+        <div className="pointer-events-none select-none">
           {children}
         </div>
-        <ProBadge className="absolute top-1 right-1" />
+        <TierBadge tier={tier} className="absolute top-1 right-1" />
       </div>
       <UpgradeModal
         open={upgradeOpen}

@@ -1,8 +1,11 @@
+import logging
 from decimal import Decimal
 from django.db import transaction
 from apps.credits.services import CreditsService
 from apps.credits.models import CreditsTransaction
 from .models import OnboardingTask, UserTaskCompletion, UserOnboardingState
+
+logger = logging.getLogger(__name__)
 
 
 class OnboardingService:
@@ -138,4 +141,8 @@ class OnboardingService:
                 },
             )
         except Exception:
-            pass
+            # WebSocket push is best-effort; reward is already granted in DB.
+            logger.exception(
+                "onboarding task-completed broadcast failed",
+                extra={"user_id": getattr(user, "id", None), "task_code": task.code},
+            )

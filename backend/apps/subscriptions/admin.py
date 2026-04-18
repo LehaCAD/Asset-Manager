@@ -376,13 +376,15 @@ class SubscriptionAdmin(admin.ModelAdmin):
             return
 
         now = timezone.now()
-        count = queryset.update(
-            plan=creator_pro,
-            status='active',
-            started_at=now,
-            expires_at=now + timedelta(days=30),
-            cancelled_at=None,
-        )
+        count = 0
+        for sub in queryset:
+            sub.plan = creator_pro
+            sub.status = 'active'
+            sub.started_at = now
+            sub.expires_at = now + timedelta(days=30)
+            sub.cancelled_at = None
+            sub.save()
+            count += 1
         self.message_user(
             request,
             f'Назначен тариф «{creator_pro.name}» на 30 дней для {count} подписок.',
@@ -418,13 +420,15 @@ class SubscriptionAdmin(admin.ModelAdmin):
             return
 
         now = timezone.now()
-        count = queryset.update(
-            plan=free_plan,
-            status='active',
-            started_at=now,
-            expires_at=now + timedelta(days=36500),  # ~100 years
-            cancelled_at=None,
-        )
+        count = 0
+        for sub in queryset:
+            sub.plan = free_plan
+            sub.status = 'active'
+            sub.started_at = now
+            sub.expires_at = now + timedelta(days=36500)
+            sub.cancelled_at = None
+            sub.save()
+            count += 1
         self.message_user(
             request,
             f'Сброшено на тариф «{free_plan.name}»: {count} подписок.',

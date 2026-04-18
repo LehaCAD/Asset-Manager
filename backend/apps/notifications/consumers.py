@@ -25,3 +25,6 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
 
     async def onboarding_task_completed(self, event):
         await self.send_json(event)
+
+    async def subscription_changed(self, event):
+        await self.send_json(event)

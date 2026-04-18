@@ -20,16 +20,16 @@ export function AmountPresets() {
     <div>
       <p className="mb-3 text-sm font-semibold text-foreground">Сумма пополнения</p>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         {PRESETS.map((p) => (
           <button
             key={p.amount}
             onClick={() => setSelectedAmount(p.amount)}
             className={cn(
-              'rounded-md border bg-[var(--bg-inset)] p-3 text-center transition-colors',
+              'rounded-md border p-3 text-center transition-colors',
               selectedAmount === p.amount && !customAmount
-                ? 'border-primary bg-primary/5'
-                : 'border-border/50 hover:border-border',
+                ? 'border-primary bg-primary/10'
+                : 'border-border bg-card hover:bg-muted/50',
             )}
           >
             <div
@@ -46,7 +46,7 @@ export function AmountPresets() {
         ))}
       </div>
 
-      <div className="mt-2 flex items-center gap-2 rounded-md border border-border/50 bg-[var(--bg-inset)] px-3 py-2.5">
+      <div className="mt-2 flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2.5">
         <span className="text-sm text-muted-foreground whitespace-nowrap">
           Другая сумма:
         </span>

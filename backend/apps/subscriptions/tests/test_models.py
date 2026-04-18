@@ -26,7 +26,6 @@ class PlanModelTest(TestCase):
             'price': 0,
             'max_projects': 1,
             'max_scenes_per_project': 10,
-            'max_elements_per_scene': 10,
             'storage_limit_gb': 1,
             'display_order': 0,
         }

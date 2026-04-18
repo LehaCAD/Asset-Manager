@@ -49,6 +49,11 @@ backend/tmp_uploads/
 # Claude auto-memory (генерируется хостом, локальный артефакт)
 memory/
 
+# Файлы с ключами и секретами — никогда в git
+docs/Ключи*
+docs/*secret*
+docs/*keys*
+
 # Local worktrees
 .worktrees/
 

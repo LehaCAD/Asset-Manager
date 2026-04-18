@@ -3,13 +3,7 @@
 import { useEffect } from "react";
 import { ElementSelectionCard } from "./ElementSelectionCard";
 import { useDisplayStore } from "@/lib/store/project-display";
-import { DISPLAY_GRID_CONFIG, ASPECT_RATIO_CLASSES, FIT_MODE_CLASSES, CARD_SIZES } from "@/lib/utils/constants";
-import type { DisplayCardSize, DisplayAspectRatio } from "@/lib/types";
-
-// Helper для получения минимальной ширины карточки
-function getMinCardWidth(size: DisplayCardSize, aspectRatio: DisplayAspectRatio): number {
-  return CARD_SIZES[size][aspectRatio].width;
-}
+import { DISPLAY_GRID_CONFIG, ASPECT_RATIO_CLASSES, FIT_MODE_CLASSES } from "@/lib/utils/constants";
 import { cn } from "@/lib/utils";
 import { ImageOff } from "lucide-react";
 import type { Element } from "@/lib/types";
@@ -54,7 +48,7 @@ export function ElementSelectionGrid({
   return (
     <div 
       className={cn("grid", gridConfig.gap, "p-1")}
-      style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${getMinCardWidth(preferences.size, preferences.aspectRatio)}px, 1fr))` }}
+      style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${gridConfig.minWidth}px, 1fr))` }}
     >
       {elements.map((element) => {
         const isSelected = selectedIds.has(element.id);

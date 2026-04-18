@@ -141,6 +141,19 @@ def cleanup_feedback_tmp():
         logger.info("Cleaned up %d stale feedback tmp files", deleted)
 
 
+@shared_task(name='apps.feedback.tasks.auto_close_inactive')
+def auto_close_inactive():
+    """Auto-close open conversations with no activity for 24 hours."""
+    from .models import Conversation
+    cutoff = timezone.now() - timedelta(hours=24)
+    count = Conversation.objects.filter(
+        status=Conversation.STATUS_OPEN,
+        updated_at__lt=cutoff,
+    ).update(status=Conversation.STATUS_CLOSED)
+    if count:
+        logger.info("Auto-closed %d inactive conversations", count)
+
+
 @shared_task
 def cleanup_old_attachments():
     """Удалить вложения старше 90 дней, пометить is_expired."""

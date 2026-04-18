@@ -1,11 +1,36 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
+from apps.subscriptions.models import Subscription
 from apps.subscriptions.services import SubscriptionService
 from apps.subscriptions.serializers import SubscriptionSerializer
 
 User = get_user_model()
+
+
+class UsernameOrEmailTokenSerializer(TokenObtainPairSerializer):
+    """Accept either username or email in the `username` field of /auth/login/.
+
+    If the input looks like an email and matches exactly one user by
+    case-insensitive email, that user's `username` is substituted before the
+    parent `validate` runs — keeping downstream logic (throttling, password
+    check, token issuance) untouched.
+
+    If multiple users share the same email (model-level uniqueness is NOT
+    enforced historically), we refuse to guess: fall through with the original
+    identifier, which will fail authentication. The user must log in by username.
+    """
+
+    def validate(self, attrs):
+        identifier = (attrs.get("username") or "").strip()
+        if "@" in identifier:
+            matches = list(User.objects.filter(email__iexact=identifier)[:2])
+            if len(matches) == 1:
+                attrs["username"] = matches[0].username
+            # len == 0 or len > 1 → leave identifier as-is; simplejwt will 401.
+        return super().validate(attrs)
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -27,9 +52,12 @@ class RegisterSerializer(serializers.ModelSerializer):
         fields = ('username', 'email', 'password', 'password_confirm', 'tos_accepted')
 
     def validate_email(self, value: str) -> str:
-        if User.objects.filter(email=value).exists():
+        # Case-insensitive to match the login-by-email path and prevent near-duplicates
+        # like "Alice@x.com" vs "alice@x.com" which would break `UsernameOrEmailTokenSerializer`.
+        normalized = (value or "").strip().lower()
+        if User.objects.filter(email__iexact=normalized).exists():
             raise serializers.ValidationError("Пользователь с таким email уже существует.")
-        return value
+        return normalized
 
     def validate_tos_accepted(self, value):
         if not value:
@@ -70,7 +98,7 @@ class UserSerializer(serializers.ModelSerializer):
         try:
             sub = obj.subscription
             return SubscriptionSerializer(sub).data
-        except Exception:
+        except Subscription.DoesNotExist:
             return None
 
 

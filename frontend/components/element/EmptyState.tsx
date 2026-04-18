@@ -2,7 +2,6 @@
 
 import { Upload, ImagePlus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useOnboardingStore } from "@/lib/store/onboarding";
 
 export interface EmptyStateProps {
   onUploadClick: () => void;
@@ -10,23 +9,8 @@ export interface EmptyStateProps {
 }
 
 export function EmptyState({ onUploadClick, isDragActive = false }: EmptyStateProps) {
-  const getTaskForPage = useOnboardingStore((s) => s.getTaskForPage);
-  const elementsTask = getTaskForPage('elements');
-
   return (
     <div className="flex flex-col gap-4 w-full h-full">
-      {/* Onboarding hint: shown when first_generation task is not yet completed */}
-      {elementsTask && (
-        <div
-          className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm"
-          style={{ background: 'rgba(139, 124, 247, 0.1)', border: '1px solid rgba(139, 124, 247, 0.2)' }}
-        >
-          <span className="text-base">✨</span>
-          <span style={{ color: '#a89ef8' }}>
-            Или сгенерируйте первое изображение — напишите промпт выше ↑
-          </span>
-        </div>
-      )}
     <button
       type="button"
       onClick={onUploadClick}

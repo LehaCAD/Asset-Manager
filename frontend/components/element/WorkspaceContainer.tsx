@@ -25,7 +25,15 @@ import { scenesApi } from '@/lib/api/scenes';
 import { elementsApi } from '@/lib/api/elements';
 import { MoveToGroupDialog } from '@/components/element/MoveToGroupDialog';
 import { RenameDialog } from '@/components/element/RenameDialog';
-import { Upload, ChevronLeft, ChevronRight, FolderPlus, Share2, Plus, MessageSquare } from 'lucide-react';
+import { Upload, ChevronLeft, ChevronRight, FolderPlus, Share2, Plus, MessageSquare, Sliders, X, Menu, ChevronDown } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 import { ReviewsOverlay } from '@/components/sharing/ReviewsOverlay';
 import { ShareSelectionMode } from '@/components/sharing/ShareSelectionMode';
@@ -102,6 +110,7 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   } | null>(null);
   const [isGroupDeleting, setIsGroupDeleting] = useState(false);
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
+  const [configMobileOpen, setConfigMobileOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<{ id: number; name: string } | null>(null);
   const [moveElementId, setMoveElementId] = useState<number | null>(null);
   const [groupRenameTarget, setGroupRenameTarget] = useState<{ id: number; name: string } | null>(null);
@@ -740,10 +749,35 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
 
   return (
     <div className="flex h-full overflow-hidden">
-      {/* Zone 1: Config Panel (left sidebar) */}
+      {/* Zone 1: Config Panel (left sidebar on md+, bottom sheet on mobile) */}
       <div className="hidden md:block">
         <ConfigPanel />
       </div>
+
+      {/* Mobile: Config Panel as TOP sheet, toggled from toolbar button */}
+      {configMobileOpen && (
+        <div className="md:hidden fixed inset-0 z-[60] bg-black/60" onClick={() => setConfigMobileOpen(false)}>
+          <div
+            className="absolute inset-x-0 top-0 max-h-[92vh] overflow-y-auto rounded-b-xl border-b border-border bg-surface shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-surface px-4 py-3">
+              <span className="text-sm font-semibold">Модель и параметры</span>
+              <button
+                type="button"
+                onClick={() => setConfigMobileOpen(false)}
+                className="p-1 text-muted-foreground hover:text-foreground"
+                aria-label="Закрыть"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="px-1 pb-4">
+              <ConfigPanel className="!w-full !border-none" forceOpen hideCollapseButton />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main content area */}
       <div
@@ -755,16 +789,69 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
       >
         <input {...getInputProps()} />
 
-        {/* Breadcrumbs + Filters toolbar — single row */}
-        <div className="flex items-center justify-between border-b px-4 py-2 shrink-0 bg-surface relative z-50">
-          {/* Left: breadcrumbs + create group */}
+        {/* Toolbar. Desktop: single row. Mobile: two rows — navigation dropdown on row 1,
+            action buttons on row 2 (Создать группу + Отзывы left; Фильтры + Вид right).
+            `z-30` so that Lightbox (z-55) / ReviewsOverlay (z-60) / ModelSelector (z-70) all cleanly overlay. */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b px-3 sm:px-4 py-2 shrink-0 bg-surface relative z-30">
+          {/* Row 1 — navigation */}
           <div className="flex items-center gap-1 min-w-0">
+            {/* Mobile nav dropdown — unified path with click-to-navigate items */}
             {breadcrumbs.length > 0 && (
-              <>
+              <div className="sm:hidden flex-1 min-w-0">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex items-center gap-2 w-full h-9 rounded-md px-3 text-sm font-medium text-foreground bg-card hover:bg-card/80 transition-colors"
+                      aria-label="Навигация"
+                    >
+                      <Menu className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span className="truncate text-left flex-1">
+                        {breadcrumbs[breadcrumbs.length - 1].label}
+                      </span>
+                      <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-[calc(100vw-1.5rem)] max-w-xs">
+                    <DropdownMenuLabel className="text-[11px] font-normal text-muted-foreground uppercase tracking-wider">
+                      Навигация
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleBack} className="cursor-pointer">
+                      <ChevronLeft className="w-4 h-4 mr-2" />
+                      Назад
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    {breadcrumbs.map((crumb, i) => {
+                      const isCurrent = i === breadcrumbs.length - 1;
+                      return (
+                        <DropdownMenuItem
+                          key={i}
+                          onClick={() => crumb.href && router.push(crumb.href)}
+                          disabled={isCurrent || !crumb.href}
+                          className={cn(
+                            "cursor-pointer",
+                            isCurrent && "font-semibold text-primary"
+                          )}
+                        >
+                          <span className="truncate">{crumb.label}</span>
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )}
+
+            {/* Desktop back + breadcrumbs */}
+            {breadcrumbs.length > 0 && (
+              <div className="hidden sm:flex items-center gap-1 min-w-0">
                 <button
                   type="button"
                   onClick={handleBack}
                   className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                  aria-label="Назад"
+                  title="Назад"
                 >
                   <ChevronLeft className="w-4 h-4" />
                   <span>Назад</span>
@@ -786,25 +873,58 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
                     )}
                   </span>
                 ))}
-              </>
+                <button
+                  type="button"
+                  onClick={() => setCreateGroupOpen(true)}
+                  className="flex items-center gap-1.5 h-7 rounded text-xs font-medium text-primary bg-card hover:bg-card/80 transition-colors shrink-0 px-3 ml-2"
+                >
+                  <FolderPlus className="h-4 w-4" />
+                  Создать группу
+                </button>
+              </div>
             )}
-            <button
-              type="button"
-              onClick={() => setCreateGroupOpen(true)}
-              className="flex items-center gap-1.5 h-7 px-3 ml-2 rounded text-xs font-medium text-primary bg-card hover:bg-card/80 transition-colors shrink-0"
-            >
-              <FolderPlus className="h-4 w-4" />
-              Создать группу
-            </button>
           </div>
 
-          {/* Right: reviews + active links + filters + view */}
-          <div className="flex items-center gap-1.5 shrink-0">
+          {/* Row 2 (mobile) / trailing actions (desktop) */}
+          <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-1.5 shrink-0">
+            {/* Mobile-only: labeled CTA + Reviews on the left */}
+            <div className="flex items-center gap-2 sm:hidden">
+              <button
+                type="button"
+                onClick={() => setCreateGroupOpen(true)}
+                className="flex items-center gap-1.5 h-9 rounded-md text-xs font-medium text-primary bg-card hover:bg-card/80 transition-colors shrink-0 px-3"
+                aria-label="Создать группу"
+              >
+                <FolderPlus className="h-4 w-4" />
+                Группа
+              </button>
+              <button
+                type="button"
+                onClick={() => setReviewsOpen(!reviewsOpen)}
+                className={cn(
+                  "relative flex items-center gap-1.5 h-9 rounded-md text-xs font-medium transition-colors shrink-0 px-3",
+                  reviewsOpen
+                    ? "bg-primary/20 text-primary"
+                    : "text-muted-foreground bg-card hover:text-foreground"
+                )}
+                aria-label="Отзывы"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                Отзывы
+                {feedbackUnread > 0 && !reviewsOpen && (
+                  <span className="bg-primary text-white text-[10px] font-bold rounded px-1.5 py-0.5 min-w-[18px] text-center leading-none">
+                    {feedbackUnread}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* Desktop-only: Reviews button with label */}
             <button
               type="button"
               onClick={() => setReviewsOpen(!reviewsOpen)}
               className={cn(
-                "flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium transition-colors shrink-0",
+                "hidden sm:flex relative items-center gap-1.5 h-7 rounded text-xs font-medium transition-colors shrink-0 px-3",
                 reviewsOpen
                   ? "bg-primary/20 text-primary"
                   : "text-muted-foreground bg-card hover:text-foreground"
@@ -818,12 +938,16 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
                 </span>
               )}
             </button>
-            <ElementFilters
-              filter={filter}
-              onFilterChange={setFilter}
-              counts={filterCounts}
-            />
-            <DisplaySettingsPopover />
+
+            {/* Icon-only filters + view — always icon-only on mobile */}
+            <div className="flex items-center gap-1 sm:gap-1.5">
+              <ElementFilters
+                filter={filter}
+                onFilterChange={setFilter}
+                counts={filterCounts}
+              />
+              <DisplaySettingsPopover />
+            </div>
           </div>
         </div>
 
@@ -856,12 +980,26 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
           )}
         </div>
 
-        {/* Zone 2: Prompt Bar (floating bottom) */}
+        {/* Zone 2: Prompt Bar (floating bottom) + mobile ConfigPanel trigger sitting right above it */}
         <div ref={promptBarRef} className="absolute bottom-0 left-0 right-0 z-40 pointer-events-none">
+          {/* Mobile-only: labeled trigger for ConfigPanel sheet.
+              Placed directly above PromptBar so «Выбрать модель» reads naturally with «Опишите идею». */}
+          <button
+            type="button"
+            onClick={() => setConfigMobileOpen(true)}
+            className="md:hidden pointer-events-auto flex items-center justify-between gap-2 w-[calc(100%-1rem)] mx-2 -mb-px rounded-t-xl border border-b-0 border-border bg-card/80 backdrop-blur hover:bg-card transition-colors px-4 py-2 text-[13px] font-medium text-foreground"
+          >
+            <span className="flex items-center gap-2">
+              <Sliders className="h-4 w-4 text-primary" strokeWidth={2} />
+              Выбрать модель и параметры
+            </span>
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          </button>
           <div className="pointer-events-auto">
             <PromptBar projectId={projectId} groupId={groupId} />
           </div>
         </div>
+
 
         {/* Bulk actions bar */}
         <ElementBulkBar

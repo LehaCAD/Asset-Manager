@@ -7,7 +7,7 @@ export default function CabinetRootLayout({
 }) {
   return (
     <AuthGuard>
-      <div className="flex h-screen flex-col bg-background overflow-hidden">
+      <div className="flex h-screen flex-col bg-background overflow-x-hidden overflow-y-hidden">
         <main className="flex-1 flex flex-col min-h-0">{children}</main>
       </div>
     </AuthGuard>

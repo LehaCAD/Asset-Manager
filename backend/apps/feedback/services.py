@@ -187,4 +187,4 @@ def _send_to_admin_channel(payload):
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)("feedback_admin", payload)
     except Exception:
-        pass
+        logger.exception("Failed to broadcast to feedback_admin channel")

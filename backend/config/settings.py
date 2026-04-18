@@ -70,6 +70,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'apps.common.middleware.RequestIDMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
@@ -179,11 +180,12 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.UserRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'anon': '60/minute',
-        'user': '120/minute',
-        'auth': '5/minute',
+        'anon': '120/minute',
+        'user': '600/minute',
+        'auth': '10/minute',
         'webhook': '30/minute',
     },
+    'EXCEPTION_HANDLER': 'apps.common.exceptions.api_exception_handler',
 }
 
 # SimpleJWT
@@ -246,6 +248,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.feedback.tasks.cleanup_old_attachments',
         'schedule': 86400.0,  # every 24 hours
     },
+    'auto-close-inactive-feedback': {
+        'task': 'apps.feedback.tasks.auto_close_inactive',
+        'schedule': 3600.0,  # every hour
+    },
 }
 
 # AWS S3 Configuration
@@ -293,34 +299,82 @@ if not DEBUG:
 
 # === Sentry ===
 SENTRY_DSN = os.getenv('SENTRY_DSN', '')
+SENTRY_ENVIRONMENT = os.getenv('SENTRY_ENVIRONMENT', 'production' if not DEBUG else 'development')
+SENTRY_RELEASE = os.getenv('SENTRY_RELEASE', os.getenv('GIT_SHA', ''))
+
 if SENTRY_DSN and not DEBUG:
     import sentry_sdk
+    from sentry_sdk.integrations.django import DjangoIntegration
+    from sentry_sdk.integrations.celery import CeleryIntegration
+    from sentry_sdk.integrations.logging import LoggingIntegration
+
+    _SENSITIVE_KEYS = {'password', 'token', 'secret', 'authorization', 'access', 'refresh', 'cookie'}
+
+    def _sentry_scrub(event, hint):
+        """Strip sensitive data from Sentry events (headers, request body, extras)."""
+        try:
+            request = event.get('request') or {}
+            headers = request.get('headers') or {}
+            for key in list(headers.keys()):
+                if key.lower() in _SENSITIVE_KEYS:
+                    headers[key] = '[Filtered]'
+            data = request.get('data')
+            if isinstance(data, dict):
+                for key in list(data.keys()):
+                    if key.lower() in _SENSITIVE_KEYS:
+                        data[key] = '[Filtered]'
+        except Exception:  # noqa: BLE001 — never break telemetry
+            pass
+        return event
+
     sentry_sdk.init(
         dsn=SENTRY_DSN,
-        traces_sample_rate=0.1,
-        profiles_sample_rate=0.1,
+        environment=SENTRY_ENVIRONMENT,
+        release=SENTRY_RELEASE or None,
+        integrations=[
+            DjangoIntegration(),
+            CeleryIntegration(),
+            LoggingIntegration(level=None, event_level=None),
+        ],
+        traces_sample_rate=float(os.getenv('SENTRY_TRACES_SAMPLE_RATE', '0.1')),
+        profiles_sample_rate=float(os.getenv('SENTRY_PROFILES_SAMPLE_RATE', '0.1')),
         send_default_pii=False,
+        before_send=_sentry_scrub,
     )
 
 # === Logging ===
+LOG_FORMAT = os.getenv('LOG_FORMAT', 'json' if not DEBUG else 'text').lower()
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'filters': {
+        'context': {
+            '()': 'apps.common.logging_filter.ContextFilter',
+        },
+    },
     'formatters': {
         'verbose': {
-            'format': '[{asctime}] {levelname} {name} {message}',
+            'format': '[{asctime}] {levelname} {name} rid={request_id} uid={user_id} {message}',
             'style': '{',
+        },
+        'json': {
+            '()': 'pythonjsonlogger.jsonlogger.JsonFormatter',
+            'format': '%(asctime)s %(levelname)s %(name)s %(message)s %(request_id)s %(user_id)s %(path)s %(method)s %(task_id)s %(task_name)s',
+            'rename_fields': {'asctime': 'timestamp', 'levelname': 'level', 'name': 'logger'},
         },
     },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
+            'formatter': 'json' if LOG_FORMAT == 'json' else 'verbose',
+            'filters': ['context'],
         },
     },
     'root': {
         'handlers': ['console'],
-        'level': 'INFO',
+        'level': LOG_LEVEL,
     },
     'loggers': {
         'django': {
@@ -328,7 +382,22 @@ LOGGING = {
             'level': 'WARNING',
             'propagate': False,
         },
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'django.server': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
         'apps': {
+            'handlers': ['console'],
+            'level': LOG_LEVEL,
+            'propagate': False,
+        },
+        'celery': {
             'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,
@@ -337,12 +406,17 @@ LOGGING = {
 }
 
 # === Email ===
+# Отправляем через reg.ru (mail.hosting.reg.ru). SSL 465, либо STARTTLS 587.
+# Полная документация: docs/systems/email.md
 EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
-EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.yandex.ru')
-EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
-EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() == 'true'
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'mail.hosting.reg.ru')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '465'))
+EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'True').lower() == 'true'
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'False').lower() == 'true'
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+EMAIL_TIMEOUT = int(os.getenv('EMAIL_TIMEOUT', '20'))
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'Раскадровка <noreply@raskadrawka.ru>')
+SERVER_EMAIL = os.getenv('SERVER_EMAIL', DEFAULT_FROM_EMAIL)
 
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')

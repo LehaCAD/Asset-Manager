@@ -4,7 +4,7 @@ import type { Notification } from "@/lib/types";
 
 type NotificationTab = 'all' | 'feedback' | 'content';
 
-// Типы фидбека — теперь живут в overlay «Отзывы», не в bell
+// Типы фидбека — теперь живут в overlay «Ссылки и отзывы», не в bell
 const FEEDBACK_TYPES = ['comment_new', 'reaction_new', 'review_new'];
 
 const TAB_TYPES: Record<NotificationTab, string[] | null> = {
@@ -16,6 +16,7 @@ const TAB_TYPES: Record<NotificationTab, string[] | null> = {
 interface NotificationState {
   notifications: Notification[];
   unreadCount: number;
+  feedbackUnreadCount: number;
   hasMore: boolean;
   isLoading: boolean;
   error: boolean;
@@ -31,6 +32,7 @@ interface NotificationState {
   addNotification: (notification: Notification) => void;
   getBellNotifications: () => Notification[];
   getBellUnreadCount: () => number;
+  getFeedbackUnreadCount: () => number;
 }
 
 export type { NotificationTab };
@@ -38,6 +40,7 @@ export type { NotificationTab };
 export const useNotificationStore = create<NotificationState>((set, get) => ({
   notifications: [],
   unreadCount: 0,
+  feedbackUnreadCount: 0,
   hasMore: false,
   isLoading: false,
   error: false,
@@ -46,8 +49,8 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
   fetchUnreadCount: async () => {
     try {
-      const count = await notificationsApi.unreadCount();
-      set({ unreadCount: count });
+      const data = await notificationsApi.unreadCount();
+      set({ unreadCount: data.count, feedbackUnreadCount: data.feedback_count });
     } catch {
       // silently ignore — unread badge is non-critical
     }
@@ -101,13 +104,16 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     set((state) => ({
       notifications: state.notifications.map((n) => ({ ...n, is_read: true })),
       unreadCount: 0,
+      feedbackUnreadCount: 0,
     }));
   },
 
   addNotification: (notification) => {
+    const isFeedback = FEEDBACK_TYPES.includes(notification.type);
     set((state) => ({
       notifications: [notification, ...state.notifications],
-      unreadCount: state.unreadCount + 1,
+      unreadCount: isFeedback ? state.unreadCount : state.unreadCount + 1,
+      feedbackUnreadCount: isFeedback ? state.feedbackUnreadCount + 1 : state.feedbackUnreadCount,
     }));
   },
 
@@ -118,8 +124,10 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   },
 
   getBellUnreadCount: () => {
-    return get().notifications.filter(
-      (n) => !FEEDBACK_TYPES.includes(n.type) && !n.is_read
-    ).length;
+    return get().unreadCount;
+  },
+
+  getFeedbackUnreadCount: () => {
+    return get().feedbackUnreadCount;
   },
 }));

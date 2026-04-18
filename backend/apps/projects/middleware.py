@@ -2,6 +2,7 @@
 JWT-аутентификация для WebSocket-соединений.
 Токен передается в query string: ws://host/ws/projects/1/?token=<jwt_access_token>
 """
+import logging
 from urllib.parse import parse_qs
 from channels.db import database_sync_to_async
 from channels.middleware import BaseMiddleware
@@ -9,6 +10,7 @@ from django.contrib.auth.models import AnonymousUser
 from rest_framework_simplejwt.tokens import AccessToken
 from django.contrib.auth import get_user_model
 
+logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
@@ -20,6 +22,9 @@ def get_user_from_token(token_str: str):
         user_id = token['user_id']
         return User.objects.get(id=user_id)
     except Exception:
+        # Invalid/expired tokens are common (tokens rotate every 30 minutes) —
+        # use DEBUG to avoid log spam, but never silent.
+        logger.debug("WS JWT auth failed", exc_info=True)
         return AnonymousUser()
 
 
@@ -51,7 +56,7 @@ def get_user_from_session(scope):
         if uid:
             return User.objects.get(id=uid)
     except Exception:
-        pass
+        logger.debug("WS session auth failed", exc_info=True)
     return AnonymousUser()
 
 

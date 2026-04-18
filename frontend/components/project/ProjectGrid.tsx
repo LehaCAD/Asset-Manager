@@ -1,27 +1,32 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, FolderOpen } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Plus, FolderOpen, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProjectCard } from "./ProjectCard";
 import { CreateProjectDialog } from "./CreateProjectDialog";
-import { ShareLinksPanel } from "@/components/sharing/ShareLinksPanel";
-import { LimitBar } from "@/components/subscription/LimitBar";
+import { ReviewsOverlay } from "@/components/sharing/ReviewsOverlay";
+import { TierBadge } from "@/components/subscription/TierBadge";
 import { UpgradeModal } from "@/components/subscription/UpgradeModal";
 import { useProjectsStore } from "@/lib/store/projects";
 import { useAuthStore } from "@/lib/store/auth";
 import { useOnboardingStore } from "@/lib/store/onboarding";
 import { OnboardingEmptyState } from "@/components/onboarding/OnboardingEmptyState";
+import { useNotificationStore } from "@/lib/store/notifications";
 
 export function ProjectGrid() {
+  const router = useRouter();
   const { projects, isLoading, loadProjects } = useProjectsStore();
   const user = useAuthStore((s) => s.user);
-  const getTaskForPage = useOnboardingStore((s) => s.getTaskForPage);
+  const getAnyTaskForPage = useOnboardingStore((s) => s.getAnyTaskForPage);
+  const onboardingTasks = useOnboardingStore((s) => s.tasks);
   const quota = user?.quota;
   const [createOpen, setCreateOpen] = useState(false);
-  const [linksPanelOpen, setLinksPanelOpen] = useState(false);
+  const [reviewsOpen, setReviewsOpen] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const feedbackUnread = useNotificationStore((s) => s.feedbackUnreadCount);
 
   const isAtProjectLimit = quota
     ? quota.max_projects > 0 && quota.used_projects >= quota.max_projects
@@ -33,68 +38,78 @@ export function ProjectGrid() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      {/* Header - breadcrumbs + create button */}
-      <div className="flex items-center border-b px-4 py-2 bg-surface shrink-0">
-        <span className="text-sm text-foreground font-medium">Проекты</span>
-        {!isLoading && (
-          <span className="text-sm text-muted-foreground ml-2">
-            · {projects.length} {projectsLabel(projects.length)}
-          </span>
-        )}
-        <button
-          type="button"
-          onClick={() => isAtProjectLimit ? setUpgradeOpen(true) : setCreateOpen(true)}
-          className={`flex items-center gap-1.5 h-7 px-3 ml-3 rounded text-xs font-medium transition-colors shrink-0 ${
-            isAtProjectLimit
-              ? "text-muted-foreground bg-muted cursor-not-allowed"
-              : "text-primary bg-card hover:bg-card/80"
-          }`}
-        >
-          <Plus className="h-4 w-4" />
-          Создать проект
-        </button>
-        <div className="ml-auto">
+      {/* Header — two rows on mobile, single row on sm+ */}
+      <div className="flex flex-col sm:flex-row sm:items-center border-b px-4 py-2 gap-2 bg-surface shrink-0">
+        {/* Row 1: title + count */}
+        <div className="flex items-center">
+          <span className="text-sm text-foreground font-medium">Проекты</span>
+          {!isLoading && (
+            <span className="text-sm text-muted-foreground ml-2">
+              · {quota && quota.max_projects > 0
+                ? `${projects.length} / ${quota.max_projects}`
+                : `${projects.length} ${projectsLabel(projects.length)}`}
+            </span>
+          )}
+        </div>
+        {/* Row 2: actions — CTA + reviews */}
+        <div className="flex items-center gap-2 sm:ml-3 sm:flex-1">
           <button
             type="button"
-            onClick={() => setLinksPanelOpen(true)}
-            className="flex items-center gap-1.5 h-7 px-3 rounded text-xs font-medium text-muted-foreground bg-card hover:text-foreground transition-colors shrink-0"
+            onClick={() => isAtProjectLimit ? setUpgradeOpen(true) : setCreateOpen(true)}
+            className="flex items-center gap-1.5 h-8 px-3 rounded text-xs font-medium text-primary bg-card hover:bg-card/80 transition-colors shrink-0"
           >
-            Активные ссылки
+            <Plus className="h-4 w-4" />
+            Создать проект
+            {isAtProjectLimit && <TierBadge tier="plus" />}
+          </button>
+          <button
+            type="button"
+            onClick={() => setReviewsOpen(!reviewsOpen)}
+            className="flex items-center gap-1.5 h-8 px-3 rounded text-xs font-medium text-muted-foreground bg-card hover:text-foreground transition-colors shrink-0 sm:ml-auto"
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span>Отзывы</span>
+            {feedbackUnread > 0 && !reviewsOpen && (
+              <span className="bg-primary text-white text-[10px] font-bold rounded px-1.5 py-0.5 min-w-[18px] text-center">
+                {feedbackUnread}
+              </span>
+            )}
           </button>
         </div>
       </div>
 
-      {/* Project limit bar */}
-      {quota && quota.max_projects > 0 && isAtProjectLimit && (
-        <div className="px-4 pt-3">
-          <LimitBar
-            used={quota.used_projects}
-            max={quota.max_projects}
-            label="Проекты"
-            upgradeText="Открыть новые возможности"
-            onUpgrade={() => setUpgradeOpen(true)}
-          />
-        </div>
-      )}
-
       {/* Grid - full width, no max-width */}
       <div className="flex-1 overflow-auto px-4 py-4">
         {isLoading ? (
-            <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))' }}>
+            <div className="grid grid-mobile-1 gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))' }}>
               {Array.from({ length: 8 }).map((_, i) => (
                 <ProjectCardSkeleton key={i} />
               ))}
             </div>
           ) : projects.length === 0 ? (
-            getTaskForPage('projects')
-              ? <OnboardingEmptyState task={getTaskForPage('projects')!} onAction={() => setCreateOpen(true)} />
+            getAnyTaskForPage('projects')
+              ? <OnboardingEmptyState task={getAnyTaskForPage('projects')!} onAction={() => setCreateOpen(true)} />
               : <EmptyState onCreateClick={() => setCreateOpen(true)} />
           ) : (
-            <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))' }}>
-              {projects.map((project) => (
-                <ProjectCard key={project.id} project={project} />
-              ))}
-            </div>
+            (() => {
+              const createProjectDone = onboardingTasks.find(t => t.code === 'create_project')?.completed;
+              const createSceneDone = onboardingTasks.find(t => t.code === 'create_scene')?.completed;
+              const shouldHint = createProjectDone && !createSceneDone && projects.length >= 1;
+              const newestId = shouldHint
+                ? [...projects].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]?.id
+                : null;
+              return (
+                <div className="grid grid-mobile-1 gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))' }}>
+                  {projects.map((project) => (
+                    <ProjectCard
+                      key={project.id}
+                      project={project}
+                      highlight={project.id === newestId}
+                    />
+                  ))}
+                </div>
+              );
+            })()
           )}
       </div>
 
@@ -108,24 +123,18 @@ export function ProjectGrid() {
         limitMax={quota?.max_projects}
       />
 
-      {/* Global share links panel (slide-over) */}
-      {linksPanelOpen && (
-        <div className="fixed inset-y-0 right-0 z-50 w-80 bg-background border-l shadow-xl flex flex-col">
-          <div className="flex items-center justify-between px-4 py-3 border-b">
-            <h3 className="text-sm font-medium">Все ссылки для просмотра</h3>
-            <button
-              type="button"
-              onClick={() => setLinksPanelOpen(false)}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              ✕
-            </button>
-          </div>
-          <div className="flex-1 overflow-auto">
-            <ShareLinksPanel />
-          </div>
-        </div>
-      )}
+      <ReviewsOverlay
+        isOpen={reviewsOpen}
+        onClose={() => setReviewsOpen(false)}
+        onOpenLightbox={(elementId, sceneId, elProjectId) => {
+          setReviewsOpen(false)
+          if (sceneId) {
+            router.push(`/projects/${elProjectId}/groups/${sceneId}?lightbox=${elementId}`)
+          } else {
+            router.push(`/projects/${elProjectId}?lightbox=${elementId}`)
+          }
+        }}
+      />
     </div>
   );
 }

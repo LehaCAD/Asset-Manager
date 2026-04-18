@@ -1,36 +1,46 @@
 "use client";
 
-import { useState } from "react";
 import { useGenerationStore } from "@/lib/store/generation";
-import { useSubscriptionStore } from "@/lib/store/subscription";
+import { useFeatureGate } from "@/lib/hooks/useFeatureGate";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { UpgradeModal } from "@/components/subscription/UpgradeModal";
-import { ProBadge } from "@/components/subscription/ProBadge";
+import { TierBadge } from "@/components/subscription/TierBadge";
 import { Info } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-export function PromptEnhanceToggle() {
+interface Props {
+  variant?: "standalone" | "inline";
+}
+
+export function PromptEnhanceToggle({ variant = "standalone" }: Props) {
   const enhancePrompt = useGenerationStore((s) => s.enhancePrompt);
   const setEnhancePrompt = useGenerationStore((s) => s.setEnhancePrompt);
-  const hasFeature = useSubscriptionStore((s) => s.hasFeature("ai_prompt"));
-  const [showUpgrade, setShowUpgrade] = useState(false);
+  const gate = useFeatureGate("ai_prompt");
 
-  if (!hasFeature) {
+  const wrapperClass =
+    variant === "inline"
+      ? "flex items-center gap-2 cursor-pointer select-none"
+      : "flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 cursor-pointer hover:bg-accent transition-colors";
+
+  if (gate.isLocked) {
     return (
       <>
-        <button
-          type="button"
-          onClick={() => setShowUpgrade(true)}
-          className="flex items-center gap-1.5 opacity-50 cursor-pointer"
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={gate.openUpgrade}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); gate.openUpgrade(); } }}
+          className={cn(wrapperClass, variant === "inline" ? "hover:opacity-80" : undefined)}
         >
-          <Checkbox disabled checked={false} className="h-3.5 w-3.5" />
-          <span className="text-xs text-muted-foreground">Усилить промпт</span>
-          <ProBadge />
-        </button>
+          <Checkbox disabled checked={false} className="h-3.5 w-3.5 border-foreground/40" />
+          <span className="text-xs text-foreground">Усилить промпт</span>
+          <TierBadge tier={gate.tier} />
+        </div>
         <UpgradeModal
           featureCode="ai_prompt"
-          open={showUpgrade}
-          onOpenChange={setShowUpgrade}
+          open={gate.upgradeOpen}
+          onOpenChange={gate.setUpgradeOpen}
         />
       </>
     );
@@ -38,16 +48,16 @@ export function PromptEnhanceToggle() {
 
   return (
     <TooltipProvider>
-      <label className="flex items-center gap-1.5 cursor-pointer">
+      <label className={cn(wrapperClass, variant === "inline" ? "hover:opacity-80" : undefined)}>
         <Checkbox
           checked={enhancePrompt}
           onCheckedChange={(checked) => setEnhancePrompt(checked === true)}
-          className="h-3.5 w-3.5"
+          className="h-3.5 w-3.5 border-foreground/50"
         />
-        <span className="text-xs text-muted-foreground">Усилить промпт</span>
+        <span className="text-xs text-foreground">Усилить промпт</span>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Info className="h-3.5 w-3.5 text-muted-foreground/50" />
+            <Info className="h-3.5 w-3.5 text-muted-foreground" />
           </TooltipTrigger>
           <TooltipContent>
             <p>Промпт будет автоматически дополнен и улучшен для лучшего результата генерации.</p>

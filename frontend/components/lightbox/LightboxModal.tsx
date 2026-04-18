@@ -305,6 +305,30 @@ export function LightboxModal({
     return () => window.removeEventListener("keydown", handler);
   }, [isOpen, onClose, handlePrev, handleNext]);
 
+  // Touch swipe handlers (mobile): horizontal swipe navigates prev/next.
+  const touchRef = useRef<{ x: number; y: number } | null>(null);
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const t = e.touches[0];
+    if (!t) return;
+    touchRef.current = { x: t.clientX, y: t.clientY };
+  }, []);
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    const start = touchRef.current;
+    touchRef.current = null;
+    if (!start) return;
+    const t = e.changedTouches[0];
+    if (!t) return;
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    // Require clear horizontal intent: |dx| > 50 and |dx| > 1.5 * |dy|
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    if (dx > 0) {
+      handlePrev();
+    } else {
+      handleNext();
+    }
+  }, [handlePrev, handleNext]);
+
   // Prevent body scroll when open
   useEffect(() => {
     if (isOpen) {
@@ -340,7 +364,7 @@ export function LightboxModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col"
+      className="fixed inset-0 z-[55] bg-background/95 backdrop-blur-sm flex flex-col"
       role="dialog"
       aria-modal="true"
       aria-label="Просмотр элемента"
@@ -377,7 +401,11 @@ export function LightboxModal({
       {/* Main content area */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Image/Video area with navigation */}
-        <div className="flex-1 relative flex flex-col items-center justify-center p-4 md:p-8">
+        <div
+          className="flex-1 relative flex flex-col items-center justify-center p-4 md:p-8"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
           {!isEmpty && currentElement && (
             <LightboxNavigation
               onPrev={handlePrev}

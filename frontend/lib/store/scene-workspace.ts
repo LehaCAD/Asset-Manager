@@ -3,6 +3,7 @@ import { scenesApi } from "@/lib/api/scenes";
 import { elementsApi } from "@/lib/api/elements";
 import { projectsApi } from "@/lib/api/projects";
 import { clientUploadFile, PresignOrphanError, preloadImage } from "@/lib/utils/client-upload";
+import { logger } from "@/lib/utils/logger";
 import { toast } from "sonner";
 import type {
   Scene,
@@ -200,9 +201,11 @@ async function processOneUpload(item: QueuedUpload, controller: AbortController)
         throw error;
       }
       if (error instanceof PresignOrphanError) {
-        elementsApi.delete(error.elementId).catch(() => {});
+        elementsApi.delete(error.elementId).catch((delErr) =>
+          logger.warn("scene_workspace.orphan_cleanup_failed", { elementId: error.elementId, cause: delErr })
+        );
       }
-      console.warn("Client upload failed, falling back to server upload:", error);
+      logger.warn("scene_workspace.client_upload_fallback", { cause: error });
       const fallbackProgress = (pct: number) => {
         useSceneWorkspaceStore.getState().updateElement(trackingId, {
           client_upload_phase: "upload_full",

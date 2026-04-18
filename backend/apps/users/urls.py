@@ -6,11 +6,19 @@ from .views import (
     VerifyEmailView, ResendVerificationView,
     ForgotPasswordView, ResetPasswordView,
 )
+from .serializers import UsernameOrEmailTokenSerializer
 from .throttles import AuthRateThrottle
+
+
+class LoginView(TokenObtainPairView):
+    """/auth/login/ — JWT obtain-pair that accepts username OR email."""
+    serializer_class = UsernameOrEmailTokenSerializer
+    throttle_classes = [AuthRateThrottle]
+
 
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='auth-register'),
-    path('login/', TokenObtainPairView.as_view(throttle_classes=[AuthRateThrottle]), name='auth-login'),
+    path('login/', LoginView.as_view(), name='auth-login'),
     path('token/refresh/', TokenRefreshView.as_view(throttle_classes=[AuthRateThrottle]), name='auth-token-refresh'),
     path('me/', MeView.as_view(), name='auth-me'),
     path('me/password/', change_password_view, name='auth-change-password'),

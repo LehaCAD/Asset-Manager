@@ -36,10 +36,11 @@ import type { Project, DownloadableElement } from "@/lib/types";
 
 interface ProjectCardProps {
   project: Project;
+  highlight?: boolean;
 }
 
 
-export function ProjectCard({ project }: ProjectCardProps) {
+export function ProjectCard({ project, highlight = false }: ProjectCardProps) {
   const router = useRouter();
   const deleteProject = useProjectsStore((s) => s.deleteProject);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -82,10 +83,49 @@ export function ProjectCard({ project }: ProjectCardProps) {
 
   return (
     <>
-      <div
-        onClick={handleCardClick}
-        className="group relative bg-card border border-border rounded-md overflow-hidden cursor-pointer hover:border-primary/40 hover:shadow-md hover:shadow-primary/5 transition-all duration-150"
-      >
+      <div className="relative">
+        {highlight && (
+          <>
+            {/* Pulsing purple ring */}
+            <div
+              aria-hidden
+              className="absolute -inset-1 rounded-lg pointer-events-none animate-project-highlight"
+              style={{
+                boxShadow:
+                  "0 0 0 2px rgba(139, 124, 247, 0.9), 0 0 28px rgba(139, 124, 247, 0.45)",
+              }}
+            />
+            {/* Floating label below card */}
+            <div
+              className="absolute -bottom-11 left-1/2 -translate-x-1/2 pointer-events-none z-10 animate-float-hint-down"
+              style={{
+                background: "linear-gradient(135deg, #8B7CF7, #6B5CE7)",
+                padding: "6px 14px",
+                borderRadius: "10px",
+                fontSize: "12px",
+                fontWeight: 600,
+                color: "white",
+                whiteSpace: "nowrap",
+                boxShadow: "0 6px 20px rgba(139, 124, 247, 0.4)",
+              }}
+            >
+              Откройте проект
+              <div
+                className="absolute left-1/2 -translate-x-1/2 w-0 h-0"
+                style={{
+                  top: "-5px",
+                  borderLeft: "6px solid transparent",
+                  borderRight: "6px solid transparent",
+                  borderBottom: "6px solid #8B7CF7",
+                }}
+              />
+            </div>
+          </>
+        )}
+        <div
+          onClick={handleCardClick}
+          className="group relative bg-card border border-border rounded-md overflow-hidden cursor-pointer hover:border-primary/40 hover:shadow-md hover:shadow-primary/5 transition-all duration-150"
+        >
         {/* Preview area */}
         <div className="aspect-video bg-muted relative overflow-hidden">
           {(() => {
@@ -259,6 +299,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
           <div className="text-xs text-muted-foreground/60">
             {formatRelativeDate(project.updated_at)}
           </div>
+        </div>
         </div>
       </div>
 

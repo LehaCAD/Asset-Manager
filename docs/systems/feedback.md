@@ -215,7 +215,7 @@ frontend/
 │   ├── AttachmentPreview.tsx  → Превью изображений/файлов (adaptive width)
 │   ├── FeedbackChat.tsx       → Полный чат в /cabinet/feedback
 │   ├── FeedbackDropdown.tsx   → Попап из navbar
-│   ├── FeedbackButton.tsx     → Pill кнопка «Чат поддержки»
+│   ├── FeedbackButton.tsx     → Icon-кнопка h-9 w-9 с MessageCircle (в Navbar, рядом с Bell). Зелёная точка = непрочитанный ответ
 │   ├── AdminChatPanel.tsx     → Правая панель в /cabinet/inbox
 │   ├── AdminFeedbackInbox.tsx → Контейнер inbox
 │   ├── ConversationList.tsx   → Список диалогов (sidebar)

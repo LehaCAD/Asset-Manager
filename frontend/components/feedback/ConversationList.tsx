@@ -11,7 +11,7 @@ import type { AdminConversation } from '@/lib/types'
 const STATUS_FILTERS = [
   { label: 'Все', value: '' },
   { label: 'Открытые', value: 'open' },
-  { label: 'Решённые', value: 'resolved' },
+  { label: 'Закрытые', value: 'closed' },
 ]
 
 const TAG_LABELS: Record<string, string> = {

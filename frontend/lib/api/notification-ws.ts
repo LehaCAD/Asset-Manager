@@ -1,4 +1,5 @@
 import { WS_BASE_URL } from "@/lib/utils/constants";
+import { logger } from "@/lib/utils/logger";
 import type { WSNewNotificationEvent, WSOnboardingTaskCompletedEvent } from "@/lib/types";
 
 type NotificationHandler = (event: WSNewNotificationEvent) => void;
@@ -62,15 +63,35 @@ class NotificationWSManager {
           this.handlers.forEach((h) => h(notifData));
         } else if (data.type === "onboarding_task_completed") {
           const onboardingData = data as unknown as WSOnboardingTaskCompletedEvent;
-          // Lazy imports to avoid circular dependencies
           void Promise.all([
             import("@/lib/store/onboarding"),
             import("@/lib/store/credits"),
-            import("sonner"),
-          ]).then(([{ useOnboardingStore }, { useCreditsStore }, { toast }]) => {
+            import("@/components/onboarding/AchievementToast"),
+          ]).then(([{ useOnboardingStore }, { useCreditsStore }, { showAchievementToast }]) => {
+            const taskIcon = useOnboardingStore.getState().tasks.find(
+              (t) => t.code === onboardingData.task_code
+            )?.icon ?? "trophy";
             useOnboardingStore.getState().handleTaskCompleted(onboardingData);
             useCreditsStore.getState().loadBalance();
-            toast.success(`Задание выполнено: ${onboardingData.task_title} — +${onboardingData.reward} кадров`);
+            showAchievementToast({
+              taskTitle: onboardingData.task_title,
+              taskIcon,
+              reward: onboardingData.reward,
+              completedCount: onboardingData.completed_count,
+              totalCount: onboardingData.total_count,
+            });
+          });
+        } else if (data.type === "subscription_changed") {
+          // Re-fetch user data to update subscription store
+          void Promise.all([
+            import("@/lib/api/auth"),
+            import("@/lib/store/auth"),
+            import("sonner"),
+          ]).then(([{ authApi }, { useAuthStore }, { toast }]) => {
+            authApi.getMe().then((me) => {
+              useAuthStore.getState().setUser(me);
+              toast.success(`Тариф обновлён: ${(data as { plan_name?: string }).plan_name ?? ""}`);
+            }).catch((err) => logger.warn("notification_ws.refresh_me_failed", { cause: err }));
           });
         }
       } catch {

@@ -18,6 +18,7 @@ interface OnboardingActions {
   markWelcomeSeen: () => Promise<void>;
   completeTask: (taskCode: string) => Promise<void>;
   getTaskForPage: (page: string) => OnboardingTaskDTO | null;
+  getAnyTaskForPage: (page: string) => OnboardingTaskDTO | null;
   isAllCompleted: () => boolean;
   handleTaskCompleted: (event: WSOnboardingTaskCompletedEvent) => void;
 }
@@ -72,6 +73,11 @@ export const useOnboardingStore = create<OnboardingState & OnboardingActions>()(
   getTaskForPage: (page: string) => {
     const { tasks } = get();
     return tasks.find((t) => t.empty_state?.page === page && !t.completed) ?? null;
+  },
+
+  getAnyTaskForPage: (page: string) => {
+    const { tasks } = get();
+    return tasks.find((t) => t.empty_state?.page === page) ?? null;
   },
 
   isAllCompleted: () => {

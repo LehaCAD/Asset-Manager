@@ -5,29 +5,32 @@ import { useParams } from 'next/navigation'
 import {
   ChevronDown,
   ChevronRight,
-  MessageCircle,
   MessageSquare,
   Play,
   Pencil,
   Download,
-  ExternalLink,
   ImageOff,
   Clapperboard,
   ThumbsUp,
   ThumbsDown,
+  X,
+  Video,
+  Image as ImageIcon,
+  Sun,
+  Moon,
+  User as UserIcon,
 } from 'lucide-react'
+import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
 import { sharingApi } from '@/lib/api/sharing'
 import { ReviewerLightbox } from '@/components/sharing/ReviewerLightbox'
 import { ReviewerNameInput } from '@/components/sharing/ReviewerNameInput'
 import { CommentThread } from '@/components/sharing/CommentThread'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
 import { DisplaySettingsPopover } from '@/components/display/DisplaySettingsPopover'
-import { ThemeToggle } from '@/components/layout/ThemeToggle'
 import { useDisplayStore } from '@/lib/store/project-display'
-import { ASPECT_RATIO_CLASSES, FIT_MODE_CLASSES, DISPLAY_GRID_CONFIG, CARD_SIZES, WS_BASE_URL } from '@/lib/utils/constants'
+import { ASPECT_RATIO_CLASSES, FIT_MODE_CLASSES, DISPLAY_GRID_CONFIG, WS_BASE_URL } from '@/lib/utils/constants'
 import type { PublicProject, PublicElement, Comment, DisplayCardSize, DisplayAspectRatio, DisplayFitMode } from '@/lib/types'
 import { getDownloadFilename } from '@/lib/utils/download-filename'
 
@@ -44,7 +47,8 @@ function getReviewStatus(reviews?: { action: string }[]): string | null {
 
 async function handleDownload(url: string, filename?: string) {
   try {
-    const response = await fetch(url)
+    const response = await fetch(url, { mode: 'cors', cache: 'no-store' })
+    if (!response.ok) throw new Error('fetch failed')
     const blob = await response.blob()
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
@@ -85,11 +89,123 @@ function LoadingView() {
   )
 }
 
+function totalCommentCount(comments: Comment[]): number {
+  return comments.reduce((sum, c) => sum + 1 + (c.replies?.length || 0), 0)
+}
+
+// ── Identity + theme popover (reviewer header) ──────────────
+
+function ReviewerIdentityMenu({
+  isAuthenticated,
+  name,
+  onSaveIdentity,
+}: {
+  isAuthenticated: boolean
+  name: string
+  onSaveIdentity: (name: string, sessionId: string) => void
+}) {
+  const { resolvedTheme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+  const isDark = mounted && resolvedTheme === 'dark'
+
+  const displayName = name || 'Гость'
+  const initials = name ? name.slice(0, 2).toUpperCase() : null
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          className={cn(
+            "inline-flex items-center justify-center h-9 w-9 rounded-full transition-colors shrink-0",
+            initials
+              ? "bg-primary text-primary-foreground font-semibold text-[11px] hover:brightness-110"
+              : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80"
+          )}
+          aria-label={initials ? `Профиль ${displayName}` : "Войти"}
+          title={displayName}
+        >
+          {initials ? (
+            <span className="tracking-wide">{initials}</span>
+          ) : (
+            <UserIcon className="h-4 w-4" strokeWidth={1.75} />
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        sideOffset={8}
+        className="w-64 p-0 overflow-hidden z-[80]"
+      >
+        {/* Identity header */}
+        <div className="px-4 py-3 border-b border-border">
+          <p className="text-[11px] text-muted-foreground">Вы вошли как</p>
+          <div className="flex items-center gap-1.5 mt-1">
+            <p className="text-sm font-medium text-foreground truncate">{displayName}</p>
+            {!isAuthenticated && (
+              <Pencil className="w-3 h-3 flex-shrink-0 text-muted-foreground opacity-60" />
+            )}
+          </div>
+        </div>
+
+        {/* Guest name input */}
+        {!isAuthenticated && (
+          <div className="px-4 py-3 border-b border-border">
+            <p className="text-[11px] text-muted-foreground mb-2">
+              Укажите имя, чтобы оставить отзыв или комментарий.
+            </p>
+            <ReviewerNameInput onSave={onSaveIdentity} />
+          </div>
+        )}
+
+        {/* Theme segmented switch — icon-only, full-width, matches navbar */}
+        <div className="px-3 py-3">
+          <div
+            role="group"
+            aria-label="Переключение темы"
+            className="flex items-center rounded-md border border-border bg-muted/40 p-0.5"
+          >
+            <button
+              type="button"
+              onClick={() => setTheme('light')}
+              className={cn(
+                "flex-1 inline-flex items-center justify-center h-8 rounded-sm transition-colors",
+                !isDark
+                  ? "bg-primary/15 text-primary shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+              aria-label="Светлая тема"
+              aria-pressed={!isDark}
+            >
+              <Sun className="h-[18px] w-[18px]" strokeWidth={2} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setTheme('dark')}
+              className={cn(
+                "flex-1 inline-flex items-center justify-center h-8 rounded-sm transition-colors",
+                isDark
+                  ? "bg-primary/15 text-primary shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+              aria-label="Тёмная тема"
+              aria-pressed={isDark}
+            >
+              <Moon className="h-[18px] w-[18px]" strokeWidth={2} />
+            </button>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 // ── Element card ─────────────────────────────────────────────
 
 function ElementCard({
   element,
   commentCount,
+  newCount,
   onClick,
   aspectRatioClass,
   fitModeClass,
@@ -99,6 +215,7 @@ function ElementCard({
 }: {
   element: PublicElement
   commentCount: number
+  newCount?: number
   onClick: () => void
   aspectRatioClass: string
   fitModeClass: string
@@ -111,7 +228,6 @@ function ElementCard({
   const reviewStatus = getReviewStatus(element.reviews)
   const hasLikes = (element.likes ?? 0) > 0
   const hasDislikes = (element.dislikes ?? 0) > 0
-  const hasReactions = hasLikes || hasDislikes
 
   return (
     <div className="flex flex-col">
@@ -148,69 +264,79 @@ function ElementCard({
           />
         )}
 
-        {/* Hover overlay */}
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-150" />
+        {/* Hover overlay — same as workspace */}
+        <div className={cn(
+          "absolute inset-0 z-20 bg-overlay",
+          "opacity-0 group-hover:opacity-100 transition-opacity duration-150",
+          "flex flex-col justify-between p-2"
+        )}>
+          <div />
+          {/* Center - Play icon for video */}
+          {isVideo && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="rounded-md bg-overlay-button hover:bg-overlay-button-hover p-1.5">
+                <Play className="h-5 w-5 text-overlay-text fill-white" />
+              </div>
+            </div>
+          )}
+          {/* Bottom row — download only (no delete for reviewer) */}
+          <div className="flex justify-between items-center">
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                handleDownload(element.file_url, getDownloadFilename(element))
+              }}
+              className="rounded-md bg-overlay-button hover:bg-overlay-button-hover transition-colors text-overlay-text p-1.5"
+              aria-label="Скачать"
+            >
+              <Download className="h-4 w-4" />
+            </button>
+            <div />
+          </div>
+        </div>
 
-        {/* Video play button */}
-        {isVideo && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-11 h-11 rounded-full bg-overlay-button flex items-center justify-center">
-              <Play className="w-5 h-5 text-overlay-text fill-overlay-text" />
+        {/* Top-right badges: media type + AI — same as workspace */}
+        <div className="absolute top-2 right-2 z-40 flex items-center gap-1">
+          {/* Media type — always visible */}
+          <div className="rounded-md bg-black/60 backdrop-blur-sm h-6 w-6 flex items-center justify-center">
+            {isVideo ? (
+              <Video className="h-3.5 w-3.5 text-white" />
+            ) : (
+              <ImageIcon className="h-3.5 w-3.5 text-white" />
+            )}
+          </div>
+          {/* AI badge */}
+          {element.source_type === 'GENERATED' && (
+            <div className="rounded-md bg-black/60 backdrop-blur-sm h-6 w-6 flex items-center justify-center">
+              <span className="text-white font-bold leading-none text-[10px]">AI</span>
+            </div>
+          )}
+        </div>
+
+        {/* Top-left: comment count badge */}
+        {commentCount > 0 && (
+          <div className="absolute top-2 left-2 z-30">
+            <div className="rounded-md bg-black/60 backdrop-blur-sm h-6 px-1.5 flex items-center gap-1">
+              <MessageSquare className="h-3.5 w-3.5 text-white" />
+              <span className="text-[11px] font-semibold text-white">
+                {commentCount > 99 ? '99+' : commentCount}
+              </span>
+              {(newCount ?? 0) > 0 && (
+                <span className="bg-primary text-white text-[9px] font-bold rounded px-1">
+                  +{newCount}
+                </span>
+              )}
             </div>
           </div>
         )}
-
-        {/* Hover: download + original — top-right */}
-        <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-10">
-          <button
-            onClick={(e) => { e.stopPropagation(); handleDownload(element.file_url, getDownloadFilename(element)) }}
-            className="w-7 h-7 rounded-full bg-overlay-button hover:bg-overlay-button-hover flex items-center justify-center"
-            aria-label="Скачать"
-          >
-            <Download className="w-3.5 h-3.5 text-overlay-text" />
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); window.open(element.file_url, '_blank') }}
-            className="w-7 h-7 rounded-full bg-overlay-button hover:bg-overlay-button-hover flex items-center justify-center"
-            aria-label="Открыть оригинал"
-          >
-            <ExternalLink className="w-3.5 h-3.5 text-overlay-text" />
-          </button>
-        </div>
-
-        {/* Top-left badges */}
-        <div className="absolute top-2 left-2 flex items-center gap-1 z-10">
-          {element.source_type === 'GENERATED' && (
-            <div className="bg-black/60 text-white text-[11px] rounded-md px-2 py-1 font-bold leading-none">
-              AI
-            </div>
-          )}
-          {commentCount > 0 && (
-            <div className="flex items-center gap-1 bg-black/60 text-white text-xs rounded-full px-2 py-0.5">
-              <MessageCircle className="w-3 h-3" />
-              {commentCount}
-            </div>
-          )}
-        </div>
       </div>
 
-      {/* Filename below image */}
-      {element.original_filename && (
-        <div className="px-2 py-1 text-xs text-muted-foreground truncate bg-card border border-t-0 border-border border-b-0">
-          {element.original_filename}
-        </div>
-      )}
-
-      {/* Action bar BELOW the image — always visible, not overlapping */}
+      {/* Action bar BELOW the image — reactions */}
       <div className="flex items-center rounded-b-md bg-card border border-t-0 border-border px-2 py-1.5">
-        {/* Like button */}
         <button
           onClick={(e) => {
             e.stopPropagation()
-            if (!hasIdentity) {
-              toast.info('Введите имя, чтобы оставить реакцию')
-              return
-            }
+            if (!hasIdentity) { toast.info('Введите имя, чтобы оставить реакцию'); return }
             onReact(element.id, 'like')
           }}
           className={cn(
@@ -224,15 +350,10 @@ function ElementCard({
           <ThumbsUp className="w-4 h-4" />
           {hasLikes && <span>{element.likes}</span>}
         </button>
-
-        {/* Dislike button */}
         <button
           onClick={(e) => {
             e.stopPropagation()
-            if (!hasIdentity) {
-              toast.info('Введите имя, чтобы оставить реакцию')
-              return
-            }
+            if (!hasIdentity) { toast.info('Введите имя, чтобы оставить реакцию'); return }
             onReact(element.id, 'dislike')
           }}
           className={cn(
@@ -246,7 +367,6 @@ function ElementCard({
           <ThumbsDown className="w-4 h-4" />
           {hasDislikes && <span>{element.dislikes}</span>}
         </button>
-
       </div>
     </div>
   )
@@ -259,9 +379,11 @@ function SceneSection({
   elements,
   collapsible,
   commentsMap,
+  newCommentCounts,
   onElementClick,
   gridStyle,
   gridGap,
+  mobileGridClass,
   aspectRatioClass,
   fitModeClass,
   hasIdentity,
@@ -272,9 +394,11 @@ function SceneSection({
   elements: PublicElement[]
   collapsible: boolean
   commentsMap: Record<number, Comment[]>
+  newCommentCounts: Record<number, number>
   onElementClick: (element: PublicElement) => void
   gridStyle: React.CSSProperties
   gridGap: string
+  mobileGridClass: string
   aspectRatioClass: string
   fitModeClass: string
   hasIdentity: boolean
@@ -298,7 +422,7 @@ function SceneSection({
           open ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />
         )}
         <h2 className="text-sm font-medium text-foreground">{name}</h2>
-        <span className="text-xs text-muted-foreground bg-muted rounded-full px-2 py-0.5">
+        <span className="text-xs text-muted-foreground bg-muted rounded px-2 py-0.5">
           {elements.length}
         </span>
       </button>
@@ -306,12 +430,13 @@ function SceneSection({
       {/* Elements grid */}
       {open && (
         <div className="px-4 pb-4">
-          <div className={`grid ${gridGap}`} style={gridStyle}>
+          <div className={`grid ${mobileGridClass} ${gridGap}`} style={gridStyle}>
             {elements.map((el) => (
               <ElementCard
                 key={el.id}
                 element={el}
-                commentCount={(commentsMap[el.id] || []).length}
+                commentCount={totalCommentCount(commentsMap[el.id] || [])}
+                newCount={newCommentCounts[el.id]}
                 onClick={() => onElementClick(el)}
                 aspectRatioClass={aspectRatioClass}
                 fitModeClass={fitModeClass}
@@ -341,6 +466,15 @@ export default function PublicSharePage() {
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(0)
 
+  // Discussion overlay for reviewer
+  const [discussionOpen, setDiscussionOpen] = useState(false)
+  useEffect(() => {
+    if (!discussionOpen) return
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setDiscussionOpen(false) }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [discussionOpen])
+
   // Reviewer name (display in header)
   const [reviewerName, setReviewerName] = useState('')
 
@@ -357,6 +491,10 @@ export default function PublicSharePage() {
   // Review state: elementId -> 'approved' | 'changes_requested' | 'rejected' | null
   const [reviewMap, setReviewMap] = useState<Record<number, string | null>>({})
 
+  // Track new updates from others (for badges on element cards)
+  const [newCommentCounts, setNewCommentCounts] = useState<Record<number, number>>({})
+  const [newGeneralCount, setNewGeneralCount] = useState(0)
+
   // Authenticated user detection — skip name input & CTA
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
@@ -364,10 +502,11 @@ export default function PublicSharePage() {
   const { preferences, hydratePreferences } = useDisplayStore()
   useEffect(() => { hydratePreferences() }, [hydratePreferences])
   const gridConfig = DISPLAY_GRID_CONFIG[preferences.size][preferences.aspectRatio]
-  const minWidth = CARD_SIZES[preferences.size][preferences.aspectRatio].width
-  const gridStyle: React.CSSProperties = { gridTemplateColumns: `repeat(auto-fill, minmax(${minWidth}px, 1fr))` }
+  const gridStyle: React.CSSProperties = { gridTemplateColumns: `repeat(auto-fill, minmax(${gridConfig.minWidth}px, 1fr))` }
   const aspectRatioClass = ASPECT_RATIO_CLASSES[preferences.aspectRatio]
   const fitModeClass = FIT_MODE_CLASSES[preferences.fitMode]
+  // Mobile density: landscape/square cards span full width; portrait packs 2 per row.
+  const mobileGridClass = preferences.aspectRatio === 'portrait' ? 'grid-mobile-2' : 'grid-mobile-1'
 
   // Check if user is authenticated — use their identity and hide CTA
   useEffect(() => {
@@ -491,6 +630,13 @@ export default function PublicSharePage() {
       if (idx >= 0) {
         setLightboxIndex(idx)
         setLightboxOpen(true)
+        // Clear new comment badge for this element
+        setNewCommentCounts((prev) => {
+          if (!prev[element.id]) return prev
+          const next = { ...prev }
+          delete next[element.id]
+          return next
+        })
       }
     },
     [allElements]
@@ -575,40 +721,63 @@ export default function PublicSharePage() {
           const data = JSON.parse(event.data)
 
           if (data.type === 'new_comment') {
+            // Skip own comments — already added optimistically from API response
+            if (data.session_id && data.session_id === sessionId) return
+
+            const newComment: Comment = {
+              id: data.comment_id,
+              element: data.element_id || null,
+              scene: data.scene_id || null,
+              parent: data.parent_id || null,
+              author_name: data.author_name,
+              author_user: null,
+              session_id: data.session_id || '',
+              text: data.text,
+              is_read: false,
+              created_at: data.created_at,
+              replies: [],
+            }
+
+            // Helper: check if comment exists anywhere in tree
+            const existsInTree = (comments: Comment[], id: number): boolean =>
+              comments.some((c) => c.id === id || (c.replies || []).some((r) => r.id === id))
+
             if (data.element_id) {
-              const newComment: Comment = {
-                id: data.comment_id,
-                element: data.element_id,
-                scene: data.scene_id,
-                parent: null,
-                author_name: data.author_name,
-                author_user: null,
-                session_id: data.session_id || '',
-                text: data.text,
-                is_read: false,
-                created_at: data.created_at,
-                replies: [],
-              }
-              setCommentsMap((prev) => ({
-                ...prev,
-                [data.element_id]: [...(prev[data.element_id] || []), newComment],
-              }))
+              setCommentsMap((prev) => {
+                const existing = prev[data.element_id] || []
+                if (existsInTree(existing, data.comment_id)) return prev
+
+                if (data.parent_id) {
+                  return {
+                    ...prev,
+                    [data.element_id]: existing.map((c) =>
+                      c.id === data.parent_id
+                        ? { ...c, replies: [...(c.replies || []), newComment] }
+                        : c
+                    ),
+                  }
+                }
+                return { ...prev, [data.element_id]: [...existing, newComment] }
+              })
+              // Track new comment for badge
+              setNewCommentCounts((prev) => ({ ...prev, [data.element_id]: (prev[data.element_id] || 0) + 1 }))
+              // Toast with click-to-open
+              toast.info(`${data.author_name}: ${data.text.slice(0, 60)}${data.text.length > 60 ? '…' : ''}`)
             } else if (data.shared_link_id) {
-              // General comment (link-level)
-              const newComment: Comment = {
-                id: data.comment_id,
-                element: null,
-                scene: null,
-                parent: null,
-                author_name: data.author_name,
-                author_user: null,
-                session_id: data.session_id || '',
-                text: data.text,
-                is_read: false,
-                created_at: data.created_at,
-                replies: [],
-              }
-              setGeneralComments((prev) => [...prev, newComment])
+              setGeneralComments((prev) => {
+                if (existsInTree(prev, data.comment_id)) return prev
+
+                if (data.parent_id) {
+                  return prev.map((c) =>
+                    c.id === data.parent_id
+                      ? { ...c, replies: [...(c.replies || []), newComment] }
+                      : c
+                  )
+                }
+                return [...prev, newComment]
+              })
+              setNewGeneralCount((prev) => prev + 1)
+              toast.info(`${data.author_name}: ${data.text.slice(0, 60)}${data.text.length > 60 ? '…' : ''}`)
             }
           } else if (data.type === 'reaction_updated') {
             setProject((prev) => {
@@ -751,80 +920,89 @@ export default function PublicSharePage() {
   const hasMultipleSections = project.scenes.length > 1 || (project.scenes.length === 1 && hasUngrouped)
   const showCollapsible = hasMultipleSections
 
+  const totalNewCount = newGeneralCount + Object.values(newCommentCounts).reduce((s, n) => s + n, 0)
+
   return (
     <div className="min-h-screen bg-muted/30 flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-sm border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 py-2.5 flex items-center justify-between">
+      <header className="sticky top-0 z-[70] bg-background/80 backdrop-blur-sm border-b border-border">
+        {/* Main bar */}
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 px-3 py-2 sm:px-4 sm:py-2.5">
           {/* Logo */}
           <a href="/" className="flex items-center gap-2 shrink-0 hover:opacity-80 transition-opacity">
             <Clapperboard className="h-5 w-5 text-primary" strokeWidth={1.75} />
-            <span className="text-sm font-semibold text-foreground tracking-tight hidden sm:inline">
+            <span className="text-sm font-semibold text-foreground tracking-tight hidden md:inline">
               Раскадровка
             </span>
           </a>
 
-          {/* Project name — center */}
-          <h1 className="text-sm font-medium text-foreground truncate mx-4 max-w-[40%] text-center">
-            {project.name}
-          </h1>
-
-          {/* Controls */}
-          <div className="flex items-center gap-1">
-            <Sheet>
-              <SheetTrigger asChild>
-                <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
-                  <MessageSquare className="w-4 h-4" />
-                  <span className="hidden sm:inline">Обсуждение</span>
-                  {generalComments.length > 0 && (
-                    <span className="bg-emerald-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
-                      {generalComments.length}
-                    </span>
-                  )}
-                </button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-[380px] sm:w-[380px] p-0 flex flex-col">
-                <SheetHeader className="px-4 py-3 border-b border-border shrink-0">
-                  <SheetTitle className="text-sm font-medium">Обсуждение</SheetTitle>
-                </SheetHeader>
-                <div className="flex-1 overflow-y-auto px-4 py-3">
-                  {!hasIdentity ? (
-                    <div className="flex flex-col items-center gap-3 py-8">
-                      <MessageSquare className="w-8 h-8 text-muted-foreground/40" />
-                      <p className="text-sm text-muted-foreground text-center">Представьтесь, чтобы участвовать в обсуждении</p>
-                      <ReviewerNameInput onSave={(name, sid) => {
-                        setReviewerName(name)
-                        setSessionId(sid)
-                      }} />
-                    </div>
-                  ) : (
-                    <CommentThread
-                      comments={generalComments}
-                      onSubmit={handleGeneralCommentSubmit}
-                      isAuthenticated={hasIdentity}
-                    />
-                  )}
-                </div>
-              </SheetContent>
-            </Sheet>
-            <DisplaySettingsPopover />
-            <ThemeToggle />
-            <Popover>
-              <PopoverTrigger asChild>
-                <button className="flex items-center gap-1.5 h-9 px-3 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-150">
-                  <span className="truncate max-w-[100px]">{reviewerName || 'Гость'}</span>
-                  {!isAuthenticated && <Pencil className="w-3 h-3 flex-shrink-0 opacity-50" />}
-                </button>
-              </PopoverTrigger>
-              {!isAuthenticated && (
-                <PopoverContent align="end" className="w-64 p-3">
-                  <ReviewerNameInput onSave={(name, sid) => {
-                    setReviewerName(name)
-                    setSessionId(sid)
-                  }} />
-                </PopoverContent>
+          {/* Project name — truncated, centered on tablet+, hidden on xs (shown below) */}
+          <div className="hidden sm:flex flex-1 flex-col items-center mx-4 max-w-[50%] min-w-0">
+            <h1 className="text-sm font-medium text-foreground truncate w-full text-center">
+              {project.name}
+            </h1>
+            <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+              {project.created_at && (
+                <span>{new Date(project.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
               )}
-            </Popover>
+              {project.total_elements != null && (
+                <span>· {project.total_elements} эл.</span>
+              )}
+              {project.expires_at ? (
+                <span>· до {new Date(project.expires_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</span>
+              ) : (
+                <span>· бессрочная</span>
+              )}
+            </div>
+          </div>
+
+          {/* Controls — all h-9, breathing gap-2, right-aligned */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Обсуждение — icon-only on xs, label on sm+ */}
+            <button
+              onClick={() => { setDiscussionOpen(!discussionOpen); setNewGeneralCount(0); setNewCommentCounts({}) }}
+              className={cn(
+                "relative inline-flex items-center justify-center gap-1.5 h-9 rounded-md text-sm font-medium transition-colors",
+                "w-9 sm:w-auto sm:px-3",
+                discussionOpen ? "bg-primary/20 text-primary" : "bg-primary/10 text-primary hover:bg-primary/20"
+              )}
+              aria-label="Обсуждение"
+            >
+              <MessageSquare className="w-4 h-4" />
+              <span className="hidden sm:inline">Обсуждение</span>
+              {totalNewCount > 0 && !discussionOpen && (
+                <span className={cn(
+                  "bg-primary text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center leading-none",
+                  "sm:static absolute -top-1 -right-1"
+                )}>
+                  {totalNewCount}
+                </span>
+              )}
+            </button>
+
+            <DisplaySettingsPopover />
+
+            {/* User / guest identity popover (also holds theme toggle) */}
+            <ReviewerIdentityMenu
+              isAuthenticated={isAuthenticated}
+              name={reviewerName}
+              onSaveIdentity={(name, sid) => { setReviewerName(name); setSessionId(sid) }}
+            />
+          </div>
+        </div>
+
+        {/* Mobile-only secondary row with project title — больше воздуха, читаемый размер */}
+        <div className="sm:hidden border-t border-border/50 px-4 py-3">
+          <h1 className="text-base font-semibold text-foreground truncate leading-tight">{project.name}</h1>
+          <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-1">
+            {project.total_elements != null && (
+              <span>{project.total_elements} эл.</span>
+            )}
+            {project.expires_at ? (
+              <span>· до {new Date(project.expires_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</span>
+            ) : (
+              <span>· бессрочная</span>
+            )}
           </div>
         </div>
       </header>
@@ -834,12 +1012,13 @@ export default function PublicSharePage() {
         {/* Ungrouped elements */}
         {hasUngrouped && (
           <div className="rounded-lg bg-background border border-border p-4">
-            <div className={`grid ${gridConfig.gap}`} style={gridStyle}>
+            <div className={`grid ${mobileGridClass} ${gridConfig.gap}`} style={gridStyle}>
               {project.ungrouped_elements.map((el) => (
                 <ElementCard
                   key={el.id}
                   element={el}
-                  commentCount={(commentsMap[el.id] || []).length}
+                  commentCount={totalCommentCount(commentsMap[el.id] || [])}
+                  newCount={newCommentCounts[el.id]}
                   onClick={() => handleElementClick(el)}
                   aspectRatioClass={aspectRatioClass}
                   fitModeClass={fitModeClass}
@@ -860,9 +1039,11 @@ export default function PublicSharePage() {
             elements={scene.elements}
             collapsible={showCollapsible}
             commentsMap={commentsMap}
+            newCommentCounts={newCommentCounts}
             onElementClick={handleElementClick}
             gridStyle={gridStyle}
             gridGap={gridConfig.gap}
+            mobileGridClass={mobileGridClass}
             aspectRatioClass={aspectRatioClass}
             fitModeClass={fitModeClass}
             hasIdentity={hasIdentity}
@@ -905,6 +1086,164 @@ export default function PublicSharePage() {
             </div>
           </div>
         </footer>
+      )}
+
+      {/* Discussion overlay */}
+      {discussionOpen && (
+        <div
+          className="fixed inset-0 z-[60] bg-background/95 backdrop-blur-sm overflow-y-auto pt-[72px] sm:pt-[60px]"
+          onClick={(e) => { if (e.target === e.currentTarget) setDiscussionOpen(false) }}
+        >
+          <div className="max-w-[1100px] mx-auto px-3 py-4 sm:p-6">
+            {/* Header */}
+            <div className="flex items-center gap-4 mb-6">
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">Обсуждение</h2>
+                <p className="text-xs text-muted-foreground">Все отзывы и комментарии по элементам</p>
+              </div>
+              <div className="flex-1" />
+              <button
+                onClick={() => setDiscussionOpen(false)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors"
+              >
+                <X className="w-4 h-4" />
+                <span className="text-xs">Esc</span>
+              </button>
+            </div>
+
+            {/* Elements with feedback */}
+            <div className="flex flex-col gap-3">
+              {allElements.map((el) => {
+                const comments = commentsMap[el.id] || []
+                const myReaction = reactionsMap[el.id]
+                const reviews = el.reviews || []
+                const reviewStatus = getReviewStatus(reviews)
+                const hasContent = comments.length > 0 || (el.likes ?? 0) > 0 || (el.dislikes ?? 0) > 0 || reviews.length > 0
+
+                return (
+                  <div key={el.id} className="rounded-lg bg-card border border-border overflow-hidden">
+                    <div className="flex gap-3 px-4 py-3">
+                      {/* Thumbnail — clickable */}
+                      <button
+                        onClick={() => { setDiscussionOpen(false); handleElementClick(el) }}
+                        className="shrink-0 w-14 h-10 rounded bg-muted overflow-hidden hover:ring-2 ring-primary/50 transition-all"
+                      >
+                        {el.thumbnail_url ? (
+                          <img src={el.thumbnail_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-[9px] text-muted-foreground">
+                            {el.element_type === 'VIDEO' ? 'vid' : 'img'}
+                          </div>
+                        )}
+                      </button>
+
+                      {/* Info row */}
+                      <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
+                        <button
+                          onClick={() => { setDiscussionOpen(false); handleElementClick(el) }}
+                          className="text-xs font-medium text-primary hover:underline"
+                        >
+                          Открыть
+                        </button>
+                        {reviewStatus && (
+                          <span className={cn(
+                            "text-[10px] font-medium px-1.5 py-0.5 rounded",
+                            reviewStatus === 'approved' && "bg-emerald-500/10 text-emerald-500",
+                            reviewStatus === 'changes_requested' && "bg-orange-500/10 text-orange-500",
+                            reviewStatus === 'rejected' && "bg-red-500/10 text-red-400",
+                          )}>
+                            {reviewStatus === 'approved' ? '✓ Согласовано' : reviewStatus === 'changes_requested' ? '↻ На доработку' : '✕ Отклонено'}
+                          </span>
+                        )}
+                        {(el.likes ?? 0) > 0 && (
+                          <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                            <ThumbsUp className="w-3 h-3" /> {el.likes}
+                          </span>
+                        )}
+                        {(el.dislikes ?? 0) > 0 && (
+                          <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                            <ThumbsDown className="w-3 h-3" /> {el.dislikes}
+                          </span>
+                        )}
+                        {comments.length > 0 && (
+                          <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                            <MessageSquare className="w-3 h-3" /> {totalCommentCount(comments)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Comments under element */}
+                    {comments.length > 0 && (
+                      <div className="border-t border-border px-4 py-3">
+                        <CommentThread
+                          comments={comments}
+                          collapsedLimit={3}
+                          onSubmit={async (text, parentId) => {
+                            if (!reviewerName || !sessionId) return
+                            const comment = await sharingApi.addPublicComment(token as string, {
+                              text,
+                              author_name: reviewerName,
+                              session_id: sessionId,
+                              element_id: el.id,
+                              parent_id: parentId,
+                            })
+                            handleCommentAdded(el.id, comment)
+                          }}
+                          isAuthenticated={hasIdentity}
+                        />
+                      </div>
+                    )}
+
+                    {/* Empty state + quick comment */}
+                    {comments.length === 0 && hasIdentity && (
+                      <div className="border-t border-border px-4 py-2">
+                        <CommentThread
+                          comments={[]}
+                          onSubmit={async (text, parentId) => {
+                            if (!reviewerName || !sessionId) return
+                            const comment = await sharingApi.addPublicComment(token as string, {
+                              text,
+                              author_name: reviewerName,
+                              session_id: sessionId,
+                              element_id: el.id,
+                              parent_id: parentId,
+                            })
+                            handleCommentAdded(el.id, comment)
+                          }}
+                          isAuthenticated={hasIdentity}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* General comments */}
+            <div className="mt-6 rounded-lg bg-card border border-border p-4">
+              <div className="flex items-center gap-1.5 mb-3">
+                <MessageSquare className="w-3.5 h-3.5 text-primary" />
+                <span className="text-xs font-medium text-primary">Общее обсуждение</span>
+              </div>
+              {!hasIdentity ? (
+                <div className="flex flex-col items-center gap-3 py-6">
+                  <p className="text-sm text-muted-foreground text-center">Представьтесь, чтобы участвовать</p>
+                  <ReviewerNameInput onSave={(name, sid) => {
+                    setReviewerName(name)
+                    setSessionId(sid)
+                  }} />
+                </div>
+              ) : (
+                <CommentThread
+                  comments={generalComments}
+                  onSubmit={handleGeneralCommentSubmit}
+                  isAuthenticated={hasIdentity}
+                />
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Lightbox */}
