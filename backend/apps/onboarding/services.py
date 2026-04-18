@@ -103,13 +103,13 @@ class OnboardingService:
     def _user_has_generation(self, user):
         from apps.elements.models import Element
         return Element.objects.filter(
-            scene__project__user=user, source_type='GENERATED', status='COMPLETED',
+            project__user=user, source_type='GENERATED', status='COMPLETED',
         ).exists()
 
     def _user_has_upload(self, user):
         from apps.elements.models import Element
         return Element.objects.filter(
-            scene__project__user=user, source_type='UPLOADED', status='COMPLETED',
+            project__user=user, source_type='UPLOADED', status='COMPLETED',
         ).exists()
 
     def _user_has_shared_link(self, user):

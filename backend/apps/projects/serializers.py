@@ -51,7 +51,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             elements = obj._preview_elements[:4]
         else:
             elements = Element.objects.filter(
-                scene__project=obj,
+                project=obj,
                 status='COMPLETED',
             ).exclude(
                 file_url=''

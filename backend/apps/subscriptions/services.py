@@ -83,7 +83,7 @@ class SubscriptionService:
         from apps.elements.models import Element  # lazy import
         used = (
             Element.objects
-            .filter(scene__project__user=user)
+            .filter(project__user=user)
             .aggregate(total=Sum('file_size'))['total']
         ) or 0
         return used < plan.storage_limit_bytes
@@ -105,7 +105,7 @@ class SubscriptionService:
 
         storage_used = (
             Element.objects
-            .filter(scene__project__user=user)
+            .filter(project__user=user)
             .aggregate(total=Sum('file_size'))['total']
         ) or 0
 
