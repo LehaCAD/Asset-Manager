@@ -43,18 +43,14 @@
 
 ---
 
-## BF-04-05 — ConfigPanel недоступна на мобилке
+## BF-04-05 — ConfigPanel недоступна на мобилке ✅
 
-**Симптом:**
-> «ConfigPanel самой не видно. Надо добавить какую-то кнопочку наверху. Нажимаешь — ConfigPanel выдвигается на половину экрана. И кнопка её закрытия».
-
-**Решение:**
-- Кнопка-тогглер в шапке workspace (или рядом с PromptBar). Иконка «настройки модели».
-- По клику — slide-up панель от низа экрана (или сверху, как удобнее) на 50-70% высоты.
-- Handle/кнопка закрытия.
-- Swipe down чтобы закрыть.
-
-**Проактивно:** продумать, не конфликтует ли с DetailPanel drawer из BF-04-03 (они оба тянут вверх-вниз). Рассмотреть: ConfigPanel — сверху вниз, DetailPanel — снизу вверх. Или одна открывается, другая закрывается автоматически.
+**Фикс:** `frontend/components/element/WorkspaceContainer.tsx`
+- На `<md` прямо над `PromptBar` добавлена именованная кнопка-тогглер «Выбрать модель и параметры» (иконка `Sliders`, `ChevronDown`). Ширина в тон PromptBar, `rounded-t-xl`, `bg-card/80 backdrop-blur`.
+- По тапу — top-sheet на весь экран сверху: `fixed inset-0 z-[60]` с `bg-black/60` бэкдропом; кликом по бэкдропу и крестиком `X` в sticky-шапке закрывается.
+- Внутри — тот же `<ConfigPanel forceOpen hideCollapseButton />` (prop-ы в `ConfigPanel.tsx:17-24`), `max-h-[92vh] overflow-y-auto`.
+- Конфликта с DetailPanel нет: DetailPanel на мобилке — right slide-out (`<MobileSlideOutPanel>`, BF-04-03/07), ConfigPanel — top-sheet. Разные оси, не пересекаются.
+- Десктоп без изменений: `<div className="hidden md:block"><ConfigPanel /></div>`.
 
 ---
 
