@@ -534,7 +534,7 @@ export interface WSElementStatusChangedEvent {
 }
 
 export type NotificationType = 'comment_new' | 'reaction_new' | 'review_new' | 'generation_completed' | 'generation_failed' | 'upload_completed'
-  | 'feedback_new' | 'feedback_reply' | 'feedback_reward'
+  | 'feedback_new' | 'feedback_reply' | 'feedback_reward' | 'achievement_earned'
 
 export interface Notification {
   id: number

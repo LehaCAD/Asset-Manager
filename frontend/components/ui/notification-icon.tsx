@@ -1,4 +1,4 @@
-import { MessageCircle, CheckCircle2, XCircle, ThumbsUp, Upload, ClipboardCheck, MessagesSquare, Reply, Gift } from 'lucide-react'
+import { MessageCircle, CheckCircle2, XCircle, ThumbsUp, Upload, ClipboardCheck, MessagesSquare, Reply, Gift, Trophy } from 'lucide-react'
 import type { NotificationType } from '@/lib/types'
 
 const ICON_CONFIG: Record<NotificationType, { icon: React.ElementType; colorClass: string }> = {
@@ -11,6 +11,7 @@ const ICON_CONFIG: Record<NotificationType, { icon: React.ElementType; colorClas
   feedback_new: { icon: MessagesSquare, colorClass: 'text-primary bg-primary/10' },
   feedback_reply: { icon: Reply, colorClass: 'text-primary bg-primary/10' },
   feedback_reward: { icon: Gift, colorClass: 'text-success bg-success/10' },
+  achievement_earned: { icon: Trophy, colorClass: 'text-primary bg-primary/10' },
 }
 
 interface NotificationIconProps {

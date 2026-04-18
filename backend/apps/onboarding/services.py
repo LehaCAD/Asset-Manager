@@ -117,7 +117,7 @@ class OnboardingService:
         return SharedLink.objects.filter(project__user=user).exists()
 
     def _notify_task_completed(self, user, task, new_balance):
-        """Send WebSocket notification via user_{id} channel."""
+        """Send WebSocket notification via user_{id} channel + persistent notification row."""
         try:
             from channels.layers import get_channel_layer
             from asgiref.sync import async_to_sync
@@ -140,6 +140,26 @@ class OnboardingService:
                     'total_count': total,
                 },
             )
+
+            # Persistent notification (BF-05-03): достижение должно попадать
+            # в журнал уведомлений так же, как ручное начисление кадров от админа.
+            if task.reward and int(task.reward) > 0:
+                try:
+                    from apps.notifications.services import create_notification
+                    from apps.notifications.models import Notification
+
+                    create_notification(
+                        user=user,
+                        type=Notification.Type.ACHIEVEMENT_EARNED,
+                        project=None,
+                        title=f'Достижение: {task.title}',
+                        message=f'Получено достижение «{task.title}», +{int(task.reward)} кадров',
+                    )
+                except Exception:
+                    logger.exception(
+                        'achievement notification create failed',
+                        extra={'user_id': getattr(user, 'id', None), 'task_code': task.code},
+                    )
         except Exception:
             # WebSocket push is best-effort; reward is already granted in DB.
             logger.exception(

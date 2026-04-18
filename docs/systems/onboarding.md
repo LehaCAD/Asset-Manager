@@ -1,7 +1,7 @@
 # Онбординг (достижения)
 
 > Актуальное состояние подсистемы. Обновлять при внесении изменений.
-> Последнее обновление: 2026-04-16
+> Последнее обновление: 2026-04-18
 
 ---
 
@@ -248,7 +248,8 @@ Backend: task completed + credits awarded
 - **Credits** (`credits`): начисление наград через `CreditsService.topup()` с `reason='onboarding_task'`.
 - **Subscriptions** (`subscriptions`): trial_bonus_credits определяет стартовый баланс (отдельно от онбординг-наград).
 - **WebSocket** (`notifications`): уведомления через тот же канал `user_{id}`.
-- **Cabinet** (`cabinet`): страница `/cabinet/achievements` в секции «Обзор».
+- **Cabinet** (`cabinet`): страница `/cabinet/achievements` в секции «Обзор». Страница сама догружает стор через `fetchOnboarding()`, если юзер открыл кабинет напрямую (вне workspace-лейаута, где живёт `OnboardingBootstrap`).
+- **Notifications** (`notifications`): при выдаче ачивки с наградой создаётся persist-`Notification` с типом `achievement_earned`; кликается и ведёт на `/cabinet/achievements`. Создаётся в `OnboardingService._notify_task_completed` после успешного `topup`.
 - **Elements** (`elements`): триггеры `element.generation_success` и `element.upload_success`.
 - **Sharing** (`sharing`): триггер `sharing.link_created`.
 

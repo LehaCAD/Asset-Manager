@@ -13,6 +13,7 @@ class Notification(models.Model):
         FEEDBACK_NEW = 'feedback_new', 'Новое обращение'
         FEEDBACK_REPLY = 'feedback_reply', 'Ответ на обращение'
         FEEDBACK_REWARD = 'feedback_reward', 'Награда за обратную связь'
+        ACHIEVEMENT_EARNED = 'achievement_earned', 'Достижение получено'
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE,

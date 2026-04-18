@@ -40,7 +40,9 @@ function NotificationItem({
         logger.warn('notification_dropdown.mark_read_failed', { notificationId: notification.id, cause: err })
       )
     }
-    if (notification.project) {
+    if (notification.type === 'achievement_earned') {
+      router.push('/cabinet/achievements')
+    } else if (notification.project) {
       let url = `/projects/${notification.project}`
       if (notification.scene) url += `/groups/${notification.scene}`
       if (notification.element) url += `?lightbox=${notification.element}`

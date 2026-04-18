@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useOnboardingStore } from "@/lib/store/onboarding";
 import { KadrIcon } from "@/components/ui/kadr-icon";
 import { getOnboardingIcon } from "@/components/onboarding/icon-map";
@@ -87,6 +88,13 @@ function AchievementCard({ task }: { task: OnboardingTaskDTO }) {
 export default function AchievementsPage() {
   const { tasks, totalEarned, totalPossible, completedCount, totalCount, isLoaded } =
     useOnboardingStore();
+  const fetchOnboarding = useOnboardingStore((s) => s.fetchOnboarding);
+
+  // BF-05-01: onboarding bootstrap живёт только в (workspace) layout; если юзер
+  // заходит в кабинет напрямую или обновляет страницу — стор пустой. Догружаем.
+  useEffect(() => {
+    if (!isLoaded) fetchOnboarding();
+  }, [isLoaded, fetchOnboarding]);
 
   if (!isLoaded) {
     return (

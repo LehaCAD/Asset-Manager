@@ -117,7 +117,9 @@ export default function NotificationsPage() {
 
   const handleRead = async (n: Notification) => {
     if (!n.is_read) await markRead(n.id);
-    if (n.project) {
+    if (n.type === 'achievement_earned') {
+      router.push('/cabinet/achievements');
+    } else if (n.project) {
       let url = `/projects/${n.project}`;
       if (n.scene) url += `/groups/${n.scene}`;
       if (n.element) url += `?lightbox=${n.element}`;
