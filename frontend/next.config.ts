@@ -20,7 +20,9 @@ export default withSentryConfig(nextConfig, {
   project: process.env.SENTRY_PROJECT,
   // Upload source maps only when auth token is present (CI/CD).
   authToken: process.env.SENTRY_AUTH_TOKEN,
-  hideSourceMaps: true,
+  sourcemaps: {
+    deleteSourcemapsAfterUpload: true,
+  },
   disableLogger: true,
   widenClientFileUpload: true,
 });
