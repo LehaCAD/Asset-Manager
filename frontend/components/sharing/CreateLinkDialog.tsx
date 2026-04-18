@@ -89,25 +89,33 @@ export function CreateLinkDialog({
       toast.error('Нет элементов для шеринга')
       return
     }
+    if (isSubmitting) return
     setIsSubmitting(true)
+    let link
     try {
-      const link = await sharingApi.createLink({
+      link = await sharingApi.createLink({
         project: projectId,
         element_ids: filteredIds,
         name: name.trim() || undefined,
         expires_at: buildExpiresAt(expiry),
         display_preferences: preferences,
       })
-
-      const fullUrl = `${window.location.origin}${link.url}`
-      await navigator.clipboard.writeText(fullUrl)
-      toast.success('Ссылка скопирована')
-      handleClose()
-      onCreated?.()
     } catch {
       toast.error('Не удалось создать ссылку')
+      setIsSubmitting(false)
+      return
+    }
+
+    const fullUrl = `${window.location.origin}${link.url}`
+    try {
+      await navigator.clipboard.writeText(fullUrl)
+      toast.success('Ссылка скопирована')
+    } catch {
+      toast.success('Ссылка создана — скопируйте её вручную')
     } finally {
       setIsSubmitting(false)
+      handleClose()
+      onCreated?.()
     }
   }
 
