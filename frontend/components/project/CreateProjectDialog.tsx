@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { toastSuccess, toastError } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -51,11 +51,11 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
     setIsLoading(true);
     try {
       await createProject({ name: name.trim(), aspect_ratio: "16:9" });
-      toast.success("Проект создан");
+      toastSuccess("Проект создан", { deferrable: "create-project" });
       setName("");
       onOpenChange(false);
     } catch {
-      toast.error("Не удалось создать проект");
+      toastError("Не удалось создать проект");
     } finally {
       setIsLoading(false);
     }

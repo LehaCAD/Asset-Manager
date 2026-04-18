@@ -705,7 +705,8 @@ export function WorkspaceContainer({ projectId, groupId }: WorkspaceContainerPro
   }, [setShareMode, setShareSelectedIds]);
 
   const handleLinkCreated = useCallback(() => {
-    toast.success('Ссылка создана');
+    // BF-02-07: CreateLinkDialog already shows "Ссылка скопирована".
+    // No second "Ссылка создана" toast here.
   }, []);
 
   // Measure PromptBar height dynamically

@@ -31,15 +31,16 @@ export function Providers({ children }: ProvidersProps) {
       })
   );
 
-  // Toasts: top-center on mobile (thumbs cover bottom), bottom-center on desktop.
+  // Toasts: top-center on mobile (thumbs cover bottom), bottom-right on desktop
+  // for regular toasts. Luxury/achievement toasts override to top-center.
   // Offset on mobile pushes toasts below the 48 px sticky navbar.
   const [toastPosition, setToastPosition] =
-    useState<"bottom-center" | "top-center">("bottom-center");
+    useState<"bottom-right" | "top-center">("bottom-right");
   const [toastOffset, setToastOffset] = useState<string>("24px");
   useEffect(() => {
     const mql = window.matchMedia("(max-width: 639px)");
     const apply = () => {
-      setToastPosition(mql.matches ? "top-center" : "bottom-center");
+      setToastPosition(mql.matches ? "top-center" : "bottom-right");
       setToastOffset(mql.matches ? "64px" : "24px");
     };
     apply();

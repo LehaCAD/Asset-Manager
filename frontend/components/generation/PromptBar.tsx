@@ -14,7 +14,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 import { formatCurrency } from "@/lib/utils/format";
 import { PromptEnhanceToggle } from "./PromptEnhanceToggle";
 import { KadrIcon } from "@/components/ui/kadr-icon";
@@ -183,13 +182,9 @@ export function PromptBar({ projectId, sceneId, groupId, className }: PromptBarP
   const handleGenerate = useCallback(async () => {
     if (!canGenerate()) return;
     await generate(projectId, effectiveGroupId);
-    // Show cost toast and reload balance
-    const { estimateCost } = useCreditsStore.getState();
-    if (estimateCost && parseFloat(estimateCost) > 0) {
-      toast.success(`Списано: ${formatCurrency(estimateCost)}`, { duration: 5000 });
-    }
+    // BF-02-03: balance refreshes silently — no "Списано" toast.
+    // The generation store emits a single "Генерация запущена" regular toast.
     useCreditsStore.getState().loadBalance();
-    // Reset textarea height after generation
     setTextareaHeight(24);
   }, [canGenerate, generate, projectId, effectiveGroupId]);
 
