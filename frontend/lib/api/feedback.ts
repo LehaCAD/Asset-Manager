@@ -44,9 +44,25 @@ export const feedbackApi = {
       throw normalizeError(error)
     }
   },
-  sendMessage: async (text: string) => {
+  sendMessage: async (
+    text: string,
+    attachments?: Array<{ file_key: string; file_name: string; file_size: number; content_type: string }>,
+  ) => {
     try {
-      const { data } = await apiClient.post<FeedbackMessage>('/api/feedback/messages/', { text })
+      const payload: Record<string, unknown> = { text }
+      if (attachments && attachments.length > 0) payload.attachments = attachments
+      const { data } = await apiClient.post<FeedbackMessage>('/api/feedback/messages/', payload)
+      return data
+    } catch (error) {
+      throw normalizeError(error)
+    }
+  },
+  presignDraftAttachment: async (fileName: string, contentType: string) => {
+    try {
+      const { data } = await apiClient.post<{ upload_url: string; file_key: string }>(
+        '/api/feedback/attachments/presign-draft/',
+        { file_name: fileName, content_type: contentType },
+      )
       return data
     } catch (error) {
       throw normalizeError(error)
@@ -119,11 +135,17 @@ export const feedbackApi = {
       throw normalizeError(error)
     }
   },
-  sendAdminReply: async (id: number, text: string) => {
+  sendAdminReply: async (
+    id: number,
+    text: string,
+    attachments?: Array<{ file_key: string; file_name: string; file_size: number; content_type: string }>,
+  ) => {
     try {
+      const payload: Record<string, unknown> = { text }
+      if (attachments && attachments.length > 0) payload.attachments = attachments
       const { data } = await apiClient.post<FeedbackMessage>(
         `/api/feedback/admin/conversations/${id}/messages/`,
-        { text },
+        payload,
       )
       return data
     } catch (error) {

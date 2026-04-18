@@ -3,6 +3,7 @@ import { create } from 'zustand'
 import { feedbackApi } from '@/lib/api/feedback'
 import { FeedbackWSManager } from '@/lib/api/feedback-ws'
 import type { AdminConversation, FeedbackMessage } from '@/lib/types'
+import type { PendingAttachment } from './feedback'
 
 const adminFeedbackWS = new FeedbackWSManager()
 
@@ -18,7 +19,8 @@ interface FeedbackAdminState {
   loadConversations: () => Promise<void>
   selectConversation: (id: number) => Promise<void>
   loadOlderMessages: () => Promise<FeedbackMessage[]>
-  sendReply: (text: string) => Promise<FeedbackMessage | null>
+  sendReply: (text: string, attachments?: PendingAttachment[]) => Promise<FeedbackMessage | null>
+  uploadDraftAttachment: (file: File, onProgress?: (pct: number) => void) => Promise<PendingAttachment>
   updateConversation: (id: number, data: { status?: string; tag?: string }) => Promise<void>
   grantReward: (id: number, amount: number, comment: string) => Promise<void>
   setFilters: (filtersOrUpdater: { status?: string; tag?: string; search?: string } | ((prev: { status?: string; tag?: string; search?: string }) => { status?: string; tag?: string; search?: string })) => void
@@ -104,12 +106,38 @@ export const useFeedbackAdminStore = create<FeedbackAdminState>((set, get) => {
       }
     },
 
-    sendReply: async (text) => {
+    sendReply: async (text, attachments) => {
       const conv = get().activeConversation
       if (!conv) return null
-      const msg = await feedbackApi.sendAdminReply(conv.id, text)
+      const msg = await feedbackApi.sendAdminReply(conv.id, text, attachments)
       set((s) => ({ messages: [...s.messages, msg] }))
       return msg
+    },
+
+    uploadDraftAttachment: async (file, onProgress) => {
+      const presign = await feedbackApi.presignDraftAttachment(file.name, file.type)
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        xhr.open('PUT', presign.upload_url)
+        xhr.setRequestHeader('Content-Type', file.type)
+        if (onProgress && xhr.upload) {
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
+          }
+        }
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) resolve()
+          else reject(new Error(`Ошибка загрузки: ${xhr.status}`))
+        }
+        xhr.onerror = () => reject(new Error('Не удалось загрузить файл'))
+        xhr.send(file)
+      })
+      return {
+        file_key: presign.file_key,
+        file_name: file.name,
+        file_size: file.size,
+        content_type: file.type,
+      }
     },
 
     updateConversation: async (id, data) => {

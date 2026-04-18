@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { Check, Tag, ExternalLink, RotateCcw } from 'lucide-react'
 import { useFeedbackAdminStore } from '@/lib/store/feedback-admin'
+import type { PendingAttachment } from '@/lib/store/feedback'
 import { ChatMessageList } from './ChatMessageList'
 import { ChatInput } from './ChatInput'
 import { RewardModal } from './RewardModal'
@@ -24,7 +25,7 @@ const TAG_OPTIONS = [
 ]
 
 export function AdminChatPanel() {
-  const { activeConversation, messages, sendReply, updateConversation, grantReward, uploadAttachment, loadOlderMessages, sendTyping } = useFeedbackAdminStore()
+  const { activeConversation, messages, sendReply, updateConversation, grantReward, uploadDraftAttachment, loadOlderMessages, sendTyping } = useFeedbackAdminStore()
   const [rewardOpen, setRewardOpen] = useState(false)
   const lastTypingSent = useRef(0)
   const prevConvIdRef = useRef<number | null>(null)
@@ -68,13 +69,8 @@ export function AdminChatPanel() {
 
   const conv = activeConversation
 
-  const handleSend = async (text: string, files?: File[]) => {
-    const msg = await sendReply(text || '')
-    if (files?.length && msg) {
-      for (const file of files) {
-        try { await uploadAttachment(msg.id, file) } catch { /* toast in ChatInput */ }
-      }
-    }
+  const handleSend = async (text: string, attachments?: PendingAttachment[]) => {
+    await sendReply(text || '', attachments)
   }
 
   const toggleStatus = () => {
@@ -173,7 +169,7 @@ export function AdminChatPanel() {
 
       {/* Input */}
       <div className="border-t border-border/50 px-4 py-3">
-        <ChatInput onSend={handleSend} onTyping={handleTyping} placeholder="Ответить..." />
+        <ChatInput onSend={handleSend} onUploadFile={uploadDraftAttachment} onTyping={handleTyping} placeholder="Ответить..." />
       </div>
 
       <RewardModal

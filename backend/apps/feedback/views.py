@@ -87,21 +87,38 @@ def messages_view(request):
     ser = SendMessageSerializer(data=request.data)
     ser.is_valid(raise_exception=True)
 
+    pending_attachments = ser.validated_data.get("attachments", [])
+    if len(pending_attachments) > MAX_ATTACHMENTS_PER_MESSAGE:
+        return Response(
+            {"detail": f"Максимум {MAX_ATTACHMENTS_PER_MESSAGE} вложений на сообщение"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    for att in pending_attachments:
+        if not att["file_key"].startswith(f"feedback/tmp/draft/{request.user.id}/"):
+            return Response({"detail": "Некорректный ключ вложения"}, status=status.HTTP_400_BAD_REQUEST)
+
     if not conv:
-        # All conversations are closed or none exist — create new one
         conv = Conversation.objects.create(user=request.user)
 
-    # Пустой text допустим: фронтенд создаёт сообщение с пустым текстом,
-    # а затем отдельным запросом прикрепляет файлы (confirm-attach).
-    # Не валидируем text на непустоту — это ломает attachment-only messages.
     msg = Message.objects.create(
         conversation=conv,
         sender=request.user,
         is_admin=False,
         text=ser.validated_data["text"],
     )
-    conv.save(update_fields=["updated_at"])  # touch updated_at
+    conv.save(update_fields=["updated_at"])
     notify_new_message(conv, msg)
+
+    if pending_attachments:
+        from .tasks import process_feedback_attachment
+        for att in pending_attachments:
+            process_feedback_attachment.delay(
+                conversation_id=conv.id,
+                message_id=msg.id,
+                tmp_file_key=att["file_key"],
+                file_name=att["file_name"],
+                content_type=att["content_type"],
+            )
 
     # Onboarding: first user-authored support message
     try:
@@ -114,6 +131,34 @@ def messages_view(request):
         )
 
     return Response(MessageSerializer(msg).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def presign_draft_view(request):
+    """Presign PUT URL for a draft attachment (uploaded before message is created).
+
+    Key is scoped under feedback/tmp/draft/<user_id>/ so that the subsequent
+    POST /messages/ only accepts keys for the requesting user.
+    """
+    ser = PresignRequestSerializer(data=request.data)
+    ser.is_valid(raise_exception=True)
+    content_type = ser.validated_data["content_type"]
+    ext_map = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "application/pdf": ".pdf"}
+    ext = ext_map.get(content_type, ".bin")
+    file_key = f"feedback/tmp/draft/{request.user.id}/{uuid.uuid4()}{ext}"
+
+    client = get_s3_client()
+    presigned_url = client.generate_presigned_url(
+        "put_object",
+        Params={
+            "Bucket": get_bucket_name(),
+            "Key": file_key,
+            "ContentType": content_type,
+        },
+        ExpiresIn=900,
+    )
+    return Response({"upload_url": presigned_url, "file_key": file_key})
 
 
 @api_view(["POST"])
@@ -361,6 +406,16 @@ def admin_conversation_messages(request, conversation_id):
     ser = SendMessageSerializer(data=request.data)
     ser.is_valid(raise_exception=True)
 
+    pending_attachments = ser.validated_data.get("attachments", [])
+    if len(pending_attachments) > MAX_ATTACHMENTS_PER_MESSAGE:
+        return Response(
+            {"detail": f"Максимум {MAX_ATTACHMENTS_PER_MESSAGE} вложений на сообщение"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    for att in pending_attachments:
+        if not att["file_key"].startswith(f"feedback/tmp/draft/{request.user.id}/"):
+            return Response({"detail": "Некорректный ключ вложения"}, status=status.HTTP_400_BAD_REQUEST)
+
     msg = Message.objects.create(
         conversation=conv,
         sender=request.user,
@@ -369,6 +424,18 @@ def admin_conversation_messages(request, conversation_id):
     )
     conv.save(update_fields=["updated_at"])
     notify_new_message(conv, msg)
+
+    if pending_attachments:
+        from .tasks import process_feedback_attachment
+        for att in pending_attachments:
+            process_feedback_attachment.delay(
+                conversation_id=conv.id,
+                message_id=msg.id,
+                tmp_file_key=att["file_key"],
+                file_name=att["file_name"],
+                content_type=att["content_type"],
+            )
+
     return Response(MessageSerializer(msg).data, status=status.HTTP_201_CREATED)
 
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { toast } from 'sonner'
-import { useFeedbackStore } from '@/lib/store/feedback'
+import { useFeedbackStore, type PendingAttachment } from '@/lib/store/feedback'
 import { ChatMessageList } from './ChatMessageList'
 import { ChatInput } from './ChatInput'
 import { Badge } from '@/components/ui/badge'
@@ -12,7 +12,7 @@ const PAGE_SIZE = 30
 export function FeedbackChat() {
   const {
     conversation, messages, isLoading,
-    loadConversation, loadMessages, sendMessage, uploadAttachment,
+    loadConversation, loadMessages, sendMessage, uploadDraftAttachment,
     connectWS, disconnectWS, markAsRead,
   } = useFeedbackStore()
   const typingIndicator = useFeedbackStore((s) => s.typingIndicator)
@@ -43,28 +43,10 @@ export function FeedbackChat() {
     }
   }, [isLoadingMore, messages, loadMessages])
 
-  const handleSend = async (text: string, files?: File[]) => {
-    const msg = await sendMessage(text || '')
+  const handleSend = async (text: string, attachments?: PendingAttachment[]) => {
+    const msg = await sendMessage(text || '', attachments)
     if (!msg) {
-      if (text || files?.length) toast.error('Не удалось отправить сообщение')
-      return
-    }
-    if (files?.length) {
-      const failed: string[] = []
-      for (const file of files) {
-        try {
-          await uploadAttachment(msg.id, file)
-        } catch {
-          failed.push(file.name)
-        }
-      }
-      if (failed.length) {
-        toast.error(
-          failed.length === 1
-            ? `Не удалось отправить вложение: ${failed[0]}`
-            : `Не отправлено вложений: ${failed.length}`,
-        )
-      }
+      toast.error('Не удалось отправить сообщение')
     }
   }
 
@@ -118,7 +100,7 @@ export function FeedbackChat() {
 
       {/* Input */}
       <div className="border-t border-border/50 px-4 py-3">
-        <ChatInput onSend={handleSend} />
+        <ChatInput onSend={handleSend} onUploadFile={uploadDraftAttachment} />
       </div>
     </div>
   )

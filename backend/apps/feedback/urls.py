@@ -7,6 +7,7 @@ urlpatterns = [
     path("conversation/", views.conversation_view),
     path("conversations/", views.conversation_history_view),
     path("messages/", views.messages_view),
+    path("attachments/presign-draft/", views.presign_draft_view),
     path("messages/<int:message_id>/presign/", views.presign_view),
     path("messages/<int:message_id>/confirm-attach/", views.confirm_attach_view),
     path("all-messages/", views.all_messages_view),

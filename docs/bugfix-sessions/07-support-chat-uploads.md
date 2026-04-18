@@ -34,20 +34,39 @@
 
 ---
 
-## BF-07-02 — Фото на стороне юзера отображается «как-то багано» ✅ (частично закрыто)
+## BF-07-02 — Фото на стороне юзера отображается «как-то багано» ✅ (preupload-UX)
 
 **Симптом:**
 > «Я добавил картинку — она непонятно как не отобразилась, как отправленная. Отобразилась, но что-то багано отправилась».
 
-**Копать:**
-- Optimistic UI: фото добавляется в тред до успеха сервера. Когда сервер падает — нет rollback.
-- Фикс: если upload провалился — показать «не удалось отправить», дать кнопку retry.
+Итеративно (ночной проход 2026-04-18):
+> «Пока загружается, нельзя отправить фотографию. Нужно отобразить процесс, показывающий, что загрузка всё ещё идёт. Сейчас спустя время фотографии отображаются, но это выглядит некорректно. Нужно, чтобы пользователь понимал, что фотографию, которую он ставил, она должна загрузиться, и после этого только можно её отправить».
 
-**Связано с [BF-07-01](#bf-07-01)** — после починки libmagic проверить, реально ли остался этот UX-баг или исчез.
+**Корень:** старый поток был «create message → upload». Пользователь видел пустое сообщение и только через секунды — прикрепившееся фото (через WS `attachment_ready`). Состояния «идёт загрузка» в UI не было, а кнопку «Отправить» можно было жать до того, как файл уехал в S3.
 
-**Фикс (2026-04-18):**
-- Основной корень (libmagic) закрыт в [BF-00-02](00-diagnostics.md). После фикса BF-07-01 при любой провальной загрузке юзер получит тост — это снимает «баг выглядит отправленным, а по факту нет».
-- Полноценный optimistic-attachment с retry-кнопкой на самой карточке вложения оставлен в бэклоге (нужен ghost-state в `messages.attachments` + серверный `attachment_rejected` event). Добавлено в `docs/BACKLOG_IDEAS.md`.
+**Фикс (2026-04-18, вторая итерация — preupload):**
+
+Бэкенд (`apps/feedback`):
+- `views.py` — `presign_draft_view` (POST `/api/feedback/attachments/presign-draft/`): presigned PUT URL без `message_id`, ключ ложится под `feedback/tmp/draft/<user_id>/`.
+- `messages_view` и `admin_conversation_messages` POST — принимают опциональный `attachments: [{file_key, file_name, file_size, content_type}]`. Проверяют, что ключи в `feedback/tmp/draft/<request.user.id>/`, и для каждого дёргают `process_feedback_attachment.delay(...)`. Лимит `MAX_ATTACHMENTS_PER_MESSAGE=5`.
+- `serializers.py` — `SendMessageSerializer` расширен полем `attachments = PendingAttachmentSerializer(many=True, default=[])`.
+- Существующий `cleanup_old_attachments` на `feedback/tmp/` подчищает orphan-черновики автоматически (draft-ключи — суффикс того же префикса).
+
+Фронтенд:
+- `lib/api/feedback.ts` — `presignDraftAttachment(name, type)`; `sendMessage` и `sendAdminReply` принимают `attachments?`.
+- `lib/store/feedback.ts` + `lib/store/feedback-admin.ts` — `uploadDraftAttachment(file, onProgress)` делает presign → XHR PUT (с `upload.onprogress`) → возвращает `PendingAttachment`. `sendMessage(text, attachments)` линкует их при создании сообщения.
+- `components/feedback/ChatInput.tsx` — полностью переписан под preupload:
+  - Загрузка стартует в момент стейджинга файла (`onUploadFile` prop), не по клику «Отправить».
+  - Для каждого превью — статус `'uploading' | 'ready' | 'error'`, спиннер-оверлей поверх картинки/иконки, красный рамка + `AlertCircle` с ретраем при ошибке.
+  - Кнопка «Отправить» и хоткей Enter заблокированы, пока есть файлы в статусе `uploading`. На кнопке — спиннер при загрузке или отправке.
+  - Paperclip/textarea дизейблятся во время `isSending`.
+  - После успешной отправки превью и текст очищаются разом. На ошибке — остаются, юзер может повторить.
+- `FeedbackChat.tsx`, `FeedbackDropdown.tsx`, `AdminChatPanel.tsx` — все три точки входа теперь передают `onUploadFile={uploadDraftAttachment}` и принимают `(text, attachments?)` в `onSend`.
+
+**Смежно проверено:**
+- `ChatInput` по-прежнему валидирует MIME/size клиентом (`ALLOWED_TYPES`, 10 МБ). Серверная magic-валидация в `process_feedback_attachment` не тронута.
+- `attachment_ready` WS-event продолжает работать (бэк эмитит его после resize/linking) — в preupload-мире сервер присылает `attachment_ready` до того, как пользователь увидит сообщение, но стор мержит в `messages[].attachments` по `message_id` безопасно (WS-event приходит после того, как фронт добавил сообщение через `messages_view` POST).
+- Legacy `uploadAttachment(messageId, file)` в `useFeedbackStore` оставлен — не вызывается, но API-функции `presignAttachment`/`confirmAttachment` держат за собой admin-тулы и любые другие потребители.
 
 ---
 

@@ -64,8 +64,19 @@ class ConversationSerializer(serializers.ModelSerializer):
         return obj.messages.filter(is_admin=True, created_at__gt=obj.user_last_read_at).count()
 
 
+class PendingAttachmentSerializer(serializers.Serializer):
+    """Uploaded-but-not-yet-linked attachment, attached at message creation."""
+    file_key = serializers.CharField(max_length=500)
+    file_name = serializers.CharField(max_length=255)
+    file_size = serializers.IntegerField(min_value=1, max_value=10 * 1024 * 1024)
+    content_type = serializers.ChoiceField(choices=[
+        "image/jpeg", "image/png", "image/webp", "application/pdf",
+    ])
+
+
 class SendMessageSerializer(serializers.Serializer):
     text = serializers.CharField(max_length=5000, allow_blank=True)
+    attachments = PendingAttachmentSerializer(many=True, required=False, default=list)
 
 
 class PresignRequestSerializer(serializers.Serializer):

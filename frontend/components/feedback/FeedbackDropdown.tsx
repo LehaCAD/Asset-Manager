@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { useFeedbackStore } from '@/lib/store/feedback'
+import { useFeedbackStore, type PendingAttachment } from '@/lib/store/feedback'
 import { ChatMessageList } from './ChatMessageList'
 import { ChatInput } from './ChatInput'
 
@@ -11,7 +11,7 @@ const PAGE_SIZE = 30
 export function FeedbackDropdown() {
   const {
     conversation, messages, isLoading,
-    loadConversation, loadMessages, sendMessage, uploadAttachment,
+    loadConversation, loadMessages, sendMessage, uploadDraftAttachment,
     connectWS, disconnectWS, markAsRead,
   } = useFeedbackStore()
   const [hasMore, setHasMore] = useState(true)
@@ -40,13 +40,8 @@ export function FeedbackDropdown() {
     }
   }, [isLoadingMore, messages, loadMessages])
 
-  const handleSend = async (text: string, files?: File[]) => {
-    const msg = await sendMessage(text || '')
-    if (files?.length && msg) {
-      for (const file of files) {
-        try { await uploadAttachment(msg.id, file) } catch { /* toast in ChatInput */ }
-      }
-    }
+  const handleSend = async (text: string, attachments?: PendingAttachment[]) => {
+    await sendMessage(text || '', attachments)
   }
 
   return (
@@ -85,7 +80,7 @@ export function FeedbackDropdown() {
 
       {/* Input — now with attachments */}
       <div className="border-t px-3 py-2 shrink-0 bg-popover">
-        <ChatInput onSend={handleSend} />
+        <ChatInput onSend={handleSend} onUploadFile={uploadDraftAttachment} />
       </div>
 
       {/* Footer */}

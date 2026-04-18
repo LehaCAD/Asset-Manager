@@ -4,6 +4,13 @@ import { feedbackApi } from '@/lib/api/feedback'
 import { feedbackWS } from '@/lib/api/feedback-ws'
 import type { FeedbackConversation, FeedbackMessage } from '@/lib/types'
 
+export interface PendingAttachment {
+  file_key: string
+  file_name: string
+  file_size: number
+  content_type: string
+}
+
 interface FeedbackState {
   conversation: FeedbackConversation | null
   messages: FeedbackMessage[]
@@ -15,7 +22,11 @@ interface FeedbackState {
 
   loadConversation: () => Promise<void>
   loadMessages: (cursor?: number) => Promise<FeedbackMessage[]>
-  sendMessage: (text: string) => Promise<FeedbackMessage | null>
+  sendMessage: (text: string, attachments?: PendingAttachment[]) => Promise<FeedbackMessage | null>
+  uploadDraftAttachment: (
+    file: File,
+    onProgress?: (pct: number) => void,
+  ) => Promise<PendingAttachment>
   uploadAttachment: (messageId: number, file: File) => Promise<void>
   markAsRead: () => Promise<void>
   connectWS: () => void
@@ -65,13 +76,13 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => {
       }
     },
 
-    sendMessage: async (text) => {
+    sendMessage: async (text, attachments) => {
       try {
         const prevConvId = get().conversation?.id
         const wasClosed = get().conversation && !get().conversation?.can_reply
 
         // sendMessage POST — backend auto-creates new conversation if needed
-        const msg = await feedbackApi.sendMessage(text)
+        const msg = await feedbackApi.sendMessage(text, attachments)
 
         // Reload conversation state
         await get().loadConversation()
@@ -96,6 +107,32 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => {
         return msg
       } catch {
         return null
+      }
+    },
+
+    uploadDraftAttachment: async (file, onProgress) => {
+      const presign = await feedbackApi.presignDraftAttachment(file.name, file.type)
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        xhr.open('PUT', presign.upload_url)
+        xhr.setRequestHeader('Content-Type', file.type)
+        if (onProgress && xhr.upload) {
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
+          }
+        }
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) resolve()
+          else reject(new Error(`Ошибка загрузки: ${xhr.status}`))
+        }
+        xhr.onerror = () => reject(new Error('Не удалось загрузить файл'))
+        xhr.send(file)
+      })
+      return {
+        file_key: presign.file_key,
+        file_name: file.name,
+        file_size: file.size,
+        content_type: file.type,
       }
     },
 
