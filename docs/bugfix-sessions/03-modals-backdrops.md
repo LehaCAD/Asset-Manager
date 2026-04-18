@@ -2,6 +2,13 @@
 
 **Цель:** все модалки корректно затемняют фон (в том числе ConfigPanel), UX создания группы — с преднаполнением имени.
 
+**Статус:** правки сделаны, ждёт прод-смоука пользователя.
+
+- ✅ BF-03-01 — Dialog/Sheet overlay+content подняты с `z-50` на `z-[90]` (`components/ui/dialog.tsx`, `components/ui/sheet.tsx`). Теперь покрывает ConfigPanel desktop (`z-[51]`), ConfigPanel mobile drawer (`z-[60]`), LightboxModal (`z-[55]`), ReviewsOverlay backdrop (`z-[60]`) и ModelSelector mobile (`z-[70]`). Убран локальный воркараунд `z-[70]` на Delete confirmation в `ReviewsOverlay.tsx:326` — стал лишним.
+- ✅ BF-03-02 — `CreateSceneDialog`: дефолтное имя «Новая группа», `onFocus → select()`, удалена иконка `Plus` с кнопки «Добавить». `CreateProjectDialog` уже имел нужный паттерн (suggestName + select + без иконки).
+- ✅ BF-03-03 — `CreateLinkDialog`: разделены ошибки создания и копирования. Теперь если `navigator.clipboard.writeText` падает (iOS Safari после `await` теряет user-gesture), пользователь видит «Ссылка создана — скопируйте её вручную», модалка закрывается, `onCreated` вызывается. Повторный клик блокируется `isSubmitting`-гардом.
+- ⏳ BF-03-04 — визуальный паритет модалок в light/dark требует ручного прогона в обеих темах и завязан на [Сессию 01](01-themes-and-colors.md). Оставляем на прод-смоук.
+
 ---
 
 ## BF-03-01 — ConfigPanel не затемняется при открытии модалок

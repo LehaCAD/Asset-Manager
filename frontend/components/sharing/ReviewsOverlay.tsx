@@ -323,7 +323,7 @@ export function ReviewsOverlay({ projectId, isOpen, onClose, onOpenLightbox }: R
 
       {/* Delete confirmation dialog */}
       <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
-        <DialogContent className="sm:max-w-sm z-[70]" overlayClassName="z-[70]">
+        <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Удалить ссылку?</DialogTitle>
             <DialogDescription>
