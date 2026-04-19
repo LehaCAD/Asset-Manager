@@ -24,11 +24,11 @@ export const sharingApi = {
     apiClient.delete(`/api/sharing/links/${id}/`),
 
   // Comments — authenticated (creator workspace)
-  getElementComments: (elementId: number) =>
-    apiClient.get<Comment[]>(`/api/sharing/elements/${elementId}/comments/`).then(r => r.data),
+  getElementComments: (elementId: number, signal?: AbortSignal) =>
+    apiClient.get<Comment[]>(`/api/sharing/elements/${elementId}/comments/`, { signal }).then(r => r.data),
 
-  getSceneComments: (sceneId: number) =>
-    apiClient.get<Comment[]>(`/api/sharing/scenes/${sceneId}/comments/`).then(r => r.data),
+  getSceneComments: (sceneId: number, signal?: AbortSignal) =>
+    apiClient.get<Comment[]>(`/api/sharing/scenes/${sceneId}/comments/`, { signal }).then(r => r.data),
 
   addElementComment: (elementId: number, text: string, parentId?: number) =>
     apiClient.post<Comment>(`/api/sharing/elements/${elementId}/comments/`, {
@@ -63,12 +63,12 @@ export const sharingApi = {
     publicClient.post(`/api/sharing/public/${token}/review/`, data).then(r => r.data),
 
   // Reactions — authenticated (creator workspace)
-  getElementReactions: (elementId: number) =>
-    apiClient.get<PublicElementReaction[]>(`/api/sharing/elements/${elementId}/reactions/`).then(r => r.data),
+  getElementReactions: (elementId: number, signal?: AbortSignal) =>
+    apiClient.get<PublicElementReaction[]>(`/api/sharing/elements/${elementId}/reactions/`, { signal }).then(r => r.data),
 
   // Reviews — authenticated (creator workspace)
-  getElementReviews: (elementId: number) =>
-    apiClient.get<Array<{ session_id: string; author_name: string; action: string }>>(`/api/sharing/elements/${elementId}/reviews/`).then(r => r.data),
+  getElementReviews: (elementId: number, signal?: AbortSignal) =>
+    apiClient.get<Array<{ session_id: string; author_name: string; action: string }>>(`/api/sharing/elements/${elementId}/reviews/`, { signal }).then(r => r.data),
 
   // Element metadata for sharing
   getProjectElements: (projectId: number) =>

@@ -101,19 +101,29 @@ export function DetailPanel({ element, onUpdateElement, onClose }: DetailPanelPr
     setPromptText(getDisplayPrompt(element));
   }, [element.id, element.prompt_text]);
 
-  // Fetch comments and reactions when element changes
+  // Fetch comments and reactions when element changes.
+  // AbortController cancels in-flight requests when user spams the lightbox arrows,
+  // so we don't pile on the comments throttle (120/min) or log noise from stale rejects.
   useEffect(() => {
-    let cancelled = false;
-    sharingApi.getElementComments(element.id).then((data) => {
-      if (!cancelled) setComments(data);
-    }).catch((err) => logger.warn("detail_panel.fetch_comments_failed", { elementId: element.id, cause: err }));
-    sharingApi.getElementReactions(element.id).then((data) => {
-      if (!cancelled) setReactions(data);
-    }).catch((err) => logger.warn("detail_panel.fetch_reactions_failed", { elementId: element.id, cause: err }));
-    sharingApi.getElementReviews(element.id).then((data) => {
-      if (!cancelled) setReviews(data);
-    }).catch((err) => logger.warn("detail_panel.fetch_reviews_failed", { elementId: element.id, cause: err }));
-    return () => { cancelled = true; };
+    const ctrl = new AbortController();
+    const swallow = (label: string) => (err: unknown) => {
+      // Aborted on element switch — expected, ignore.
+      if (ctrl.signal.aborted) return;
+      // 429 throttle — user-facing rate limit, not a bug. Already counted in backend logs.
+      const status = (err as { status?: number } | null)?.status;
+      if (status === 429) return;
+      logger.warn(label, { elementId: element.id, cause: err });
+    };
+    sharingApi.getElementComments(element.id, ctrl.signal).then((data) => {
+      if (!ctrl.signal.aborted) setComments(data);
+    }).catch(swallow("detail_panel.fetch_comments_failed"));
+    sharingApi.getElementReactions(element.id, ctrl.signal).then((data) => {
+      if (!ctrl.signal.aborted) setReactions(data);
+    }).catch(swallow("detail_panel.fetch_reactions_failed"));
+    sharingApi.getElementReviews(element.id, ctrl.signal).then((data) => {
+      if (!ctrl.signal.aborted) setReviews(data);
+    }).catch(swallow("detail_panel.fetch_reviews_failed"));
+    return () => { ctrl.abort(); };
   }, [element.id]);
 
   const hasPromptChanged = promptText !== getDisplayPrompt(element);

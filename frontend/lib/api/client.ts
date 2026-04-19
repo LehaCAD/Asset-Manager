@@ -227,7 +227,8 @@ export function normalizeError(error: unknown): Error {
     // Log everything except auth redirects (handled explicitly by refresh flow)
     // and explicit client aborts (navigation, React StrictMode double-invoke).
     const aborted = error.code === "ERR_CANCELED" || error.name === "CanceledError";
-    if (status !== 401 && !timeoutLike && !aborted) {
+    const throttled = status === 429;
+    if (status !== 401 && !timeoutLike && !aborted && !throttled) {
       logger.error(
         "api_error",
         {
@@ -242,6 +243,11 @@ export function normalizeError(error: unknown): Error {
       );
     } else if (timeoutLike) {
       logger.warn("api_timeout", { url, method: error.config?.method });
+    } else if (throttled) {
+      // 429 = backend rate limit. User-facing, not a bug — keep visible in console
+      // but don't fan out to Sentry/Telegram.
+      // eslint-disable-next-line no-console
+      console.warn("[api_throttled]", { url, method: error.config?.method });
     }
 
     return apiError;
